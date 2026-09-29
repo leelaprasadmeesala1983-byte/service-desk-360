@@ -24,12 +24,15 @@ const user = pgTable(
     role: userRoleEnum("role").notNull().default("TECHNICIAN"),
     department: text("department"),
     status: userStatusEnum("status").notNull().default("ACTIVE"),
+    // Admin who created this user; null for initial/self-created accounts.
+    createdById: text("created_by_id"),
     // Soft delete: the row is kept so historical tracking still resolves the name.
     deletedAt: timestamp("deleted_at"),
   },
   (table) => [
     index("user_role_idx").on(table.role),
     index("user_status_idx").on(table.status),
+    index("user_created_by_idx").on(table.createdById),
   ],
 );
 

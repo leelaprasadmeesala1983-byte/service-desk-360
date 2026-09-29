@@ -1,7 +1,6 @@
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, or, type SQL, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { user } from "@/db/schema/auth";
-import { sendToVendor } from "@/db/schema/send-to-vendor";
 import { vendor } from "@/db/schema/vendor";
 import type {
   CreateVendorInput,
@@ -10,15 +9,22 @@ import type {
   VendorListResponse,
   VendorRow,
 } from "@/types/vendors";
+import { scopeAdminOwnership, type Viewer } from "./record-scope";
 
 export async function listVendors(
   params: VendorListParams = {},
+  viewer?: Viewer,
 ): Promise<VendorListResponse> {
   const page = Math.max(1, params.page ?? 1);
   const limit = Math.max(1, Math.min(100, params.limit ?? 10));
   const offset = (page - 1) * limit;
 
-  const conditions = [];
+  const conditions: (SQL | undefined)[] = [];
+
+  const scope = scopeAdminOwnership(vendor.createdById, viewer);
+  if (scope) {
+    conditions.push(scope);
+  }
 
   if (params.search && params.search.trim().length > 0) {
     const rawSearch = params.search.trim();
@@ -34,7 +40,9 @@ export async function listVendors(
     );
   }
 
-  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+  const activeConditions = conditions.filter(Boolean) as SQL[];
+  const whereClause =
+    activeConditions.length > 0 ? and(...activeConditions) : undefined;
 
   const [countResult, rows] = await Promise.all([
     db
@@ -89,7 +97,8 @@ export async function listVendors(
   };
 }
 
-export async function getAllVendors(): Promise<VendorRow[]> {
+export async function getAllVendors(viewer?: Viewer): Promise<VendorRow[]> {
+  const scope = scopeAdminOwnership(vendor.createdById, viewer);
   const rows = await db
     .select({
       id: vendor.id,
@@ -104,6 +113,7 @@ export async function getAllVendors(): Promise<VendorRow[]> {
     })
     .from(vendor)
     .leftJoin(user, eq(vendor.createdById, user.id))
+    .where(scope ? scope : undefined)
     .orderBy(vendor.vendorName);
 
   return rows.map((row) => ({
@@ -119,7 +129,11 @@ export async function getAllVendors(): Promise<VendorRow[]> {
   }));
 }
 
-export async function getVendorById(id: string): Promise<Vendor | null> {
+export async function getVendorById(
+  id: string,
+  viewer?: Viewer,
+): Promise<Vendor | null> {
+  const scope = scopeAdminOwnership(vendor.createdById, viewer);
   const [row] = await db
     .select({
       id: vendor.id,
@@ -136,7 +150,7 @@ export async function getVendorById(id: string): Promise<Vendor | null> {
     })
     .from(vendor)
     .leftJoin(user, eq(vendor.createdById, user.id))
-    .where(eq(vendor.id, id))
+    .where(and(eq(vendor.id, id), scope ? scope : undefined))
     .limit(1);
 
   if (!row) return null;
@@ -181,7 +195,9 @@ export async function createVendorRecord(
 export async function updateVendorRecord(
   id: string,
   input: Partial<CreateVendorInput>,
+  viewer?: Viewer,
 ): Promise<Vendor | null> {
+  const scope = scopeAdminOwnership(vendor.createdById, viewer);
   const valuesToUpdate: Record<string, unknown> = {
     updatedAt: new Date(),
   };
@@ -198,24 +214,28 @@ export async function updateVendorRecord(
   const [updated] = await db
     .update(vendor)
     .set(valuesToUpdate)
-    .where(eq(vendor.id, id))
+    .where(and(eq(vendor.id, id), scope ? scope : undefined))
     .returning();
 
   return (updated as Vendor) ?? null;
 }
 
-export async function deleteVendorRecord(id: string): Promise<boolean> {
+export async function deleteVendorRecord(
+  id: string,
+  viewer?: Viewer,
+): Promise<boolean> {
+  const scope = scopeAdminOwnership(vendor.createdById, viewer);
   const [target] = await db
     .select({ id: vendor.id })
     .from(vendor)
-    .where(eq(vendor.id, id))
+    .where(and(eq(vendor.id, id), scope ? scope : undefined))
     .limit(1);
 
   if (!target) return false;
 
   const result = await db
     .delete(vendor)
-    .where(eq(vendor.id, id))
+    .where(and(eq(vendor.id, id), scope ? scope : undefined))
     .returning({ id: vendor.id });
 
   return result.length > 0;

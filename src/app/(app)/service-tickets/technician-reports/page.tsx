@@ -23,7 +23,9 @@ export default async function TechnicianReportsPage() {
       year: currentYear,
       viewer: { role: user.role, id: user.id },
     }),
-    user.role === "ADMIN" ? listAssignableTechnicians() : Promise.resolve([]),
+    user.role === "ADMIN"
+      ? listAssignableTechnicians({ role: user.role, id: user.id })
+      : Promise.resolve([]),
   ]);
 
   return (

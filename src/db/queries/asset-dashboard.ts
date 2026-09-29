@@ -1,5 +1,6 @@
-import { count, desc, eq, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, or, sql } from "drizzle-orm";
 import { db } from "@/db";
+import { scopeAdminOwnership, type Viewer } from "@/db/queries/record-scope";
 import { type AssetProduct, asset } from "@/db/schema/asset";
 import { assetStatusHistory } from "@/db/schema/asset-status-history";
 import { user } from "@/db/schema/auth";
@@ -11,15 +12,22 @@ import type {
   ModuleCounts,
 } from "@/types/asset-dashboard";
 
-export async function getModuleCounts(): Promise<ModuleCounts> {
+export async function getModuleCounts(viewer?: Viewer): Promise<ModuleCounts> {
+  const assetScope = scopeAdminOwnership(asset.createdById, viewer);
+  const stvScope = scopeAdminOwnership(sendToVendor.createdById, viewer);
+
   const [assetRows, stvStageCounts, vendorCountRes] = await Promise.all([
-    db.select({ products: asset.products }).from(asset),
+    db
+      .select({ products: asset.products })
+      .from(asset)
+      .where(assetScope ? assetScope : undefined),
     db
       .select({
         workflowStage: sendToVendor.workflowStage,
         count: count(),
       })
       .from(sendToVendor)
+      .where(stvScope ? stvScope : undefined)
       .groupBy(sendToVendor.workflowStage),
     db.select({ count: count() }).from(vendor),
   ]);
@@ -133,7 +141,12 @@ function formatActivityDescription(
   return `${upper.replace(/_/g, " ")}: ${newStatus || "Updated"}`;
 }
 
-export async function getAssetDashboardData(): Promise<AssetDashboardSummary> {
+export async function getAssetDashboardData(
+  viewer?: Viewer,
+): Promise<AssetDashboardSummary> {
+  const assetScope = scopeAdminOwnership(asset.createdById, viewer);
+  const stvScope = scopeAdminOwnership(sendToVendor.createdById, viewer);
+
   const [
     statusCounts,
     repairCounts,
@@ -150,6 +163,7 @@ export async function getAssetDashboardData(): Promise<AssetDashboardSummary> {
         count: sql<number>`count(*)::int`,
       })
       .from(asset)
+      .where(assetScope ? assetScope : undefined)
       .groupBy(asset.status),
 
     // 2. Repair status counts (only active records in Repair Status workflow)
@@ -159,7 +173,12 @@ export async function getAssetDashboardData(): Promise<AssetDashboardSummary> {
         count: sql<number>`count(*)::int`,
       })
       .from(sendToVendor)
-      .where(eq(sendToVendor.workflowStage, "REPAIR_STATUS"))
+      .where(
+        and(
+          eq(sendToVendor.workflowStage, "REPAIR_STATUS"),
+          stvScope ? stvScope : undefined,
+        ),
+      )
       .groupBy(sendToVendor.repairStatus)
       .having(sql`count(*) > 0`),
 
@@ -172,9 +191,12 @@ export async function getAssetDashboardData(): Promise<AssetDashboardSummary> {
       })
       .from(sendToVendor)
       .where(
-        or(
-          eq(sendToVendor.workflowStage, "SENT_TO_VENDOR"),
-          eq(sendToVendor.status, "SENT_TO_VENDOR"),
+        and(
+          or(
+            eq(sendToVendor.workflowStage, "SENT_TO_VENDOR"),
+            eq(sendToVendor.status, "SENT_TO_VENDOR"),
+          ),
+          stvScope ? stvScope : undefined,
         ),
       )
       .groupBy(sendToVendor.vendorName)
@@ -198,7 +220,12 @@ export async function getAssetDashboardData(): Promise<AssetDashboardSummary> {
       })
       .from(sendToVendor)
       .leftJoin(asset, eq(sendToVendor.assetId, asset.id))
-      .where(eq(sendToVendor.status, "SENT_TO_VENDOR"))
+      .where(
+        and(
+          eq(sendToVendor.status, "SENT_TO_VENDOR"),
+          stvScope ? stvScope : undefined,
+        ),
+      )
       .orderBy(sendToVendor.bookingDate)
       .limit(10),
 
@@ -225,11 +252,14 @@ export async function getAssetDashboardData(): Promise<AssetDashboardSummary> {
       .from(sendToVendor)
       .leftJoin(asset, eq(sendToVendor.assetId, asset.id))
       .where(
-        or(
-          eq(sendToVendor.workflowStage, "CUSTOMER_RETURN"),
-          eq(sendToVendor.repairStatus, "RETURN_TO_CUSTOMER"),
-          eq(sendToVendor.repairStatus, "CUSTOMER_RECEIVED"),
-          eq(asset.status, "Ready For Customer Dispatch"),
+        and(
+          or(
+            eq(sendToVendor.workflowStage, "CUSTOMER_RETURN"),
+            eq(sendToVendor.repairStatus, "RETURN_TO_CUSTOMER"),
+            eq(sendToVendor.repairStatus, "CUSTOMER_RECEIVED"),
+            eq(asset.status, "Ready For Customer Dispatch"),
+          ),
+          stvScope ? stvScope : undefined,
         ),
       )
       .orderBy(desc(sendToVendor.updatedAt))
@@ -256,11 +286,12 @@ export async function getAssetDashboardData(): Promise<AssetDashboardSummary> {
       .from(assetStatusHistory)
       .leftJoin(asset, eq(assetStatusHistory.assetId, asset.id))
       .leftJoin(user, eq(assetStatusHistory.performedById, user.id))
+      .where(assetScope ? assetScope : undefined)
       .orderBy(desc(assetStatusHistory.performedAt))
       .limit(6),
 
     // 7. Dynamic module counts
-    getModuleCounts(),
+    getModuleCounts(viewer),
   ]);
 
   // Aggregate KPI metrics

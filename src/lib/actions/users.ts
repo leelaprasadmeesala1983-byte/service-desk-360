@@ -30,7 +30,7 @@ function fullName(firstName: string, lastName: string) {
  * Home modules they see.
  */
 async function createUser(input: unknown): Promise<ActionResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
 
   const parsed = addUserSchema.safeParse(input);
   if (!parsed.success) {
@@ -73,6 +73,7 @@ async function createUser(input: unknown): Promise<ActionResult> {
     role: data.role,
     department: data.department,
     status: data.status,
+    createdById: admin.id,
   });
 
   const ctx = await auth.$context;
@@ -102,9 +103,18 @@ async function updateUser(input: unknown): Promise<ActionResult> {
 
   const target = await db.query.user.findFirst({
     where: eq(user.id, data.id),
-    columns: { id: true, role: true, phone: true },
+    columns: { id: true, role: true, phone: true, createdById: true },
   });
   if (!target) return actionError("That user no longer exists.");
+
+  // Ownership / authorization check
+  if (
+    (admin.role as string) !== "SUPER_ADMIN" &&
+    target.id !== admin.id &&
+    target.createdById !== admin.id
+  ) {
+    return actionError("You are not authorized to update this user.");
+  }
 
   if (data.phone !== target.phone) {
     const phoneClash = await db.query.user.findFirst({
@@ -167,9 +177,18 @@ async function setUserStatus(input: unknown): Promise<ActionResult> {
 
   const target = await db.query.user.findFirst({
     where: eq(user.id, id),
-    columns: { role: true },
+    columns: { role: true, createdById: true },
   });
   if (!target) return actionError("That user no longer exists.");
+
+  // Ownership / authorization check
+  if (
+    (admin.role as string) !== "SUPER_ADMIN" &&
+    id !== admin.id &&
+    target.createdById !== admin.id
+  ) {
+    return actionError("You are not authorized to change this user's status.");
+  }
 
   if (
     target.role === "ADMIN" &&
@@ -203,9 +222,17 @@ async function deleteUser(input: unknown): Promise<ActionResult> {
 
   const target = await db.query.user.findFirst({
     where: eq(user.id, id),
-    columns: { role: true },
+    columns: { role: true, createdById: true },
   });
   if (!target) return actionOk();
+
+  // Ownership / authorization check
+  if (
+    (admin.role as string) !== "SUPER_ADMIN" &&
+    target.createdById !== admin.id
+  ) {
+    return actionError("You are not authorized to delete this user.");
+  }
 
   if (target.role === "ADMIN" && (await countActiveAdmins(id)) === 0) {
     return actionError("At least one active admin must remain.");
@@ -231,7 +258,7 @@ async function deleteUser(input: unknown): Promise<ActionResult> {
 }
 
 async function adminUpdateUserPassword(input: unknown): Promise<ActionResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
 
   const parsed = adminUpdatePasswordSchema.safeParse(input);
   if (!parsed.success) {
@@ -245,9 +272,20 @@ async function adminUpdateUserPassword(input: unknown): Promise<ActionResult> {
 
   const target = await db.query.user.findFirst({
     where: eq(user.id, id),
-    columns: { id: true },
+    columns: { id: true, createdById: true },
   });
   if (!target) return actionError("That user no longer exists.");
+
+  // Ownership / authorization check
+  if (
+    (admin.role as string) !== "SUPER_ADMIN" &&
+    target.id !== admin.id &&
+    target.createdById !== admin.id
+  ) {
+    return actionError(
+      "You are not authorized to update this user's password.",
+    );
+  }
 
   const ctx = await auth.$context;
   const hashedPassword = await ctx.password.hash(password);

@@ -10,7 +10,8 @@ export async function GET(_request: NextRequest) {
   }
 
   try {
-    const stats = await getAssetStats();
+    const viewer = { role: user.role, id: user.id };
+    const stats = await getAssetStats(viewer);
     return NextResponse.json({ success: true, data: stats });
   } catch (err: unknown) {
     console.error("GET /api/assets/stats error:", err);

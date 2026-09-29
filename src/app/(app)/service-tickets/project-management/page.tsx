@@ -15,7 +15,7 @@ export default async function ProjectManagementPage({
   const [records, stats, technicians] = await Promise.all([
     listProjects({ viewer }),
     getProjectStats(viewer),
-    listAssignableTechnicians(),
+    listAssignableTechnicians(viewer),
   ]);
 
   return (

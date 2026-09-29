@@ -5,35 +5,48 @@ import { db } from "@/db";
 import { quickCashSettings } from "@/db/schema/quick-cash-settings";
 
 /**
- * Get opening balance setting
+ * Get opening balance setting (scoped to user if provided)
  */
-async function getOpeningBalance(): Promise<string> {
+async function getOpeningBalance(userId?: string): Promise<string> {
   try {
+    if (userId) {
+      const [userResult] = await db
+        .select({ value: quickCashSettings.value })
+        .from(quickCashSettings)
+        .where(eq(quickCashSettings.key, `opening_balance_${userId}`));
+
+      if (userResult?.value) {
+        return String(userResult.value);
+      }
+      return "0.00";
+    }
+
     const [result] = await db
       .select({ value: quickCashSettings.value })
       .from(quickCashSettings)
       .where(eq(quickCashSettings.key, "opening_balance"));
 
-    return result?.value ? String(result.value) : "0";
+    return result?.value ? String(result.value) : "0.00";
   } catch {
-    return "0";
+    return "0.00";
   }
 }
 
 /**
- * Set opening balance (admin only)
+ * Set opening balance (admin only, scoped to user)
  */
 async function setOpeningBalance(
   amount: string,
   updatedBy: string,
 ): Promise<void> {
   try {
+    const key = `opening_balance_${updatedBy}`;
     await db
       .insert(quickCashSettings)
       .values({
-        key: "opening_balance",
+        key,
         value: amount,
-        description: "Daily opening balance",
+        description: `Daily opening balance for user ${updatedBy}`,
         updatedBy,
       })
       .onConflictDoUpdate({

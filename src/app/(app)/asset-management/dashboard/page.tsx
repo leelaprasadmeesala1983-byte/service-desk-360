@@ -12,9 +12,10 @@ export default async function AssetManagementDashboardPage() {
     notFound();
   }
 
+  const viewer = { role: user.role, id: user.id };
   const [assetStats, sendToVendorStats] = await Promise.all([
-    getAssetStats(),
-    getSendToVendorStats(),
+    getAssetStats(viewer),
+    getSendToVendorStats(viewer),
   ]);
 
   return (

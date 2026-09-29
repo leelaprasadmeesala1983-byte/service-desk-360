@@ -298,10 +298,18 @@ async function updateProject(
 
 async function deleteProject(input: unknown): Promise<ActionResult> {
   const current = await requireUser();
-  if (current.role !== "ADMIN") return actionError("Admins only.");
+  if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
+    return actionError("Admins only.");
 
   const parsed = deleteRecordSchema.safeParse(input);
   if (!parsed.success) return actionError("Invalid request.");
+
+  const existing = await getProject(parsed.data.id, {
+    role: current.role,
+    id: current.id,
+  });
+  if (!existing)
+    return actionError("Project not found or you do not have permission.");
 
   await db.delete(project).where(eq(project.id, parsed.data.id));
   revalidatePath(PATH);

@@ -11,7 +11,8 @@ export async function GET(_request: NextRequest) {
   }
 
   try {
-    const data = await getModuleCounts();
+    const viewer = { role: user.role, id: user.id };
+    const data = await getModuleCounts(viewer);
     return NextResponse.json({ success: true, data });
   } catch (err: unknown) {
     console.error("GET /api/assets/module-counts error:", err);

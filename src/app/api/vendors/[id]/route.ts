@@ -20,7 +20,8 @@ export async function GET(
   const { id } = await params;
 
   try {
-    const item = await getVendorById(id);
+    const viewer = { role: user.role, id: user.id };
+    const item = await getVendorById(id, viewer);
     if (!item) {
       return NextResponse.json({ error: "Vendor not found" }, { status: 404 });
     }
@@ -43,7 +44,7 @@ export async function PUT(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (user.role !== "ADMIN") {
+  if (user.role !== "ADMIN" && (user.role as string) !== "SUPER_ADMIN") {
     return NextResponse.json(
       { error: "Forbidden. Admins only." },
       { status: 403 },
@@ -66,7 +67,8 @@ export async function PUT(
       );
     }
 
-    const updated = await updateVendorRecord(id, parsed.data);
+    const viewer = { role: user.role, id: user.id };
+    const updated = await updateVendorRecord(id, parsed.data, viewer);
     if (!updated) {
       return NextResponse.json({ error: "Vendor not found" }, { status: 404 });
     }
@@ -88,7 +90,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (user.role !== "ADMIN") {
+  if (user.role !== "ADMIN" && (user.role as string) !== "SUPER_ADMIN") {
     return NextResponse.json(
       { error: "Forbidden. Admins only." },
       { status: 403 },
@@ -98,7 +100,8 @@ export async function DELETE(
   const { id } = await params;
 
   try {
-    const deleted = await deleteVendorRecord(id);
+    const viewer = { role: user.role, id: user.id };
+    const deleted = await deleteVendorRecord(id, viewer);
     if (!deleted) {
       return NextResponse.json({ error: "Vendor not found" }, { status: 404 });
     }

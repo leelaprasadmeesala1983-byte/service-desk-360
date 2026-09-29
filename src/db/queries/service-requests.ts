@@ -97,10 +97,12 @@ function mapRow(
 }
 
 function scopeServiceToViewer(viewer: Viewer) {
-  if (viewer.role === "ADMIN") return undefined;
+  if (viewer.role === "SUPER_ADMIN") return undefined;
+  if (viewer.role === "ADMIN") return eq(serviceRequest.createdById, viewer.id);
   return or(
     eq(serviceRequest.assignedTechnicianId, viewer.id),
     sql`${viewer.id} = ANY(${serviceRequest.assignedTechnicianIds})`,
+    eq(serviceRequest.createdById, viewer.id),
   );
 }
 
@@ -222,4 +224,9 @@ async function getServiceRequestStats(viewer: Viewer): Promise<StatusCounts> {
 }
 
 export type { ServiceRequestRow, StatusCounts };
-export { listServiceRequests, getServiceRequest, getServiceRequestStats };
+export {
+  listServiceRequests,
+  getServiceRequest,
+  getServiceRequestStats,
+  scopeServiceToViewer,
+};

@@ -100,10 +100,12 @@ function mapRow(
 }
 
 function scopeProjectToViewer(viewer: Viewer) {
-  if (viewer.role === "ADMIN") return undefined;
+  if (viewer.role === "SUPER_ADMIN") return undefined;
+  if (viewer.role === "ADMIN") return eq(project.createdById, viewer.id);
   return or(
     eq(project.assignedTechnicianId, viewer.id),
     sql`${viewer.id} = ANY(${project.assignedTechnicianIds})`,
+    eq(project.createdById, viewer.id),
   );
 }
 
@@ -215,4 +217,4 @@ async function getProjectStats(viewer: Viewer): Promise<StatusCounts> {
 }
 
 export type { ProjectRow };
-export { listProjects, getProject, getProjectStats };
+export { listProjects, getProject, getProjectStats, scopeProjectToViewer };

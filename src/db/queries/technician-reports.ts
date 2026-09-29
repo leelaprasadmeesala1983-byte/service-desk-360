@@ -1,6 +1,16 @@
 import "server-only";
 
-import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lte,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 
 import { db } from "@/db";
 import { user } from "@/db/schema/auth";
@@ -12,7 +22,7 @@ import type { RecordType, UserRole } from "@/lib/constants";
 import { formatRecordId } from "@/lib/format";
 
 type Viewer = {
-  role: UserRole;
+  role: UserRole | string;
   id: string;
 };
 
@@ -141,9 +151,18 @@ export async function logMultipleTechniciansWorkDates(params: {
  * Ensures historical records with assigned technicians have corresponding
  * work log entries for their creation date and last update date.
  */
-export async function syncHistoricalWorkLogs(): Promise<void> {
+export async function syncHistoricalWorkLogs(viewer?: Viewer): Promise<void> {
   try {
+    const isScopedAdmin =
+      viewer &&
+      (viewer.role as string) !== "SUPER_ADMIN" &&
+      viewer.role === "ADMIN";
+
     // 1. Service Requests
+    const srWhere = isScopedAdmin
+      ? eq(serviceRequest.createdById, viewer.id)
+      : undefined;
+
     const serviceRows = await db
       .select({
         id: serviceRequest.id,
@@ -151,8 +170,10 @@ export async function syncHistoricalWorkLogs(): Promise<void> {
         techIds: serviceRequest.assignedTechnicianIds,
         createdAt: serviceRequest.createdAt,
         updatedAt: serviceRequest.updatedAt,
+        createdById: serviceRequest.createdById,
       })
-      .from(serviceRequest);
+      .from(serviceRequest)
+      .where(srWhere ? srWhere : undefined);
 
     for (const row of serviceRows) {
       const ids =
@@ -168,6 +189,7 @@ export async function syncHistoricalWorkLogs(): Promise<void> {
           workType: "SERVICE",
           referenceId: row.id,
           workDate: row.createdAt,
+          createdById: row.createdById,
         });
 
         if (
@@ -180,12 +202,17 @@ export async function syncHistoricalWorkLogs(): Promise<void> {
             workType: "SERVICE",
             referenceId: row.id,
             workDate: row.updatedAt,
+            createdById: row.createdById,
           });
         }
       }
     }
 
     // 2. Installations
+    const insWhere = isScopedAdmin
+      ? eq(installation.createdById, viewer.id)
+      : undefined;
+
     const installRows = await db
       .select({
         id: installation.id,
@@ -193,8 +220,10 @@ export async function syncHistoricalWorkLogs(): Promise<void> {
         techIds: installation.assignedTechnicianIds,
         createdAt: installation.createdAt,
         updatedAt: installation.updatedAt,
+        createdById: installation.createdById,
       })
-      .from(installation);
+      .from(installation)
+      .where(insWhere ? insWhere : undefined);
 
     for (const row of installRows) {
       const ids =
@@ -210,6 +239,7 @@ export async function syncHistoricalWorkLogs(): Promise<void> {
           workType: "INSTALLATION",
           referenceId: row.id,
           workDate: row.createdAt,
+          createdById: row.createdById,
         });
 
         if (
@@ -222,12 +252,17 @@ export async function syncHistoricalWorkLogs(): Promise<void> {
             workType: "INSTALLATION",
             referenceId: row.id,
             workDate: row.updatedAt,
+            createdById: row.createdById,
           });
         }
       }
     }
 
     // 3. Projects
+    const prjWhere = isScopedAdmin
+      ? eq(project.createdById, viewer.id)
+      : undefined;
+
     const projectRows = await db
       .select({
         id: project.id,
@@ -235,8 +270,10 @@ export async function syncHistoricalWorkLogs(): Promise<void> {
         techIds: project.assignedTechnicianIds,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
+        createdById: project.createdById,
       })
-      .from(project);
+      .from(project)
+      .where(prjWhere ? prjWhere : undefined);
 
     for (const row of projectRows) {
       const ids =
@@ -252,6 +289,7 @@ export async function syncHistoricalWorkLogs(): Promise<void> {
           workType: "PROJECT",
           referenceId: row.id,
           workDate: row.createdAt,
+          createdById: row.createdById,
         });
 
         if (
@@ -264,6 +302,7 @@ export async function syncHistoricalWorkLogs(): Promise<void> {
             workType: "PROJECT",
             referenceId: row.id,
             workDate: row.updatedAt,
+            createdById: row.createdById,
           });
         }
       }
@@ -316,14 +355,22 @@ export async function getMonthlyTechnicianSummary(params: {
   const { month, year, technicianId, workType, viewer } = params;
   const { startDate, endDate } = getMonthDateRange(year, month);
 
-  // Sync historical records if table is sparse
-  await syncHistoricalWorkLogs();
+  // Sync historical records for viewer's scope
+  await syncHistoricalWorkLogs(viewer);
 
-  // Query all technicians
-  const techConditions = [eq(user.role, "TECHNICIAN")];
-  if (viewer.role === "TECHNICIAN") {
+  // Query only authorized active non-deleted technicians
+  const techConditions: SQL[] = [
+    eq(user.role, "TECHNICIAN"),
+    isNull(user.deletedAt),
+  ];
+
+  if ((viewer.role as string) !== "SUPER_ADMIN" && viewer.role === "ADMIN") {
+    techConditions.push(eq(user.createdById, viewer.id));
+  } else if (viewer.role === "TECHNICIAN") {
     techConditions.push(eq(user.id, viewer.id));
-  } else if (technicianId && technicianId !== "ALL") {
+  }
+
+  if (technicianId && technicianId !== "ALL") {
     techConditions.push(eq(user.id, technicianId));
   }
 
@@ -424,7 +471,14 @@ export async function getMonthlyTechnicianSummary(params: {
   const results: TechnicianMonthlySummaryItem[] = [];
 
   for (const t of techniciansList) {
-    const entry = techMap.get(t.id)!;
+    const entry = techMap.get(t.id) ?? {
+      name: t.name,
+      department: t.department ?? "-",
+      projectDates: new Set<string>(),
+      installationDates: new Set<string>(),
+      serviceDates: new Set<string>(),
+      allDates: new Set<string>(),
+    };
     const projectDays = entry.projectDates.size;
     const installationDays = entry.installationDates.size;
     const serviceDays = entry.serviceDates.size;
@@ -528,6 +582,16 @@ export async function getTechnicianDetailedReport(params: {
     return null;
   }
 
+  const techConditions: SQL[] = [
+    eq(user.id, technicianId),
+    eq(user.role, "TECHNICIAN"),
+    isNull(user.deletedAt),
+  ];
+
+  if ((viewer.role as string) !== "SUPER_ADMIN" && viewer.role === "ADMIN") {
+    techConditions.push(eq(user.createdById, viewer.id));
+  }
+
   const [tech] = await db
     .select({
       id: user.id,
@@ -539,7 +603,7 @@ export async function getTechnicianDetailedReport(params: {
       status: user.status,
     })
     .from(user)
-    .where(eq(user.id, technicianId));
+    .where(and(...techConditions));
 
   if (!tech) return null;
 
@@ -587,27 +651,35 @@ export async function getTechnicianDetailedReport(params: {
       if (!projectDateMap.has(log.referenceId)) {
         projectDateMap.set(log.referenceId, new Set());
       }
-      projectDateMap.get(log.referenceId)!.add(d);
+      projectDateMap.get(log.referenceId)?.add(d);
     } else if (log.workType === "INSTALLATION") {
       installRefIds.add(log.referenceId);
       installMonthDates.add(d);
       if (!installDateMap.has(log.referenceId)) {
         installDateMap.set(log.referenceId, new Set());
       }
-      installDateMap.get(log.referenceId)!.add(d);
+      installDateMap.get(log.referenceId)?.add(d);
     } else if (log.workType === "SERVICE") {
       serviceRefIds.add(log.referenceId);
       serviceMonthDates.add(d);
       if (!serviceDateMap.has(log.referenceId)) {
         serviceDateMap.set(log.referenceId, new Set());
       }
-      serviceDateMap.get(log.referenceId)!.add(d);
+      serviceDateMap.get(log.referenceId)?.add(d);
     }
   }
+
+  const isScopedAdmin =
+    (viewer.role as string) !== "SUPER_ADMIN" && viewer.role === "ADMIN";
 
   // Fetch Project details
   const projectsBreakdown: TaskWorkBreakdownItem[] = [];
   if (projectRefIds.size > 0) {
+    const prjWhere: SQL[] = [inArray(project.id, Array.from(projectRefIds))];
+    if (isScopedAdmin) {
+      prjWhere.push(eq(project.createdById, viewer.id));
+    }
+
     const prjRows = await db
       .select({
         id: project.id,
@@ -617,7 +689,7 @@ export async function getTechnicianDetailedReport(params: {
         status: project.status,
       })
       .from(project)
-      .where(inArray(project.id, Array.from(projectRefIds)));
+      .where(and(...prjWhere));
 
     for (const prj of prjRows) {
       const dates = Array.from(projectDateMap.get(prj.id) || []).sort();
@@ -638,6 +710,13 @@ export async function getTechnicianDetailedReport(params: {
   // Fetch Installation details
   const installationsBreakdown: TaskWorkBreakdownItem[] = [];
   if (installRefIds.size > 0) {
+    const insWhere: SQL[] = [
+      inArray(installation.id, Array.from(installRefIds)),
+    ];
+    if (isScopedAdmin) {
+      insWhere.push(eq(installation.createdById, viewer.id));
+    }
+
     const insRows = await db
       .select({
         id: installation.id,
@@ -647,7 +726,7 @@ export async function getTechnicianDetailedReport(params: {
         status: installation.status,
       })
       .from(installation)
-      .where(inArray(installation.id, Array.from(installRefIds)));
+      .where(and(...insWhere));
 
     for (const ins of insRows) {
       const dates = Array.from(installDateMap.get(ins.id) || []).sort();
@@ -668,6 +747,13 @@ export async function getTechnicianDetailedReport(params: {
   // Fetch Service Request details
   const servicesBreakdown: TaskWorkBreakdownItem[] = [];
   if (serviceRefIds.size > 0) {
+    const srvWhere: SQL[] = [
+      inArray(serviceRequest.id, Array.from(serviceRefIds)),
+    ];
+    if (isScopedAdmin) {
+      srvWhere.push(eq(serviceRequest.createdById, viewer.id));
+    }
+
     const srvRows = await db
       .select({
         id: serviceRequest.id,
@@ -677,7 +763,7 @@ export async function getTechnicianDetailedReport(params: {
         status: serviceRequest.status,
       })
       .from(serviceRequest)
-      .where(inArray(serviceRequest.id, Array.from(serviceRefIds)));
+      .where(and(...srvWhere));
 
     for (const srv of srvRows) {
       const dates = Array.from(serviceDateMap.get(srv.id) || []).sort();
@@ -748,7 +834,98 @@ export async function getRecordTechnicianWorkReport(params: {
   referenceId: string;
   viewer: Viewer;
 }): Promise<RecordTechnicianWorkReport> {
-  const { workType, referenceId } = params;
+  const { workType, referenceId, viewer } = params;
+
+  // Validate parent record authorization
+  let authorized = true;
+  if ((viewer.role as string) !== "SUPER_ADMIN") {
+    if (workType === "SERVICE") {
+      const [sr] = await db
+        .select({
+          id: serviceRequest.id,
+          createdById: serviceRequest.createdById,
+          assignedTechnicianId: serviceRequest.assignedTechnicianId,
+          assignedTechnicianIds: serviceRequest.assignedTechnicianIds,
+        })
+        .from(serviceRequest)
+        .where(eq(serviceRequest.id, referenceId));
+      if (!sr) authorized = false;
+      else if (viewer.role === "ADMIN" && sr.createdById !== viewer.id) {
+        authorized = false;
+      } else if (viewer.role === "TECHNICIAN") {
+        const techIds =
+          Array.isArray(sr.assignedTechnicianIds) &&
+          sr.assignedTechnicianIds.length > 0
+            ? sr.assignedTechnicianIds
+            : sr.assignedTechnicianId
+              ? [sr.assignedTechnicianId]
+              : [];
+        if (!techIds.includes(viewer.id) && sr.createdById !== viewer.id) {
+          authorized = false;
+        }
+      }
+    } else if (workType === "INSTALLATION") {
+      const [ins] = await db
+        .select({
+          id: installation.id,
+          createdById: installation.createdById,
+          assignedTechnicianId: installation.assignedTechnicianId,
+          assignedTechnicianIds: installation.assignedTechnicianIds,
+        })
+        .from(installation)
+        .where(eq(installation.id, referenceId));
+      if (!ins) authorized = false;
+      else if (viewer.role === "ADMIN" && ins.createdById !== viewer.id) {
+        authorized = false;
+      } else if (viewer.role === "TECHNICIAN") {
+        const techIds =
+          Array.isArray(ins.assignedTechnicianIds) &&
+          ins.assignedTechnicianIds.length > 0
+            ? ins.assignedTechnicianIds
+            : ins.assignedTechnicianId
+              ? [ins.assignedTechnicianId]
+              : [];
+        if (!techIds.includes(viewer.id) && ins.createdById !== viewer.id) {
+          authorized = false;
+        }
+      }
+    } else if (workType === "PROJECT") {
+      const [prj] = await db
+        .select({
+          id: project.id,
+          createdById: project.createdById,
+          assignedTechnicianId: project.assignedTechnicianId,
+          assignedTechnicianIds: project.assignedTechnicianIds,
+        })
+        .from(project)
+        .where(eq(project.id, referenceId));
+      if (!prj) authorized = false;
+      else if (viewer.role === "ADMIN" && prj.createdById !== viewer.id) {
+        authorized = false;
+      } else if (viewer.role === "TECHNICIAN") {
+        const techIds =
+          Array.isArray(prj.assignedTechnicianIds) &&
+          prj.assignedTechnicianIds.length > 0
+            ? prj.assignedTechnicianIds
+            : prj.assignedTechnicianId
+              ? [prj.assignedTechnicianId]
+              : [];
+        if (!techIds.includes(viewer.id) && prj.createdById !== viewer.id) {
+          authorized = false;
+        }
+      }
+    }
+  }
+
+  if (!authorized) {
+    return {
+      recordType: workType,
+      referenceId,
+      totalTechnicians: 0,
+      totalWorkDays: 0,
+      technicians: [],
+    };
+  }
 
   const logs = await db
     .select({
@@ -790,7 +967,7 @@ export async function getRecordTechnicianWorkReport(params: {
         dates: new Set(),
       });
     }
-    techMap.get(log.technicianId)!.dates.add(d);
+    techMap.get(log.technicianId)?.dates.add(d);
   }
 
   const technicians: RecordTechnicianWorkItem[] = [];

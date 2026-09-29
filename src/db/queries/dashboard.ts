@@ -10,10 +10,16 @@ import { serviceRequest } from "@/db/schema/service-request";
 import type { RecordStatus } from "@/lib/constants";
 import { formatRecordId, type RecordKind } from "@/lib/format";
 import { PENDING_STATUSES } from "@/lib/service-ticket";
-import type { InstallationRow } from "./installations";
-import type { ProjectRow } from "./projects";
-import { scopeToViewer, type Viewer } from "./record-scope";
-import type { ServiceRequestRow } from "./service-requests";
+import {
+  type InstallationRow,
+  scopeInstallationToViewer,
+} from "./installations";
+import { type ProjectRow, scopeProjectToViewer } from "./projects";
+import type { Viewer } from "./record-scope";
+import {
+  type ServiceRequestRow,
+  scopeServiceToViewer,
+} from "./service-requests";
 
 type DashboardStats = {
   totalServices: number;
@@ -67,7 +73,7 @@ type DashboardData = {
 
 async function tableCount(
   table: typeof serviceRequest | typeof installation | typeof project,
-  scope: ReturnType<typeof scopeToViewer>,
+  scope: ReturnType<typeof scopeServiceToViewer>,
 ): Promise<number> {
   const [row] = await db.select({ value: count() }).from(table).where(scope);
   return row?.value ?? 0;
@@ -96,12 +102,9 @@ function bucketByMonth(dates: Date[]): Map<string, number> {
 }
 
 async function getDashboardData(viewer: Viewer): Promise<DashboardData> {
-  const serviceScope = scopeToViewer(
-    serviceRequest.assignedTechnicianId,
-    viewer,
-  );
-  const installScope = scopeToViewer(installation.assignedTechnicianId, viewer);
-  const projectScope = scopeToViewer(project.assignedTechnicianId, viewer);
+  const serviceScope = scopeServiceToViewer(viewer);
+  const installScope = scopeInstallationToViewer(viewer);
+  const projectScope = scopeProjectToViewer(viewer);
 
   // Monthly activity — filter to the 6-month window at the database level.
   const now = new Date();

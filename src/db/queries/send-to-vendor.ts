@@ -1,5 +1,6 @@
-import { and, count, desc, eq, ilike, ne, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { db } from "@/db";
+import { scopeAdminOwnership, type Viewer } from "@/db/queries/record-scope";
 import { type AssetProduct, asset } from "@/db/schema/asset";
 import { assetStatusHistory } from "@/db/schema/asset-status-history";
 import { user } from "@/db/schema/auth";
@@ -16,12 +17,18 @@ import type {
 
 export async function listSendToVendor(
   params: SendToVendorListParams = {},
+  viewer?: Viewer,
 ): Promise<SendToVendorListResponse> {
   const page = Math.max(1, params.page ?? 1);
   const limit = Math.max(1, Math.min(100, params.limit ?? 10));
   const offset = (page - 1) * limit;
 
   const conditions = [];
+
+  const scopeCondition = scopeAdminOwnership(sendToVendor.createdById, viewer);
+  if (scopeCondition) {
+    conditions.push(scopeCondition);
+  }
 
   if (params.status && params.status !== "ALL") {
     conditions.push(eq(sendToVendor.status, params.status));
@@ -210,7 +217,14 @@ export async function listSendToVendor(
 
 export async function getSendToVendorById(
   id: string,
+  viewer?: Viewer,
 ): Promise<SendToVendor | null> {
+  const conditions = [eq(sendToVendor.id, id)];
+  const scopeCondition = scopeAdminOwnership(sendToVendor.createdById, viewer);
+  if (scopeCondition) {
+    conditions.push(scopeCondition);
+  }
+
   const [row] = await db
     .select({
       id: sendToVendor.id,
@@ -254,7 +268,7 @@ export async function getSendToVendorById(
     .from(sendToVendor)
     .leftJoin(user, eq(sendToVendor.createdById, user.id))
     .leftJoin(asset, eq(sendToVendor.assetId, asset.id))
-    .where(eq(sendToVendor.id, id))
+    .where(and(...conditions))
     .limit(1);
 
   if (!row) return null;
@@ -551,14 +565,31 @@ export async function createSendToVendorRecord(
       }
     }
 
-    return firstCreated!;
+    if (!firstCreated) {
+      throw new Error("No send-to-vendor record created");
+    }
+
+    return firstCreated;
   });
 }
 
 export async function updateSendToVendorRecord(
   id: string,
   input: Partial<CreateSendToVendorInput>,
+  viewer?: Viewer,
 ): Promise<SendToVendor | null> {
+  if (viewer && viewer.role === "ADMIN") {
+    const [existingCheck] = await db
+      .select({ createdById: sendToVendor.createdById })
+      .from(sendToVendor)
+      .where(eq(sendToVendor.id, id))
+      .limit(1);
+
+    if (!existingCheck || existingCheck.createdById !== viewer.id) {
+      return null;
+    }
+  }
+
   const valuesToUpdate: Record<string, unknown> = {
     updatedAt: new Date(),
   };
@@ -608,6 +639,7 @@ export async function updateSendToVendorStatus(
   repairStatus: string,
   userId?: string,
   targetWorkflowStage?: string,
+  viewer?: Viewer,
 ): Promise<SendToVendor | null> {
   return await db.transaction(async (tx) => {
     const [existingDispatch] = await tx
@@ -617,6 +649,14 @@ export async function updateSendToVendorStatus(
       .limit(1);
 
     if (!existingDispatch) return null;
+
+    if (
+      viewer &&
+      viewer.role === "ADMIN" &&
+      existingDispatch.createdById !== viewer.id
+    ) {
+      return null;
+    }
 
     let nextWorkflowStage: string;
     if (targetWorkflowStage) {
@@ -676,7 +716,7 @@ export async function updateSendToVendorStatus(
       .returning();
 
     // Collect affected asset IDs from items or assetId
-    const dispatchItems = (existingDispatch.items as any[]) || [];
+    const dispatchItems = (existingDispatch.items as DispatchItem[]) || [];
     const assetIdSet = new Set<string>();
     if (existingDispatch.assetId) assetIdSet.add(existingDispatch.assetId);
     for (const it of dispatchItems) {
@@ -747,6 +787,7 @@ export async function updateSendToVendorStatus(
 export async function deleteSendToVendorRecord(
   id: string,
   userId?: string,
+  viewer?: Viewer,
 ): Promise<boolean> {
   return await db.transaction(async (tx) => {
     const [dispatch] = await tx
@@ -756,6 +797,14 @@ export async function deleteSendToVendorRecord(
       .limit(1);
 
     if (!dispatch) return false;
+
+    if (
+      viewer &&
+      viewer.role === "ADMIN" &&
+      dispatch.createdById !== viewer.id
+    ) {
+      throw new Error("You do not have permission to delete this record.");
+    }
 
     const dispatchItems = (dispatch.items as DispatchItem[]) || [];
     const assetIdSet = new Set<string>();
@@ -848,13 +897,19 @@ export async function deleteSendToVendorRecord(
   });
 }
 
-export async function getSendToVendorStats(): Promise<SendToVendorStats> {
+export async function getSendToVendorStats(
+  viewer?: Viewer,
+): Promise<SendToVendorStats> {
+  const scopeCondition = scopeAdminOwnership(sendToVendor.createdById, viewer);
+  const whereClause = scopeCondition ? scopeCondition : undefined;
+
   const results = await db
     .select({
       status: sendToVendor.status,
       count: count(),
     })
     .from(sendToVendor)
+    .where(whereClause)
     .groupBy(sendToVendor.status);
 
   let total = 0;

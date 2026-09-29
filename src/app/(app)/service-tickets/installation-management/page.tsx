@@ -18,7 +18,7 @@ export default async function InstallationManagementPage({
   const [records, stats, technicians] = await Promise.all([
     listInstallations({ viewer }),
     getInstallationStats(viewer),
-    listAssignableTechnicians(),
+    listAssignableTechnicians(viewer),
   ]);
 
   return (

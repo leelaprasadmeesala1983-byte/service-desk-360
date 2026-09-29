@@ -95,7 +95,7 @@ function ProfilePanel({ user, open, onOpenChange }: ProfilePanelProps) {
   const onLogout = () => {
     startTransition(async () => {
       await logout();
-      router.replace("/login");
+      window.location.href = "/login";
     });
   };
 

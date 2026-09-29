@@ -4,6 +4,7 @@ import { desc, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { db } from "@/db";
+import { scopeRecordToViewer, type Viewer } from "@/db/queries/record-scope";
 import { user } from "@/db/schema/auth";
 import { installation } from "@/db/schema/installation";
 import { project } from "@/db/schema/project";
@@ -158,7 +159,39 @@ function getCustomerKey(
  */
 export async function getCustomerReports(
   params: CustomerReportFilterParams = {},
+  viewer?: Viewer,
 ): Promise<CustomerReportResult> {
+  const srScope = viewer
+    ? scopeRecordToViewer(
+        {
+          createdById: serviceRequest.createdById,
+          assignedTechnicianId: serviceRequest.assignedTechnicianId,
+          assignedTechnicianIds: serviceRequest.assignedTechnicianIds,
+        },
+        viewer,
+      )
+    : undefined;
+  const insScope = viewer
+    ? scopeRecordToViewer(
+        {
+          createdById: installation.createdById,
+          assignedTechnicianId: installation.assignedTechnicianId,
+          assignedTechnicianIds: installation.assignedTechnicianIds,
+        },
+        viewer,
+      )
+    : undefined;
+  const prjScope = viewer
+    ? scopeRecordToViewer(
+        {
+          createdById: project.createdById,
+          assignedTechnicianId: project.assignedTechnicianId,
+          assignedTechnicianIds: project.assignedTechnicianIds,
+        },
+        viewer,
+      )
+    : undefined;
+
   const [servicesData, installationsData, projectsData] = await Promise.all([
     db
       .select({
@@ -177,6 +210,7 @@ export async function getCustomerReports(
         updatedAt: serviceRequest.updatedAt,
       })
       .from(serviceRequest)
+      .where(srScope ? srScope : undefined)
       .orderBy(desc(serviceRequest.createdAt)),
 
     db
@@ -193,6 +227,7 @@ export async function getCustomerReports(
         updatedAt: installation.updatedAt,
       })
       .from(installation)
+      .where(insScope ? insScope : undefined)
       .orderBy(desc(installation.createdAt)),
 
     db
@@ -211,6 +246,7 @@ export async function getCustomerReports(
         updatedAt: project.updatedAt,
       })
       .from(project)
+      .where(prjScope ? prjScope : undefined)
       .orderBy(desc(project.createdAt)),
   ]);
 
@@ -446,12 +482,16 @@ export async function getCustomerReports(
  */
 export async function getAllFilteredCustomersForExport(
   params: CustomerReportFilterParams = {},
+  viewer?: Viewer,
 ): Promise<CustomerRow[]> {
-  const result = await getCustomerReports({
-    ...params,
-    page: 1,
-    perPage: 100000,
-  });
+  const result = await getCustomerReports(
+    {
+      ...params,
+      page: 1,
+      perPage: 100000,
+    },
+    viewer,
+  );
   return result.customers;
 }
 
@@ -460,7 +500,39 @@ export async function getAllFilteredCustomersForExport(
  */
 export async function getCustomer360Details(
   customerKey: string,
+  viewer?: Viewer,
 ): Promise<Customer360Data | null> {
+  const srScope = viewer
+    ? scopeRecordToViewer(
+        {
+          createdById: serviceRequest.createdById,
+          assignedTechnicianId: serviceRequest.assignedTechnicianId,
+          assignedTechnicianIds: serviceRequest.assignedTechnicianIds,
+        },
+        viewer,
+      )
+    : undefined;
+  const insScope = viewer
+    ? scopeRecordToViewer(
+        {
+          createdById: installation.createdById,
+          assignedTechnicianId: installation.assignedTechnicianId,
+          assignedTechnicianIds: installation.assignedTechnicianIds,
+        },
+        viewer,
+      )
+    : undefined;
+  const prjScope = viewer
+    ? scopeRecordToViewer(
+        {
+          createdById: project.createdById,
+          assignedTechnicianId: project.assignedTechnicianId,
+          assignedTechnicianIds: project.assignedTechnicianIds,
+        },
+        viewer,
+      )
+    : undefined;
+
   const [servicesData, installationsData, projectsData, allTechs] =
     await Promise.all([
       db
@@ -470,6 +542,7 @@ export async function getCustomer360Details(
         })
         .from(serviceRequest)
         .leftJoin(srTech, eq(srTech.id, serviceRequest.assignedTechnicianId))
+        .where(srScope ? srScope : undefined)
         .orderBy(desc(serviceRequest.createdAt)),
 
       db
@@ -480,6 +553,7 @@ export async function getCustomer360Details(
         })
         .from(installation)
         .leftJoin(insTech, eq(insTech.id, installation.assignedTechnicianId))
+        .where(insScope ? insScope : undefined)
         .orderBy(desc(installation.createdAt)),
 
       db
@@ -490,6 +564,7 @@ export async function getCustomer360Details(
         })
         .from(project)
         .leftJoin(prjTech, eq(prjTech.id, project.assignedTechnicianId))
+        .where(prjScope ? prjScope : undefined)
         .orderBy(desc(project.createdAt)),
 
       db

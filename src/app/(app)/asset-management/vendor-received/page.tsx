@@ -11,11 +11,15 @@ export default async function VendorReceivedPage() {
     notFound();
   }
 
-  const initialDispatches = await listSendToVendor({
-    page: 1,
-    limit: 10,
-    workflowStage: "VENDOR_RECEIVED",
-  });
+  const viewer = { role: user.role, id: user.id };
+  const initialDispatches = await listSendToVendor(
+    {
+      page: 1,
+      limit: 10,
+      workflowStage: "VENDOR_RECEIVED",
+    },
+    viewer,
+  );
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">

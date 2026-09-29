@@ -1,24 +1,78 @@
 import "server-only";
 
-import { and, eq, type SQL } from "drizzle-orm";
+import { and, eq, or, type SQL, sql } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 
 import type { RecordStatus, UserRole } from "@/lib/constants";
 import { parseRecordIdSearch } from "@/lib/format";
 
 /**
- * Every Service Ticket list/detail/stat query runs through the same viewer:
- * an admin sees everything, a technician sees only records assigned to them
- * (spec §4.2–§4.4). This is enforced in the query, not by a UI toggle.
+ * Every transactional record query runs through the authenticated viewer:
+ * - SUPER_ADMIN: intentional full organization visibility (no filter).
+ * - ADMIN: strictly scoped to own transactional records (createdById === viewer.id).
+ * - TECHNICIAN: restricted to assigned tickets/records or created records.
  */
-type Viewer = { role: UserRole; id: string };
+type Viewer = { role: UserRole | string; id: string };
 
-/** Restricts a technician to their own assignments; no-op for an admin. */
+/**
+ * Restricts queries by authenticated user ownership and role:
+ * - Admin A sees only records created by Admin A.
+ * - Admin B sees only records created by Admin B.
+ * - Technician sees records assigned to them or created by them.
+ * - Super Admin sees all records.
+ */
+function scopeRecordToViewer(
+  columns: {
+    createdById: PgColumn;
+    assignedTechnicianId?: PgColumn;
+    assignedTechnicianIds?: PgColumn;
+  },
+  viewer?: Viewer,
+): SQL | undefined {
+  if (!viewer || (viewer.role as string) === "SUPER_ADMIN") {
+    return undefined;
+  }
+
+  if (viewer.role === "ADMIN") {
+    return eq(columns.createdById, viewer.id);
+  }
+
+  // TECHNICIAN role
+  const techConditions: SQL[] = [];
+  if (columns.assignedTechnicianId) {
+    techConditions.push(eq(columns.assignedTechnicianId, viewer.id));
+  }
+  if (columns.assignedTechnicianIds) {
+    techConditions.push(
+      sql`${viewer.id} = ANY(${columns.assignedTechnicianIds})`,
+    );
+  }
+  techConditions.push(eq(columns.createdById, viewer.id));
+
+  return techConditions.length === 1
+    ? techConditions[0]
+    : or(...techConditions);
+}
+
+/** Restricts an admin to their own created records; no-op for super admin. */
+function scopeAdminOwnership(
+  createdByIdColumn: PgColumn,
+  viewer?: Viewer,
+): SQL | undefined {
+  if (!viewer || (viewer.role as string) === "SUPER_ADMIN") return undefined;
+  return eq(createdByIdColumn, viewer.id);
+}
+
+/** Legacy helper: scopes technician to assignments, or admin to created records. */
 function scopeToViewer(
   assignedTechnicianColumn: PgColumn,
-  viewer: Viewer,
+  viewer?: Viewer,
+  createdByIdColumn?: PgColumn,
 ): SQL | undefined {
-  if (viewer.role === "ADMIN") return undefined;
+  if (!viewer || (viewer.role as string) === "SUPER_ADMIN") return undefined;
+  if (viewer.role === "ADMIN") {
+    return createdByIdColumn ? eq(createdByIdColumn, viewer.id) : undefined;
+  }
   return eq(assignedTechnicianColumn, viewer.id);
 }
 
@@ -36,7 +90,9 @@ type ListParams = {
 function buildListWhere(
   params: ListParams,
   columns: {
+    createdById?: PgColumn;
     assignedTechnicianId: PgColumn;
+    assignedTechnicianIds?: PgColumn;
     status: PgColumn;
     seq: PgColumn;
     search: PgColumn[];
@@ -44,9 +100,22 @@ function buildListWhere(
   ilikeFn: (column: PgColumn, value: string) => SQL,
   orFn: (...conditions: (SQL | undefined)[]) => SQL | undefined,
 ): SQL | undefined {
-  const clauses: (SQL | undefined)[] = [
-    scopeToViewer(columns.assignedTechnicianId, params.viewer),
-  ];
+  const clauses: (SQL | undefined)[] = [];
+
+  if (columns.createdById) {
+    clauses.push(
+      scopeRecordToViewer(
+        {
+          createdById: columns.createdById,
+          assignedTechnicianId: columns.assignedTechnicianId,
+          assignedTechnicianIds: columns.assignedTechnicianIds,
+        },
+        params.viewer,
+      ),
+    );
+  } else {
+    clauses.push(scopeToViewer(columns.assignedTechnicianId, params.viewer));
+  }
 
   if (params.status && params.status !== "ALL") {
     clauses.push(eq(columns.status, params.status));
@@ -66,4 +135,9 @@ function buildListWhere(
 }
 
 export type { Viewer, ListParams };
-export { scopeToViewer, buildListWhere };
+export {
+  scopeToViewer,
+  scopeRecordToViewer,
+  scopeAdminOwnership,
+  buildListWhere,
+};

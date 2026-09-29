@@ -1,5 +1,9 @@
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { db } from "@/db";
+import {
+  scopeAdminOwnership,
+  type Viewer,
+} from "@/db/queries/record-scope";
 import { asset } from "@/db/schema/asset";
 import { assetStatusHistory } from "@/db/schema/asset-status-history";
 import { user } from "@/db/schema/auth";
@@ -17,12 +21,18 @@ import type {
 
 export async function listAssets(
   params: AssetListParams = {},
+  viewer?: Viewer,
 ): Promise<AssetListResponse> {
   const page = Math.max(1, params.page ?? 1);
   const limit = Math.max(1, Math.min(100, params.limit ?? 10));
   const offset = (page - 1) * limit;
 
   const conditions = [];
+
+  const scopeCondition = scopeAdminOwnership(asset.createdById, viewer);
+  if (scopeCondition) {
+    conditions.push(scopeCondition);
+  }
 
   // Filter by status if not "ALL" and specified
   if (params.status && params.status !== "ALL") {
@@ -126,7 +136,16 @@ export async function listAssets(
   };
 }
 
-export async function getAssetById(id: string): Promise<Asset | null> {
+export async function getAssetById(
+  id: string,
+  viewer?: Viewer,
+): Promise<Asset | null> {
+  const conditions = [eq(asset.id, id)];
+  const scopeCondition = scopeAdminOwnership(asset.createdById, viewer);
+  if (scopeCondition) {
+    conditions.push(scopeCondition);
+  }
+
   const [row] = await db
     .select({
       id: asset.id,
@@ -147,7 +166,7 @@ export async function getAssetById(id: string): Promise<Asset | null> {
     })
     .from(asset)
     .leftJoin(user, eq(asset.createdById, user.id))
-    .where(eq(asset.id, id))
+    .where(and(...conditions))
     .limit(1);
 
   if (!row) return null;
@@ -175,13 +194,17 @@ export async function getAssetById(id: string): Promise<Asset | null> {
   };
 }
 
-export async function getAssetStats(): Promise<AssetStats> {
+export async function getAssetStats(viewer?: Viewer): Promise<AssetStats> {
+  const scopeCondition = scopeAdminOwnership(asset.createdById, viewer);
+  const whereClause = scopeCondition ? scopeCondition : undefined;
+
   const results = await db
     .select({
       status: asset.status,
       count: sql<number>`count(*)::int`,
     })
     .from(asset)
+    .where(whereClause)
     .groupBy(asset.status);
 
   const stats: AssetStats = {
@@ -307,7 +330,11 @@ export async function createAssetRecord(
       }
     }
 
-    return firstCreated!;
+    if (!firstCreated) {
+      throw new Error("No asset created");
+    }
+
+    return firstCreated;
   });
 }
 
@@ -317,8 +344,22 @@ export async function updateAssetRecord(
     targetProductId?: string;
   },
   createdById?: string,
+  viewer?: Viewer,
 ): Promise<Asset | null> {
   return await db.transaction(async (tx) => {
+    // 1. Ownership check
+    if (viewer && viewer.role === "ADMIN") {
+      const [existingCheck] = await tx
+        .select({ createdById: asset.createdById })
+        .from(asset)
+        .where(eq(asset.id, id))
+        .limit(1);
+
+      if (!existingCheck || existingCheck.createdById !== viewer.id) {
+        return null;
+      }
+    }
+
     const valuesToUpdate: Record<string, unknown> = {
       updatedAt: new Date(),
     };
@@ -433,6 +474,7 @@ export async function updateAssetRecord(
 export async function deleteAssetProductRecord(
   assetId: string,
   productId: string,
+  viewer?: Viewer,
 ): Promise<boolean> {
   const [target] = await db
     .select({
@@ -440,12 +482,17 @@ export async function deleteAssetProductRecord(
       status: asset.status,
       repairStatus: asset.repairStatus,
       products: asset.products,
+      createdById: asset.createdById,
     })
     .from(asset)
     .where(eq(asset.id, assetId))
     .limit(1);
 
   if (!target) return false;
+
+  if (viewer && viewer.role === "ADMIN" && target.createdById !== viewer.id) {
+    throw new Error("You do not have permission to delete this product.");
+  }
 
   const currentProducts = (target.products as AssetProduct[]) || [];
   const targetProduct = currentProducts.find((p) => p.id === productId);
@@ -465,7 +512,7 @@ export async function deleteAssetProductRecord(
 
   // If this was the only product in the asset, delete the entire asset record
   if (remainingProducts.length === 0) {
-    return await deleteAssetRecord(assetId);
+    return await deleteAssetRecord(assetId, viewer);
   }
 
   // Otherwise, update the asset with the remaining products
@@ -481,18 +528,26 @@ export async function deleteAssetProductRecord(
   return Boolean(updated);
 }
 
-export async function deleteAssetRecord(id: string): Promise<boolean> {
+export async function deleteAssetRecord(
+  id: string,
+  viewer?: Viewer,
+): Promise<boolean> {
   const [target] = await db
     .select({
       id: asset.id,
       status: asset.status,
       repairStatus: asset.repairStatus,
+      createdById: asset.createdById,
     })
     .from(asset)
     .where(eq(asset.id, id))
     .limit(1);
 
   if (!target) return false;
+
+  if (viewer && viewer.role === "ADMIN" && target.createdById !== viewer.id) {
+    throw new Error("You do not have permission to delete this asset.");
+  }
 
   const blockedStatuses = [
     "Under Repair",

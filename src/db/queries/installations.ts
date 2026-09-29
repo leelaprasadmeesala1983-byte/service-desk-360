@@ -108,10 +108,12 @@ function mapRow(
 }
 
 function scopeInstallationToViewer(viewer: Viewer) {
-  if (viewer.role === "ADMIN") return undefined;
+  if (viewer.role === "SUPER_ADMIN") return undefined;
+  if (viewer.role === "ADMIN") return eq(installation.createdById, viewer.id);
   return or(
     eq(installation.assignedTechnicianId, viewer.id),
     sql`${viewer.id} = ANY(${installation.assignedTechnicianIds})`,
+    eq(installation.createdById, viewer.id),
   );
 }
 
@@ -230,4 +232,9 @@ async function getInstallationStats(viewer: Viewer): Promise<StatusCounts> {
 }
 
 export type { InstallationRow };
-export { listInstallations, getInstallation, getInstallationStats };
+export {
+  listInstallations,
+  getInstallation,
+  getInstallationStats,
+  scopeInstallationToViewer,
+};

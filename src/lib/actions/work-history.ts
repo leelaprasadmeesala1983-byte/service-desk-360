@@ -179,9 +179,19 @@ export async function updateWorkHistory(input: unknown): Promise<ActionResult> {
 
     const prev = existing[0];
 
-    // Authorization check: Admins can edit any log; Technicians can only edit logs they created or are assigned to
+    // Authorization check: Admins can edit their own logs (or super admin); Technicians can edit logs they created or are assigned to
     if (
-      current.role !== "ADMIN" &&
+      (current.role as string) !== "SUPER_ADMIN" &&
+      current.role === "ADMIN" &&
+      prev.createdById &&
+      prev.createdById !== current.id
+    ) {
+      return actionError(
+        "You are not authorized to edit this work history entry.",
+      );
+    }
+    if (
+      current.role === "TECHNICIAN" &&
       prev.createdById !== current.id &&
       !prev.technicianIds?.includes(current.id)
     ) {
@@ -278,7 +288,11 @@ export async function deleteWorkHistory(input: unknown): Promise<ActionResult> {
       return actionError("Work history entry not found.");
     }
 
-    if (current.role !== "ADMIN" && existing[0].createdById !== current.id) {
+    if (
+      (current.role as string) !== "SUPER_ADMIN" &&
+      existing[0].createdById &&
+      existing[0].createdById !== current.id
+    ) {
       return actionError(
         "You are not authorized to delete this work history entry.",
       );

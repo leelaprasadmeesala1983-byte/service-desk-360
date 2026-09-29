@@ -82,7 +82,8 @@ export async function updateSendToVendor(
   input: unknown,
 ): Promise<ActionResult<SendToVendor>> {
   const current = await requireUser();
-  if (current.role !== "ADMIN") return actionError("Admins only.");
+  if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
+    return actionError("Admins only.");
 
   if (!id) return actionError("Send to Vendor ID is required.");
 
@@ -92,24 +93,31 @@ export async function updateSendToVendor(
   const data = parsed.data;
 
   try {
-    const updated = await updateSendToVendorRecord(id, {
-      assetId: data.assetId || null,
-      items: data.items,
-      vendorId: data.vendorId || null,
-      vendorName: data.vendorName,
-      contactPerson: data.contactPerson,
-      phoneNumber: data.phoneNumber,
-      address: data.address,
-      reasonForRepair: data.reasonForRepair,
-      remarks: data.remarks || "",
-      courierName: data.courierName,
-      docketAwbNumber: data.docketAwbNumber,
-      bookingDate: data.bookingDate,
-      numberOfPackages: data.numberOfPackages,
-      dispatchRemarks: data.dispatchRemarks || "",
-    });
+    const updated = await updateSendToVendorRecord(
+      id,
+      {
+        assetId: data.assetId || null,
+        items: data.items,
+        vendorId: data.vendorId || null,
+        vendorName: data.vendorName,
+        contactPerson: data.contactPerson,
+        phoneNumber: data.phoneNumber,
+        address: data.address,
+        reasonForRepair: data.reasonForRepair,
+        remarks: data.remarks || "",
+        courierName: data.courierName,
+        docketAwbNumber: data.docketAwbNumber,
+        bookingDate: data.bookingDate,
+        numberOfPackages: data.numberOfPackages,
+        dispatchRemarks: data.dispatchRemarks || "",
+      },
+      { role: current.role, id: current.id },
+    );
 
-    if (!updated) return actionError("Send to Vendor record not found.");
+    if (!updated)
+      return actionError(
+        "Send to Vendor record not found or you do not have permission.",
+      );
 
     revalidatePath(PATH);
     return actionOk(updated);
@@ -127,7 +135,8 @@ export async function updateVendorDispatchRepairStatus(
   targetWorkflowStage?: string,
 ): Promise<ActionResult<SendToVendor>> {
   const current = await requireUser();
-  if (current.role !== "ADMIN") return actionError("Admins only.");
+  if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
+    return actionError("Admins only.");
 
   if (!id) return actionError("Vendor Dispatch ID is required.");
   if (!repairStatus) return actionError("Repair Status is required.");
@@ -138,8 +147,12 @@ export async function updateVendorDispatchRepairStatus(
       repairStatus,
       current.id,
       targetWorkflowStage,
+      { role: current.role, id: current.id },
     );
-    if (!updated) return actionError("Vendor Dispatch record not found.");
+    if (!updated)
+      return actionError(
+        "Vendor Dispatch record not found or you do not have permission.",
+      );
 
     revalidatePath("/asset-management");
     revalidatePath("/asset-management/send-to-vendor");
@@ -158,13 +171,17 @@ export async function deleteSendToVendor(
   input: unknown,
 ): Promise<ActionResult> {
   const current = await requireUser();
-  if (current.role !== "ADMIN") return actionError("Admins only.");
+  if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
+    return actionError("Admins only.");
 
   const parsed = deleteSendToVendorSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
 
   try {
-    const success = await deleteSendToVendorRecord(parsed.data.id, current.id);
+    const success = await deleteSendToVendorRecord(parsed.data.id, current.id, {
+      role: current.role,
+      id: current.id,
+    });
     if (!success) {
       return actionError("Record not found or already deleted.");
     }
@@ -184,10 +201,13 @@ export async function deleteSendToVendor(
 export async function getSendToVendorDetails(
   id: string,
 ): Promise<ActionResult<SendToVendor>> {
-  await requireUser();
+  const current = await requireUser();
 
   try {
-    const item = await getSendToVendorById(id);
+    const item = await getSendToVendorById(id, {
+      role: current.role,
+      id: current.id,
+    });
     if (!item) return actionError("Send to Vendor record not found.");
     return actionOk(item);
   } catch (error) {
@@ -199,10 +219,13 @@ export async function getSendToVendorDetails(
 export async function getSendToVendorList(
   params: SendToVendorListParams = {},
 ): Promise<ActionResult<SendToVendorListResponse>> {
-  await requireUser();
+  const current = await requireUser();
 
   try {
-    const response = await listSendToVendor(params);
+    const response = await listSendToVendor(params, {
+      role: current.role,
+      id: current.id,
+    });
     return actionOk(response);
   } catch (error) {
     console.error("Failed to list Send to Vendor records:", error);
@@ -213,10 +236,13 @@ export async function getSendToVendorList(
 export async function getSendToVendorDashboardStats(): Promise<
   ActionResult<SendToVendorStats>
 > {
-  await requireUser();
+  const current = await requireUser();
 
   try {
-    const stats = await getSendToVendorStats();
+    const stats = await getSendToVendorStats({
+      role: current.role,
+      id: current.id,
+    });
     return actionOk(stats);
   } catch (error) {
     console.error("Failed to get Send to Vendor stats:", error);

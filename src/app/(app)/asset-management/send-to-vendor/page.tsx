@@ -11,11 +11,15 @@ export default async function SendToVendorPage() {
     notFound();
   }
 
-  const initialDispatches = await listSendToVendor({
-    page: 1,
-    limit: 10,
-    workflowStage: "SENT_TO_VENDOR",
-  });
+  const viewer = { role: user.role, id: user.id };
+  const initialDispatches = await listSendToVendor(
+    {
+      page: 1,
+      limit: 10,
+      workflowStage: "SENT_TO_VENDOR",
+    },
+    viewer,
+  );
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">

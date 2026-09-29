@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search") || undefined;
 
   try {
-    const vendors = await getVendorReportOptions(search);
+    const viewer = { role: user.role, id: user.id };
+    const vendors = await getVendorReportOptions(search, viewer);
     return NextResponse.json({ vendors });
   } catch (err: unknown) {
     console.error("GET /api/reports/vendors error:", err);
