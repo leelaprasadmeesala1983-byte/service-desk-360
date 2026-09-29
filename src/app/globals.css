@@ -1,0 +1,238 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-heading);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-shell: var(--shell);
+  --color-shell-foreground: var(--shell-foreground);
+  --color-shell-muted-foreground: var(--shell-muted-foreground);
+  --color-shell-active: var(--shell-active);
+  --color-shell-badge: var(--shell-badge);
+  --color-brand: var(--brand);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: #f8fafc;
+  --foreground: #10233f;
+  --card: #ffffff;
+  --card-foreground: #10233f;
+  --popover: #ffffff;
+  --popover-foreground: #10233f;
+  --primary: #1769c2;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #10233f;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #eef6ff;
+  --accent-foreground: #1557a6;
+  --destructive: #dc2626;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #4d91dc;
+  --chart-1: #2f80ed;
+  --chart-2: #35b96f;
+  --chart-3: #f5b72f;
+  --chart-4: #8b5cf6;
+  --chart-5: #ef4444;
+  --radius: 0.625rem;
+
+  /* Dark navy shell used by the header's left panel and the sidebar. */
+  --shell: #17253a;
+  --shell-foreground: #ffffff;
+  --shell-muted-foreground: #a9b4c4;
+  --shell-active: #1475d1;
+  --shell-badge: #243750;
+  --brand: #1557a6;
+
+  --sidebar: #17253a;
+  --sidebar-foreground: #a9b4c4;
+  --sidebar-primary: #1475d1;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(255, 255, 255, 0.06);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #4d91dc;
+}
+
+.dark {
+  --background: #0b1524;
+  --foreground: #e8eef7;
+  --card: #13202f;
+  --card-foreground: #e8eef7;
+  --popover: #13202f;
+  --popover-foreground: #e8eef7;
+  --primary: #4d91dc;
+  --primary-foreground: #08131f;
+  --secondary: #1c2a3c;
+  --secondary-foreground: #e8eef7;
+  --muted: #1c2a3c;
+  --muted-foreground: #94a3b8;
+  --accent: #1c3350;
+  --accent-foreground: #cfe2fa;
+  --destructive: #f87171;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.15);
+  --ring: #4d91dc;
+  --chart-1: #5aa0f2;
+  --chart-2: #4ecb8b;
+  --chart-3: #f5c451;
+  --chart-4: #a78bfa;
+  --chart-5: #f87171;
+
+  --shell: #0e1a29;
+  --shell-foreground: #ffffff;
+  --shell-muted-foreground: #94a3b8;
+  --shell-active: #1475d1;
+  --shell-badge: #1c2a3c;
+  --brand: #4d91dc;
+
+  --sidebar: #0e1a29;
+  --sidebar-foreground: #94a3b8;
+  --sidebar-primary: #1475d1;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(255, 255, 255, 0.06);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #4d91dc;
+}
+
+/* UI Density Design Tokens */
+:root,
+[data-density="compact"] {
+  --header-height: 68px;
+  --sidebar-width: 280px;
+  --sidebar-item-height: 42px;
+  --card-padding: 14px;
+  --control-height: 38px;
+  --table-row-height: 44px;
+  --table-cell-py: 8px;
+  --table-cell-px: 12px;
+  --space-page: 20px;
+  --space-section: 16px;
+  --space-card: 14px;
+  --text-page-title: 28px;
+  --text-section-title: 18px;
+  --text-body: 14px;
+  --text-small: 12.5px;
+}
+
+[data-density="default"] {
+  --header-height: 72px;
+  --sidebar-width: 288px;
+  --sidebar-item-height: 44px;
+  --card-padding: 16px;
+  --control-height: 40px;
+  --table-row-height: 48px;
+  --table-cell-py: 10px;
+  --table-cell-px: 14px;
+  --space-page: 24px;
+  --space-section: 20px;
+  --space-card: 16px;
+  --text-page-title: 32px;
+  --text-section-title: 20px;
+  --text-body: 14.5px;
+  --text-small: 13px;
+}
+
+[data-density="comfortable"] {
+  --header-height: 76px;
+  --sidebar-width: 296px;
+  --sidebar-item-height: 48px;
+  --card-padding: 20px;
+  --control-height: 44px;
+  --table-row-height: 52px;
+  --table-cell-py: 12px;
+  --table-cell-px: 16px;
+  --space-page: 28px;
+  --space-section: 24px;
+  --space-card: 20px;
+  --text-page-title: 34px;
+  --text-section-title: 22px;
+  --text-body: 15px;
+  --text-small: 13.5px;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+
+  /* Compact baseline adjustments */
+  [data-density="compact"] {
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  [data-density="default"] {
+    font-size: 14.5px;
+    line-height: 1.5;
+  }
+
+  [data-density="comfortable"] {
+    font-size: 15.5px;
+    line-height: 1.55;
+  }
+
+  /* Disable browser native password reveal and clear controls */
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  input::-webkit-credentials-auto-fill-button {
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
