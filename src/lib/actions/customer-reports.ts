@@ -22,11 +22,17 @@ export async function fetchCustomerReports(
 ): Promise<ActionResult<CustomerReportResult>> {
   try {
     const current = await requireUser();
-    if (current.role !== "ADMIN") {
+    if (
+      current.role !== "ADMIN" &&
+      (current.role as string) !== "SUPER_ADMIN"
+    ) {
       return actionError("Admins only.");
     }
 
-    const data = await getCustomerReports(params);
+    const data = await getCustomerReports(params, {
+      role: current.role,
+      id: current.id,
+    });
     return actionOk(data);
   } catch (error) {
     console.error("fetchCustomerReports error:", error);
@@ -42,11 +48,17 @@ export async function fetchCustomer360(
 ): Promise<ActionResult<Customer360Data>> {
   try {
     const current = await requireUser();
-    if (current.role !== "ADMIN") {
+    if (
+      current.role !== "ADMIN" &&
+      (current.role as string) !== "SUPER_ADMIN"
+    ) {
       return actionError("Admins only.");
     }
 
-    const data = await getCustomer360Details(customerKey);
+    const data = await getCustomer360Details(customerKey, {
+      role: current.role,
+      id: current.id,
+    });
     if (!data) {
       return actionError("Customer not found.");
     }
@@ -66,11 +78,17 @@ export async function exportCustomerReportsExcel(
 ): Promise<ActionResult<{ data: string; filename: string }>> {
   try {
     const current = await requireUser();
-    if (current.role !== "ADMIN") {
+    if (
+      current.role !== "ADMIN" &&
+      (current.role as string) !== "SUPER_ADMIN"
+    ) {
       return actionError("Admins only.");
     }
 
-    const customers = await getAllFilteredCustomersForExport(params);
+    const customers = await getAllFilteredCustomersForExport(params, {
+      role: current.role,
+      id: current.id,
+    });
 
     const headers = [
       "S.No",

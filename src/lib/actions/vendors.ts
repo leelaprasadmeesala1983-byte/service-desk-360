@@ -38,7 +38,8 @@ export async function createVendor(
   input: unknown,
 ): Promise<ActionResult<Vendor>> {
   const current = await requireUser();
-  if (current.role !== "ADMIN") return actionError("Admins only.");
+  if (current.role !== "ADMIN" && current.role !== "SUPER_ADMIN")
+    return actionError("Admins only.");
 
   const parsed = vendorFormSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
@@ -62,7 +63,8 @@ export async function updateVendor(
   input: unknown,
 ): Promise<ActionResult<Vendor>> {
   const current = await requireUser();
-  if (current.role !== "ADMIN") return actionError("Admins only.");
+  if (current.role !== "ADMIN" && current.role !== "SUPER_ADMIN")
+    return actionError("Admins only.");
 
   if (!id) return actionError("Vendor ID is required.");
 
@@ -72,8 +74,9 @@ export async function updateVendor(
   const data = parsed.data;
 
   try {
-    const updated = await updateVendorRecord(id, data);
-    if (!updated) return actionError("Vendor not found.");
+    const viewer = { role: current.role, id: current.id };
+    const updated = await updateVendorRecord(id, data, viewer);
+    if (!updated) return actionError("Vendor not found or access denied.");
 
     revalidatePath(PATH);
     revalidatePath("/asset-management/send-to-vendor");
@@ -87,13 +90,15 @@ export async function updateVendor(
 
 export async function deleteVendor(input: unknown): Promise<ActionResult> {
   const current = await requireUser();
-  if (current.role !== "ADMIN") return actionError("Admins only.");
+  if (current.role !== "ADMIN" && current.role !== "SUPER_ADMIN")
+    return actionError("Admins only.");
 
   const parsed = deleteVendorSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
 
   try {
-    const success = await deleteVendorRecord(parsed.data.id);
+    const viewer = { role: current.role, id: current.id };
+    const success = await deleteVendorRecord(parsed.data.id, viewer);
     if (!success) return actionError("Vendor not found or already deleted.");
 
     revalidatePath(PATH);
@@ -109,10 +114,11 @@ export async function deleteVendor(input: unknown): Promise<ActionResult> {
 export async function getVendorDetails(
   id: string,
 ): Promise<ActionResult<Vendor>> {
-  await requireUser();
+  const current = await requireUser();
 
   try {
-    const item = await getVendorById(id);
+    const viewer = { role: current.role, id: current.id };
+    const item = await getVendorById(id, viewer);
     if (!item) return actionError("Vendor not found.");
     return actionOk(item);
   } catch (error) {
@@ -124,10 +130,11 @@ export async function getVendorDetails(
 export async function getVendors(
   params: VendorListParams = {},
 ): Promise<ActionResult<VendorListResponse>> {
-  await requireUser();
+  const current = await requireUser();
 
   try {
-    const response = await listVendors(params);
+    const viewer = { role: current.role, id: current.id };
+    const response = await listVendors(params, viewer);
     return actionOk(response);
   } catch (error) {
     console.error("Failed to list vendors:", error);
@@ -136,10 +143,11 @@ export async function getVendors(
 }
 
 export async function getActiveVendors(): Promise<ActionResult<VendorRow[]>> {
-  await requireUser();
+  const current = await requireUser();
 
   try {
-    const list = await getAllVendors();
+    const viewer = { role: current.role, id: current.id };
+    const list = await getAllVendors(viewer);
     return actionOk(list);
   } catch (error) {
     console.error("Failed to fetch active vendors:", error);

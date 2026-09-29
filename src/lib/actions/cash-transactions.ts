@@ -35,13 +35,21 @@ async function getCashTransaction(id: string): Promise<{
 } | null> {
   try {
     const current = await requireUser();
-    if (current.role !== "ADMIN") return null;
+    if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
+      return null;
 
     const transaction = await db.query.cashTransaction.findFirst({
       where: eq(cashTransaction.id, id),
     });
 
     if (!transaction) return null;
+    if (
+      (current.role as string) !== "SUPER_ADMIN" &&
+      transaction.createdById &&
+      transaction.createdById !== current.id
+    ) {
+      return null;
+    }
 
     return {
       id: transaction.id,
@@ -82,7 +90,8 @@ function invalid(error: ZodError): ActionResult {
 async function addCashTransaction(input: unknown): Promise<ActionResult> {
   try {
     const current = await requireUser();
-    if (current.role !== "ADMIN") return actionError("Admins only.");
+    if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
+      return actionError("Admins only.");
 
     const parsed = cashTransactionSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
@@ -97,7 +106,7 @@ async function addCashTransaction(input: unknown): Promise<ActionResult> {
       );
     }
 
-    const register = await getDailyRegister(dateStr);
+    const register = await getDailyRegister(dateStr, current.id);
     const numAmount = Math.abs(Number(data.amount) || 0);
 
     // Check available balance for CASH_OUT
@@ -153,7 +162,8 @@ async function addCashTransaction(input: unknown): Promise<ActionResult> {
 async function updateCashTransaction(input: unknown): Promise<ActionResult> {
   try {
     const current = await requireUser();
-    if (current.role !== "ADMIN") return actionError("Admins only.");
+    if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
+      return actionError("Admins only.");
 
     const baseSchema = cashTransactionSchema.extend({
       id: z.string().min(1),
@@ -166,6 +176,16 @@ async function updateCashTransaction(input: unknown): Promise<ActionResult> {
       where: eq(cashTransaction.id, data.id),
     });
     if (!existing) return actionError("Transaction not found.");
+
+    if (
+      (current.role as string) !== "SUPER_ADMIN" &&
+      existing.createdById &&
+      existing.createdById !== current.id
+    ) {
+      return actionError(
+        "You do not have permission to modify this transaction.",
+      );
+    }
 
     const todayStr = formatLocalDate(new Date());
     const existingDateStr = formatLocalDate(existing.createdAt);
@@ -182,7 +202,10 @@ async function updateCashTransaction(input: unknown): Promise<ActionResult> {
       );
     }
 
-    const existingRegister = await getDailyRegister(existingDateStr);
+    const existingRegister = await getDailyRegister(
+      existingDateStr,
+      current.id,
+    );
     const numAmount = Math.abs(Number(data.amount) || 0);
 
     // Verify available balance for CASH_OUT
@@ -276,12 +299,23 @@ async function updateCashTransaction(input: unknown): Promise<ActionResult> {
 async function deleteCashTransaction(id: string): Promise<ActionResult> {
   try {
     const current = await requireUser();
-    if (current.role !== "ADMIN") return actionError("Admins only.");
+    if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
+      return actionError("Admins only.");
 
     const existing = await db.query.cashTransaction.findFirst({
       where: eq(cashTransaction.id, id),
     });
     if (!existing) return actionError("Transaction not found.");
+
+    if (
+      (current.role as string) !== "SUPER_ADMIN" &&
+      existing.createdById &&
+      existing.createdById !== current.id
+    ) {
+      return actionError(
+        "You do not have permission to delete this transaction.",
+      );
+    }
 
     const todayStr = formatLocalDate(new Date());
     const dateStr = formatLocalDate(existing.createdAt);
@@ -311,7 +345,8 @@ async function setOpeningBalance(input: {
 }): Promise<ActionResult> {
   try {
     const current = await requireUser();
-    if (current.role !== "ADMIN") return actionError("Admins only.");
+    if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
+      return actionError("Admins only.");
 
     const parsed = z
       .object({
@@ -335,12 +370,13 @@ async function setOpeningBalance(input: {
       );
     }
 
-    const register = await getDailyRegister(targetDate);
+    const register = await getDailyRegister(targetDate, current.id);
     const amountStr = parsed.data.amount || "0";
 
     await db
       .insert(dailyCashRegister)
       .values({
+        userId: current.id,
         date: targetDate,
         openingBalance: amountStr,
         totalCashIn: register.totalCashIn,
@@ -353,7 +389,7 @@ async function setOpeningBalance(input: {
         status: "OPEN",
       })
       .onConflictDoUpdate({
-        target: dailyCashRegister.date,
+        target: [dailyCashRegister.userId, dailyCashRegister.date],
         set: {
           openingBalance: amountStr,
           closingBalance: (
@@ -452,8 +488,12 @@ async function exportCashTransactions(
   from?: string,
   to?: string,
 ): Promise<{ data: string; filename: string }> {
-  await requireAdmin();
-  const rows = await listAllFilteredCashTransactions({ from, to });
+  const current = await requireAdmin();
+  const rows = await listAllFilteredCashTransactions({
+    from,
+    to,
+    userId: (current.role as string) === "SUPER_ADMIN" ? undefined : current.id,
+  });
 
   const dateSuffix =
     from && to

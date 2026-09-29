@@ -18,7 +18,7 @@ export default async function ServiceManagementPage({
   const [records, stats, technicians] = await Promise.all([
     listServiceRequests({ viewer }),
     getServiceRequestStats(viewer),
-    listAssignableTechnicians(),
+    listAssignableTechnicians(viewer),
   ]);
 
   return (

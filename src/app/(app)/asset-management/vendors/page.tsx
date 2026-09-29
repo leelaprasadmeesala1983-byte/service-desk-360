@@ -11,10 +11,15 @@ export default async function VendorsPage() {
     notFound();
   }
 
-  const initialVendors = await listVendors({
-    page: 1,
-    limit: 10,
-  });
+  const viewer = { role: user.role, id: user.id };
+
+  const initialVendors = await listVendors(
+    {
+      page: 1,
+      limit: 10,
+    },
+    viewer,
+  );
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">

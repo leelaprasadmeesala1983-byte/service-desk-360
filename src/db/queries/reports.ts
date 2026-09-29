@@ -1,5 +1,6 @@
-import { desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { db } from "@/db";
+import { scopeAdminOwnership, type Viewer } from "@/db/queries/record-scope";
 import { type AssetProduct, asset } from "@/db/schema/asset";
 import { assetStatusHistory } from "@/db/schema/asset-status-history";
 import { customerDispatch } from "@/db/schema/customer-dispatch";
@@ -29,7 +30,9 @@ import type {
  */
 export async function getCustomerReportOptions(
   search?: string,
+  viewer?: Viewer,
 ): Promise<CustomerReportOption[]> {
+  const assetScope = scopeAdminOwnership(asset.createdById, viewer);
   const allAssets = await db
     .select({
       id: asset.id,
@@ -39,6 +42,7 @@ export async function getCustomerReportOptions(
       products: asset.products,
     })
     .from(asset)
+    .where(assetScope ? assetScope : undefined)
     .orderBy(asset.customerName);
 
   // Group by customerName (case-insensitive) + customerNumber
@@ -90,15 +94,17 @@ export async function getCustomerReportOptions(
 export async function getCustomerReport(
   customerKey: string,
   params: { page?: number; limit?: number; search?: string } = {},
+  viewer?: Viewer,
 ): Promise<CustomerReportData | null> {
   const page = Math.max(1, params.page ?? 1);
   const limit = Math.max(1, Math.min(10000, params.limit ?? 10));
+  const assetScope = scopeAdminOwnership(asset.createdById, viewer);
 
   // Look for customer by ID or Name
   let customerAssets = await db
     .select()
     .from(asset)
-    .where(eq(asset.id, customerKey));
+    .where(and(eq(asset.id, customerKey), assetScope ? assetScope : undefined));
 
   let targetCustomerName = "";
   let targetCustomerNumber = "";
@@ -114,9 +120,12 @@ export async function getCustomerReport(
       .select()
       .from(asset)
       .where(
-        or(
-          ilike(asset.customerName, targetCustomerName),
-          eq(asset.customerNumber, targetCustomerNumber),
+        and(
+          or(
+            ilike(asset.customerName, targetCustomerName),
+            eq(asset.customerNumber, targetCustomerNumber),
+          ),
+          assetScope ? assetScope : undefined,
         ),
       )
       .orderBy(desc(asset.createdAt));
@@ -126,9 +135,12 @@ export async function getCustomerReport(
       .select()
       .from(asset)
       .where(
-        or(
-          ilike(asset.customerName, customerKey),
-          eq(asset.customerNumber, customerKey),
+        and(
+          or(
+            ilike(asset.customerName, customerKey),
+            eq(asset.customerNumber, customerKey),
+          ),
+          assetScope ? assetScope : undefined,
         ),
       )
       .orderBy(desc(asset.createdAt));
@@ -344,7 +356,9 @@ export async function getCustomerReport(
  */
 export async function getVendorReportOptions(
   search?: string,
+  viewer?: Viewer,
 ): Promise<VendorReportOption[]> {
+  const stvScope = scopeAdminOwnership(sendToVendor.createdById, viewer);
   const allVendors = await db
     .select({
       id: vendor.id,
@@ -366,7 +380,8 @@ export async function getVendorReportOptions(
       address: sendToVendor.address,
       items: sendToVendor.items,
     })
-    .from(sendToVendor);
+    .from(sendToVendor)
+    .where(stvScope ? stvScope : undefined);
 
   const vendorMap = new Map<
     string,
@@ -444,9 +459,11 @@ export async function getVendorReportOptions(
 export async function getVendorReport(
   vendorIdOrName: string,
   params: { page?: number; limit?: number; search?: string } = {},
+  viewer?: Viewer,
 ): Promise<VendorReportData | null> {
   const page = Math.max(1, params.page ?? 1);
   const limit = Math.max(1, Math.min(10000, params.limit ?? 10));
+  const stvScope = scopeAdminOwnership(sendToVendor.createdById, viewer);
 
   let targetVendor: {
     id: string;
@@ -469,6 +486,19 @@ export async function getVendorReport(
   }
 
   // Find all dispatches matching vendor ID or name
+  const vendorMatchCondition = targetVendor
+    ? or(
+        eq(sendToVendor.vendorId, targetVendor.id),
+        ilike(sendToVendor.vendorName, targetVendor.vendorName),
+      )
+    : or(
+        ilike(sendToVendor.vendorName, vendorIdOrName),
+        ilike(
+          sendToVendor.vendorName,
+          `%${vendorIdOrName.replace(/^vendor_/, "").replace(/_/g, " ")}%`,
+        ),
+      );
+
   const dispatches = await db
     .select({
       id: sendToVendor.id,
@@ -502,20 +532,7 @@ export async function getVendorReport(
     })
     .from(sendToVendor)
     .leftJoin(asset, eq(sendToVendor.assetId, asset.id))
-    .where(
-      targetVendor
-        ? or(
-            eq(sendToVendor.vendorId, targetVendor.id),
-            ilike(sendToVendor.vendorName, targetVendor.vendorName),
-          )
-        : or(
-            ilike(sendToVendor.vendorName, vendorIdOrName),
-            ilike(
-              sendToVendor.vendorName,
-              `%${vendorIdOrName.replace(/^vendor_/, "").replace(/_/g, " ")}%`,
-            ),
-          ),
-    )
+    .where(and(vendorMatchCondition, stvScope ? stvScope : undefined))
     .orderBy(desc(sendToVendor.createdAt));
 
   if (!targetVendor) {
@@ -728,12 +745,15 @@ export async function getVendorReport(
  */
 export async function getItemReport(
   trackIdOrQuery: string,
+  viewer?: Viewer,
 ): Promise<ItemReportData | null> {
   const rawQuery = trackIdOrQuery.trim();
   if (!rawQuery) return null;
 
   const seq = parseRecordIdSearch(rawQuery);
   const isUuid = rawQuery.length === 36 && rawQuery.includes("-");
+  const assetScope = scopeAdminOwnership(asset.createdById, viewer);
+  const stvScope = scopeAdminOwnership(sendToVendor.createdById, viewer);
 
   // Search in asset table
   const assetConditions = [
@@ -751,7 +771,7 @@ export async function getItemReport(
   const [foundAsset] = await db
     .select()
     .from(asset)
-    .where(or(...assetConditions))
+    .where(and(or(...assetConditions), assetScope ? assetScope : undefined))
     .limit(1);
 
   if (!foundAsset) {
@@ -767,11 +787,11 @@ export async function getItemReport(
     const [foundDispatch] = await db
       .select()
       .from(sendToVendor)
-      .where(or(...dispatchConditions))
+      .where(and(or(...dispatchConditions), stvScope ? stvScope : undefined))
       .limit(1);
 
     if (foundDispatch?.assetId) {
-      return getItemReport(foundDispatch.assetId);
+      return getItemReport(foundDispatch.assetId, viewer);
     }
 
     return null;
@@ -796,7 +816,12 @@ export async function getItemReport(
   const dispatches = await db
     .select()
     .from(sendToVendor)
-    .where(eq(sendToVendor.assetId, foundAsset.id))
+    .where(
+      and(
+        eq(sendToVendor.assetId, foundAsset.id),
+        stvScope ? stvScope : undefined,
+      ),
+    )
     .orderBy(desc(sendToVendor.createdAt));
 
   const primaryDispatch = dispatches[0];

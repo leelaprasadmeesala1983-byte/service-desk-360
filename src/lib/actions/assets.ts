@@ -75,7 +75,8 @@ export async function updateAsset(
   targetProductId?: string,
 ): Promise<ActionResult<Asset>> {
   const current = await requireUser();
-  if (current.role !== "ADMIN") return actionError("Admins only.");
+  if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
+    return actionError("Admins only.");
 
   if (!id) return actionError("Asset ID is required.");
 
@@ -100,9 +101,11 @@ export async function updateAsset(
         targetProductId,
       },
       current.id,
+      { role: current.role, id: current.id },
     );
 
-    if (!updated) return actionError("Asset not found.");
+    if (!updated)
+      return actionError("Asset not found or you do not have permission.");
 
     revalidatePath(PATH);
     return actionOk(updated);
@@ -114,15 +117,21 @@ export async function updateAsset(
 
 export async function deleteAsset(input: unknown): Promise<ActionResult> {
   const current = await requireUser();
-  if (current.role !== "ADMIN") return actionError("Admins only.");
+  if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
+    return actionError("Admins only.");
 
   const parsed = deleteAssetSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
 
   try {
+    const viewer = { role: current.role, id: current.id };
     const success = parsed.data.productId
-      ? await deleteAssetProductRecord(parsed.data.id, parsed.data.productId)
-      : await deleteAssetRecord(parsed.data.id);
+      ? await deleteAssetProductRecord(
+          parsed.data.id,
+          parsed.data.productId,
+          viewer,
+        )
+      : await deleteAssetRecord(parsed.data.id, viewer);
 
     if (!success)
       return actionError("Asset or product not found or already deleted.");
@@ -142,10 +151,10 @@ export async function deleteAsset(input: unknown): Promise<ActionResult> {
 export async function getAssetDetails(
   id: string,
 ): Promise<ActionResult<Asset>> {
-  await requireUser();
+  const current = await requireUser();
 
   try {
-    const item = await getAssetById(id);
+    const item = await getAssetById(id, { role: current.role, id: current.id });
     if (!item) return actionError("Asset not found.");
     return actionOk(item);
   } catch (error) {
@@ -157,10 +166,13 @@ export async function getAssetDetails(
 export async function getAssets(
   params: AssetListParams = {},
 ): Promise<ActionResult<AssetListResponse>> {
-  await requireUser();
+  const current = await requireUser();
 
   try {
-    const response = await listAssets(params);
+    const response = await listAssets(params, {
+      role: current.role,
+      id: current.id,
+    });
     return actionOk(response);
   } catch (error) {
     console.error("Failed to list assets:", error);
@@ -169,10 +181,10 @@ export async function getAssets(
 }
 
 export async function getDashboardStats(): Promise<ActionResult<AssetStats>> {
-  await requireUser();
+  const current = await requireUser();
 
   try {
-    const stats = await getAssetStats();
+    const stats = await getAssetStats({ role: current.role, id: current.id });
     return actionOk(stats);
   } catch (error) {
     console.error("Failed to get asset stats:", error);

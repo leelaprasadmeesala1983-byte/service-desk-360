@@ -20,7 +20,8 @@ export async function GET(
   const { id } = await params;
 
   try {
-    const item = await getSendToVendorById(id);
+    const viewer = { role: user.role, id: user.id };
+    const item = await getSendToVendorById(id, viewer);
     if (!item) {
       return NextResponse.json(
         { error: "Send to Vendor record not found" },
@@ -46,7 +47,7 @@ export async function PUT(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (user.role !== "ADMIN") {
+  if (user.role !== "ADMIN" && (user.role as string) !== "SUPER_ADMIN") {
     return NextResponse.json(
       { error: "Forbidden. Admins only." },
       { status: 403 },
@@ -70,24 +71,29 @@ export async function PUT(
     }
 
     const data = parsed.data;
-    const updated = await updateSendToVendorRecord(id, {
-      assetId: data.assetId || null,
-      vendorName: data.vendorName,
-      contactPerson: data.contactPerson,
-      phoneNumber: data.phoneNumber,
-      address: data.address,
-      reasonForRepair: data.reasonForRepair,
-      remarks: data.remarks || "",
-      courierName: data.courierName,
-      docketAwbNumber: data.docketAwbNumber,
-      bookingDate: data.bookingDate,
-      numberOfPackages: data.numberOfPackages,
-      dispatchRemarks: data.dispatchRemarks || "",
-    });
+    const viewer = { role: user.role, id: user.id };
+    const updated = await updateSendToVendorRecord(
+      id,
+      {
+        assetId: data.assetId || null,
+        vendorName: data.vendorName,
+        contactPerson: data.contactPerson,
+        phoneNumber: data.phoneNumber,
+        address: data.address,
+        reasonForRepair: data.reasonForRepair,
+        remarks: data.remarks || "",
+        courierName: data.courierName,
+        docketAwbNumber: data.docketAwbNumber,
+        bookingDate: data.bookingDate,
+        numberOfPackages: data.numberOfPackages,
+        dispatchRemarks: data.dispatchRemarks || "",
+      },
+      viewer,
+    );
 
     if (!updated) {
       return NextResponse.json(
-        { error: "Send to Vendor record not found" },
+        { error: "Send to Vendor record not found or access denied" },
         { status: 404 },
       );
     }
@@ -109,7 +115,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (user.role !== "ADMIN") {
+  if (user.role !== "ADMIN" && (user.role as string) !== "SUPER_ADMIN") {
     return NextResponse.json(
       { error: "Forbidden. Admins only." },
       { status: 403 },
@@ -119,7 +125,8 @@ export async function DELETE(
   const { id } = await params;
 
   try {
-    const deleted = await deleteSendToVendorRecord(id, user.id);
+    const viewer = { role: user.role, id: user.id };
+    const deleted = await deleteSendToVendorRecord(id, user.id, viewer);
     if (!deleted) {
       return NextResponse.json(
         { error: "Send to Vendor record not found" },

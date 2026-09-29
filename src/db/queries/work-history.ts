@@ -3,6 +3,7 @@ import "server-only";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
+import { scopeRecordToViewer, type Viewer } from "@/db/queries/record-scope";
 import { user } from "@/db/schema/auth";
 import { installation } from "@/db/schema/installation";
 import { project } from "@/db/schema/project";
@@ -93,11 +94,14 @@ export type SelectableRecord = {
  * always including the initial request creation and any subsequent work logs,
  * sorted chronologically (newest first).
  */
-export async function listWorkHistoryByRecord(params: {
-  workType: RecordType;
-  referenceId: string;
-}): Promise<WorkHistoryItem[]> {
-  const result = await getCombinedWorkHistory(params);
+export async function listWorkHistoryByRecord(
+  params: {
+    workType: RecordType;
+    referenceId: string;
+  },
+  viewer?: Viewer,
+): Promise<WorkHistoryItem[]> {
+  const result = await getCombinedWorkHistory(params, viewer);
   return result.history;
 }
 
@@ -105,10 +109,13 @@ export async function listWorkHistoryByRecord(params: {
  * Retrieves the parent ticket details alongside the complete merged chronological
  * history timeline (initial request + all daily work logs).
  */
-export async function getCombinedWorkHistory(params: {
-  workType: RecordType;
-  referenceId: string;
-}): Promise<CombinedWorkHistoryResult> {
+export async function getCombinedWorkHistory(
+  params: {
+    workType: RecordType;
+    referenceId: string;
+  },
+  viewer?: Viewer,
+): Promise<CombinedWorkHistoryResult> {
   const { workType, referenceId } = params;
   if (!referenceId) {
     return {
@@ -137,11 +144,20 @@ export async function getCombinedWorkHistory(params: {
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         referenceId,
       );
-    const whereClause = isUuid
+    const idClause = isUuid
       ? eq(serviceRequest.id, referenceId)
       : seqNumber !== null
         ? eq(serviceRequest.seq, seqNumber)
         : eq(serviceRequest.id, referenceId);
+
+    const scope = scopeRecordToViewer(
+      {
+        createdById: serviceRequest.createdById,
+        assignedTechnicianId: serviceRequest.assignedTechnicianId,
+        assignedTechnicianIds: serviceRequest.assignedTechnicianIds,
+      },
+      viewer,
+    );
 
     const rows = await db
       .select({
@@ -162,7 +178,7 @@ export async function getCombinedWorkHistory(params: {
         updatedAt: serviceRequest.updatedAt,
       })
       .from(serviceRequest)
-      .where(whereClause)
+      .where(scope ? and(idClause, scope) : idClause)
       .limit(1);
 
     const sr = rows[0];
@@ -211,11 +227,20 @@ export async function getCombinedWorkHistory(params: {
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         referenceId,
       );
-    const whereClause = isUuid
+    const idClause = isUuid
       ? eq(installation.id, referenceId)
       : seqNumber !== null
         ? eq(installation.seq, seqNumber)
         : eq(installation.id, referenceId);
+
+    const scope = scopeRecordToViewer(
+      {
+        createdById: installation.createdById,
+        assignedTechnicianId: installation.assignedTechnicianId,
+        assignedTechnicianIds: installation.assignedTechnicianIds,
+      },
+      viewer,
+    );
 
     const rows = await db
       .select({
@@ -234,7 +259,7 @@ export async function getCombinedWorkHistory(params: {
         updatedAt: installation.updatedAt,
       })
       .from(installation)
-      .where(whereClause)
+      .where(scope ? and(idClause, scope) : idClause)
       .limit(1);
 
     const ins = rows[0];
@@ -280,11 +305,20 @@ export async function getCombinedWorkHistory(params: {
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         referenceId,
       );
-    const whereClause = isUuid
+    const idClause = isUuid
       ? eq(project.id, referenceId)
       : seqNumber !== null
         ? eq(project.seq, seqNumber)
         : eq(project.id, referenceId);
+
+    const scope = scopeRecordToViewer(
+      {
+        createdById: project.createdById,
+        assignedTechnicianId: project.assignedTechnicianId,
+        assignedTechnicianIds: project.assignedTechnicianIds,
+      },
+      viewer,
+    );
 
     const rows = await db
       .select({
@@ -304,7 +338,7 @@ export async function getCombinedWorkHistory(params: {
         updatedAt: project.updatedAt,
       })
       .from(project)
-      .where(whereClause)
+      .where(scope ? and(idClause, scope) : idClause)
       .limit(1);
 
     const prj = rows[0];
@@ -681,9 +715,19 @@ export async function getWorkHistoryById(
 /**
  * Returns active service requests for the Log Request form dropdown with pre-populated metadata.
  */
-export async function listSelectableServiceRequests(): Promise<
-  SelectableRecord[]
-> {
+export async function listSelectableServiceRequests(
+  viewer?: Viewer,
+): Promise<SelectableRecord[]> {
+  const scopeCondition = viewer
+    ? scopeRecordToViewer(
+        {
+          createdById: serviceRequest.createdById,
+          assignedTechnicianId: serviceRequest.assignedTechnicianId,
+          assignedTechnicianIds: serviceRequest.assignedTechnicianIds,
+        },
+        viewer,
+      )
+    : undefined;
   const rows = await db
     .select({
       id: serviceRequest.id,
@@ -698,6 +742,7 @@ export async function listSelectableServiceRequests(): Promise<
       assignedTechnicianIds: serviceRequest.assignedTechnicianIds,
     })
     .from(serviceRequest)
+    .where(scopeCondition ? scopeCondition : undefined)
     .orderBy(desc(serviceRequest.createdAt));
 
   // Collect technician names

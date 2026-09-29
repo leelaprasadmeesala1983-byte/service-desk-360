@@ -20,7 +20,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const reportData = await getItemReport(trackId.trim());
+    const viewer = { role: user.role, id: user.id };
+    const reportData = await getItemReport(trackId.trim(), viewer);
 
     if (!reportData) {
       return NextResponse.json(

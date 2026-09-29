@@ -88,7 +88,7 @@ function AppHeader({
   const onLogout = () => {
     startTransition(async () => {
       await logout();
-      router.replace("/login");
+      window.location.href = "/login";
     });
   };
 

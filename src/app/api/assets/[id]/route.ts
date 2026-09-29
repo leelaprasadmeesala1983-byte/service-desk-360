@@ -21,7 +21,8 @@ export async function GET(
   const { id } = await params;
 
   try {
-    const item = await getAssetById(id);
+    const viewer = { role: user.role, id: user.id };
+    const item = await getAssetById(id, viewer);
     if (!item) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
     }
@@ -44,7 +45,7 @@ export async function PUT(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (user.role !== "ADMIN") {
+  if (user.role !== "ADMIN" && (user.role as string) !== "SUPER_ADMIN") {
     return NextResponse.json(
       { error: "Forbidden. Admins only." },
       { status: 403 },
@@ -70,19 +71,30 @@ export async function PUT(
     }
 
     const data = parsed.data;
-    const updated = await updateAssetRecord(id, {
-      name:
-        data.name && data.name.trim().length > 0 ? data.name.trim() : undefined,
-      customerName: data.customerName,
-      customerNumber: data.customerNumber,
-      location: data.location,
-      status: data.status,
-      products: data.products,
-      targetProductId,
-    });
+    const viewer = { role: user.role, id: user.id };
+    const updated = await updateAssetRecord(
+      id,
+      {
+        name:
+          data.name && data.name.trim().length > 0
+            ? data.name.trim()
+            : undefined,
+        customerName: data.customerName,
+        customerNumber: data.customerNumber,
+        location: data.location,
+        status: data.status,
+        products: data.products,
+        targetProductId,
+      },
+      user.id,
+      viewer,
+    );
 
     if (!updated) {
-      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Asset not found or access denied" },
+        { status: 404 },
+      );
     }
 
     return NextResponse.json({ success: true, data: updated });
@@ -102,7 +114,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (user.role !== "ADMIN") {
+  if (user.role !== "ADMIN" && (user.role as string) !== "SUPER_ADMIN") {
     return NextResponse.json(
       { error: "Forbidden. Admins only." },
       { status: 403 },
@@ -114,9 +126,10 @@ export async function DELETE(
   const productId = searchParams.get("productId");
 
   try {
+    const viewer = { role: user.role, id: user.id };
     const deleted = productId
-      ? await deleteAssetProductRecord(id, productId)
-      : await deleteAssetRecord(id);
+      ? await deleteAssetProductRecord(id, productId, viewer)
+      : await deleteAssetRecord(id, viewer);
 
     if (!deleted) {
       return NextResponse.json(

@@ -21,10 +21,13 @@ export async function GET(
   }
 
   try {
-    const result = await getCombinedWorkHistory({
-      workType: "SERVICE",
-      referenceId: serviceRequestId,
-    });
+    const result = await getCombinedWorkHistory(
+      {
+        workType: "SERVICE",
+        referenceId: serviceRequestId,
+      },
+      { role: user.role, id: user.id },
+    );
 
     if (!result.serviceRequest) {
       return NextResponse.json(

@@ -37,7 +37,9 @@ export default async function QuickCashPage({
     month?: string;
   }>;
 }) {
-  await requireAdmin();
+  const current = await requireAdmin();
+  const userId =
+    (current.role as string) === "SUPER_ADMIN" ? undefined : current.id;
   const params = await searchParams;
 
   const now = new Date();
@@ -68,7 +70,7 @@ export default async function QuickCashPage({
   const monthlyTo = params.to || defaultMonthlyTo;
 
   // 1. Fetch Today's / Target Day's Register (automatic daily session)
-  const todayRegisterPromise = getDailyRegister(targetDate);
+  const todayRegisterPromise = getDailyRegister(targetDate, userId);
 
   // 2. Fetch Transactions for the active tab
   const transactionsPromise =
@@ -78,18 +80,20 @@ export default async function QuickCashPage({
           limit: perPage,
           from: monthlyFrom,
           to: monthlyTo,
+          userId,
         })
       : listCashTransactions({
           page,
           limit: perPage,
           from: targetDate,
           to: targetDate,
+          userId,
         });
 
   // 3. Tab-targeted fetching: fetch history/monthly queries only when their tab is active
   const historyPromise =
     currentTab === "history"
-      ? listDailyRegisters({ page, limit: perPage })
+      ? listDailyRegisters({ page, limit: perPage, userId })
       : Promise.resolve({ rows: [], total: 0 });
 
   const defaultMonthlySummary = {
@@ -106,10 +110,15 @@ export default async function QuickCashPage({
 
   const monthlyPromise =
     currentTab === "monthly"
-      ? getMonthlySummary(targetYear, targetMonth, {
-          from: monthlyFrom,
-          to: monthlyTo,
-        })
+      ? getMonthlySummary(
+          targetYear,
+          targetMonth,
+          {
+            from: monthlyFrom,
+            to: monthlyTo,
+          },
+          userId,
+        )
       : Promise.resolve(defaultMonthlySummary);
 
   // Run all active queries in parallel

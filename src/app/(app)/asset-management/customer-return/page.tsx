@@ -11,11 +11,15 @@ export default async function CustomerReturnPage() {
     notFound();
   }
 
-  const initialDispatches = await listSendToVendor({
-    page: 1,
-    limit: 10,
-    workflowStage: "CUSTOMER_RETURN",
-  });
+  const viewer = { role: user.role, id: user.id };
+  const initialDispatches = await listSendToVendor(
+    {
+      page: 1,
+      limit: 10,
+      workflowStage: "CUSTOMER_RETURN",
+    },
+    viewer,
+  );
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">

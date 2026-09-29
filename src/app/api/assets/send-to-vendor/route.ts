@@ -21,7 +21,8 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search") || undefined;
 
   try {
-    const result = await listSendToVendor({ page, limit, search });
+    const viewer = { role: user.role, id: user.id };
+    const result = await listSendToVendor({ page, limit, search }, viewer);
     return NextResponse.json(result);
   } catch (err: unknown) {
     console.error("GET /api/assets/send-to-vendor error:", err);

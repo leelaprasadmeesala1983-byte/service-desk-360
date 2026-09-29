@@ -11,16 +11,15 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  const page = searchParams.get("page")
-    ? Number.parseInt(searchParams.get("page")!, 10)
-    : 1;
-  const limit = searchParams.get("limit")
-    ? Number.parseInt(searchParams.get("limit")!, 10)
-    : 10;
+  const pageParam = searchParams.get("page");
+  const limitParam = searchParams.get("limit");
+  const page = pageParam ? Number.parseInt(pageParam, 10) : 1;
+  const limit = limitParam ? Number.parseInt(limitParam, 10) : 10;
   const search = searchParams.get("search") || undefined;
 
   try {
-    const result = await listVendors({ page, limit, search });
+    const viewer = { role: user.role, id: user.id };
+    const result = await listVendors({ page, limit, search }, viewer);
     return NextResponse.json(result);
   } catch (err: unknown) {
     console.error("GET /api/vendors error:", err);
@@ -37,7 +36,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (user.role !== "ADMIN") {
+  if (user.role !== "ADMIN" && (user.role as string) !== "SUPER_ADMIN") {
     return NextResponse.json(
       { error: "Forbidden. Admins only." },
       { status: 403 },

@@ -11,17 +11,16 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  const page = searchParams.get("page")
-    ? Number.parseInt(searchParams.get("page")!, 10)
-    : 1;
-  const limit = searchParams.get("limit")
-    ? Number.parseInt(searchParams.get("limit")!, 10)
-    : 10;
+  const pageParam = searchParams.get("page");
+  const limitParam = searchParams.get("limit");
+  const page = pageParam ? Number.parseInt(pageParam, 10) : 1;
+  const limit = limitParam ? Number.parseInt(limitParam, 10) : 10;
   const search = searchParams.get("search") || undefined;
   const status = searchParams.get("status") || undefined;
 
   try {
-    const result = await listAssets({ page, limit, search, status });
+    const viewer = { role: user.role, id: user.id };
+    const result = await listAssets({ page, limit, search, status }, viewer);
     return NextResponse.json(result);
   } catch (err: unknown) {
     console.error("GET /api/assets error:", err);

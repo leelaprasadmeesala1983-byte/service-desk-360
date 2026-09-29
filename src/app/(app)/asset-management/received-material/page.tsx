@@ -11,11 +11,15 @@ export default async function ReceivedMaterialPage() {
     notFound();
   }
 
-  const initialAssets = await listAssets({
-    page: 1,
-    limit: 10,
-    status: "ALL",
-  });
+  const viewer = { role: user.role, id: user.id };
+  const initialAssets = await listAssets(
+    {
+      page: 1,
+      limit: 10,
+      status: "ALL",
+    },
+    viewer,
+  );
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">

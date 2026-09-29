@@ -18,10 +18,14 @@ export default async function CustomerReportsPage() {
     redirect("/service-tickets");
   }
 
-  const initialData = await getCustomerReports({
-    page: 1,
-    perPage: 10,
-  });
+  const viewer = { role: user.role, id: user.id };
+  const initialData = await getCustomerReports(
+    {
+      page: 1,
+      perPage: 10,
+    },
+    viewer,
+  );
 
   return <CustomerReportsView initialData={initialData} />;
 }
