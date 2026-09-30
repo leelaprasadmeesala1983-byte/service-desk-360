@@ -8,7 +8,7 @@ export default async function ItemPrintPage({
 }: {
   searchParams: Promise<{ id?: string; trackId?: string }>;
 }) {
-  await requireUser();
+  const user = await requireUser();
   const params = await searchParams;
   const trackId = params.trackId || params.id;
 
@@ -16,7 +16,8 @@ export default async function ItemPrintPage({
     return notFound();
   }
 
-  const reportData = await getItemReport(decodeURIComponent(trackId));
+  const viewer = { role: user.role, id: user.id };
+  const reportData = await getItemReport(decodeURIComponent(trackId), viewer);
 
   if (!reportData) {
     return notFound();

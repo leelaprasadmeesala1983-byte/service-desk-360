@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Eye,
   Loader2,
   Printer,
   RefreshCw,
@@ -26,7 +27,18 @@ import {
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { CustomerReportData, CustomerReportOption } from "@/types/reports";
+import {
+  type UnifiedReportRecord,
+  normalizeCustomerRecord,
+  printSingleReportRecord,
+} from "@/lib/utils/print-report-record";
+import { printCustomerReportDirect } from "@/lib/utils/print-reports";
+import type {
+  CustomerMaterialItem,
+  CustomerReportData,
+  CustomerReportOption,
+} from "@/types/reports";
+import { ReportRecordDetailDialog } from "./report-record-detail-dialog";
 
 type CustomerReportViewProps = {
   initialOptions?: CustomerReportOption[];
@@ -47,6 +59,11 @@ export function CustomerReportView({
   const [reportData, setReportData] = useState<CustomerReportData | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Individual Record Dialog State
+  const [selectedRecord, setSelectedRecord] =
+    useState<UnifiedReportRecord | null>(null);
+  const [recordDialogOpen, setRecordDialogOpen] = useState(false);
 
   // Pagination
   const [page, setPage] = useState(1);
@@ -147,17 +164,32 @@ export function CustomerReportView({
     }
   };
 
+  const handleViewRecord = (item: CustomerMaterialItem) => {
+    const unified = normalizeCustomerRecord(
+      item,
+      reportData?.summary.address,
+      reportData?.summary.customerNumber,
+    );
+    setSelectedRecord(unified);
+    setRecordDialogOpen(true);
+  };
+
+  const handlePrintRecord = (item: CustomerMaterialItem) => {
+    const unified = normalizeCustomerRecord(
+      item,
+      reportData?.summary.address,
+      reportData?.summary.customerNumber,
+    );
+    printSingleReportRecord(unified);
+  };
+
   const handlePrint = () => {
-    if (!selectedCustomerId) {
-      toast.error("Please select a customer first.");
+    if (!reportData) {
+      toast.error("Please select a customer and load report data first.");
       return;
     }
-    const printUrl = `/reports/print/customer?id=${encodeURIComponent(selectedCustomerId)}`;
-    window.open(
-      printUrl,
-      "_blank",
-      "noopener,noreferrer,width=1000,height=800",
-    );
+    // Direct client print ensures instant generation with 0 failures
+    printCustomerReportDirect(reportData);
   };
 
   const filteredDropdownOptions = customerOptions.filter((c) => {
@@ -340,26 +372,27 @@ export function CustomerReportView({
             </span>
           </div>
 
-          {/* 4. SIMPLE MATERIAL TABLE */}
+          {/* 4. MATERIAL TABLE WITH ACTIONS */}
           <div className="border border-border bg-card overflow-hidden rounded-xl shadow-xs">
             <div className="overflow-x-auto max-w-full">
-              <Table className="min-w-[900px] text-xs">
+              <Table className="min-w-[950px] text-xs">
                 <TableHeader>
                   <TableRow className="bg-muted/40">
                     <TableHead className="w-28 font-bold">Track ID</TableHead>
                     <TableHead className="w-28">Date</TableHead>
-                    <TableHead className="w-48">Product</TableHead>
-                    <TableHead className="w-32">Serial</TableHead>
-                    <TableHead className="w-36">Vendor</TableHead>
-                    <TableHead className="w-32">Status</TableHead>
-                    <TableHead className="w-36">Location</TableHead>
+                    <TableHead className="w-44">Product</TableHead>
+                    <TableHead className="w-28">Serial</TableHead>
+                    <TableHead className="w-32">Vendor</TableHead>
+                    <TableHead className="w-28">Status</TableHead>
+                    <TableHead className="w-32">Location</TableHead>
+                    <TableHead className="w-24 text-right font-bold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {reportData.materials.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={7}
+                        colSpan={8}
                         className="py-8 text-center text-muted-foreground"
                       >
                         No material records found for this customer.
@@ -405,6 +438,30 @@ export function CustomerReportView({
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {item.location || reportData.summary.address || "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              onClick={() => handleViewRecord(item)}
+                              aria-label="View Record Details"
+                              title="View Record Details"
+                              className="size-7 text-foreground/70 hover:text-foreground hover:bg-muted cursor-pointer"
+                            >
+                              <Eye className="size-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              onClick={() => handlePrintRecord(item)}
+                              aria-label="Print / PDF Record"
+                              title="Print / PDF Record"
+                              className="size-7 text-primary hover:text-primary hover:bg-primary/10 cursor-pointer"
+                            >
+                              <Printer className="size-3.5" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -478,6 +535,16 @@ export function CustomerReportView({
           )}
         </>
       )}
+
+      {/* Detail Dialog */}
+      <ReportRecordDetailDialog
+        open={recordDialogOpen}
+        record={selectedRecord}
+        onClose={() => {
+          setRecordDialogOpen(false);
+          setSelectedRecord(null);
+        }}
+      />
     </div>
   );
 }

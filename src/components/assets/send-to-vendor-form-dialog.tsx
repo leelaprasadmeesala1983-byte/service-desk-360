@@ -68,7 +68,8 @@ const DEFAULT_SEND_TO_VENDOR_VALUES: SendToVendorFormValues = {
   courierName: "",
   docketAwbNumber: "",
   bookingDate: "",
-  numberOfPackages: 1,
+  numberOfPackages: "" as unknown as number,
+  noOfPackages: "" as unknown as number,
   dispatchRemarks: "",
 };
 
@@ -113,7 +114,8 @@ export function SendToVendorFormDialog({
     formState: { errors },
   } = form;
 
-  const numberOfPackagesValue = watch("numberOfPackages");
+  const numberOfPackagesValue =
+    watch("numberOfPackages") ?? watch("noOfPackages");
 
   // Flatten available assets into available un-dispatched product items
   const allAvailableItems = useMemo<DispatchItem[]>(() => {
@@ -280,7 +282,14 @@ export function SendToVendorFormDialog({
           courierName: initialData.courierName || "",
           docketAwbNumber: initialData.docketAwbNumber || "",
           bookingDate: formatLocalDate(initialData.bookingDate),
-          numberOfPackages: initialData.numberOfPackages || 1,
+          numberOfPackages:
+            initialData.numberOfPackages ||
+            (initialData as any).noOfPackages ||
+            1,
+          noOfPackages:
+            initialData.numberOfPackages ||
+            (initialData as any).noOfPackages ||
+            1,
           dispatchRemarks: initialData.dispatchRemarks || "",
         });
       } else if (initialDispatchItems && initialDispatchItems.length > 0) {
@@ -311,7 +320,8 @@ export function SendToVendorFormDialog({
           ...DEFAULT_SEND_TO_VENDOR_VALUES,
           assetId: formattedItems[0]?.receivedMaterialId || "",
           items: formattedItems,
-          numberOfPackages: formattedItems.length || 1,
+          numberOfPackages: "" as unknown as number,
+          noOfPackages: "" as unknown as number,
           bookingDate: formatLocalDate(new Date()),
         });
       } else if (initialAsset) {
@@ -341,7 +351,8 @@ export function SendToVendorFormDialog({
           ...DEFAULT_SEND_TO_VENDOR_VALUES,
           assetId: initialAsset.id,
           items: formattedItems,
-          numberOfPackages: formattedItems.length || 1,
+          numberOfPackages: "" as unknown as number,
+          noOfPackages: "" as unknown as number,
           bookingDate: formatLocalDate(new Date()),
         });
       } else {
@@ -355,6 +366,8 @@ export function SendToVendorFormDialog({
           ...DEFAULT_SEND_TO_VENDOR_VALUES,
           assetId: "",
           items: [],
+          numberOfPackages: "" as unknown as number,
+          noOfPackages: "" as unknown as number,
           bookingDate: formatLocalDate(new Date()),
         });
       }
@@ -458,6 +471,26 @@ export function SendToVendorFormDialog({
       return;
     }
 
+    const rawPkg = values.noOfPackages ?? values.numberOfPackages;
+    const parsedPackages =
+      typeof rawPkg === "number"
+        ? rawPkg
+        : Number.parseInt(String(rawPkg), 10);
+
+    if (
+      rawPkg === undefined ||
+      rawPkg === null ||
+      (rawPkg as unknown) === "" ||
+      Number.isNaN(parsedPackages) ||
+      parsedPackages < 1
+    ) {
+      form.setError("numberOfPackages", {
+        type: "manual",
+        message: "No. of Packages is required and must be a positive whole number.",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const finalCourier =
@@ -465,17 +498,13 @@ export function SendToVendorFormDialog({
           ? customCourier.trim() || "Other"
           : selectedCourier.trim();
 
-      const parsedPackages =
-        typeof values.numberOfPackages === "number"
-          ? values.numberOfPackages
-          : Number.parseInt(String(values.numberOfPackages), 10);
-
       const success = await onSubmit({
         ...values,
         assetId: selectedItems[0]?.receivedMaterialId || values.assetId,
         items: selectedItems,
         courierName: finalCourier,
-        numberOfPackages: Number.isNaN(parsedPackages) ? 1 : parsedPackages,
+        numberOfPackages: parsedPackages,
+        noOfPackages: parsedPackages,
       });
 
       if (success) {
@@ -985,12 +1014,14 @@ export function SendToVendorFormDialog({
                   </Label>
                   <Input
                     id="number-of-packages"
+                    name="noOfPackages"
                     type="text"
                     inputMode="numeric"
-                    placeholder="1"
+                    placeholder="Enter number of packages (e.g. 1)"
                     value={
                       numberOfPackagesValue === undefined ||
-                      numberOfPackagesValue === null
+                      numberOfPackagesValue === null ||
+                      (numberOfPackagesValue as unknown) === ""
                         ? ""
                         : String(numberOfPackagesValue)
                     }
@@ -1009,22 +1040,34 @@ export function SendToVendorFormDialog({
                     onChange={(e) => {
                       const val = e.target.value;
                       if (/^\d*$/.test(val)) {
-                        setValue(
-                          "numberOfPackages",
-                          val === "" ? ("" as any) : Number.parseInt(val, 10),
-                          { shouldValidate: true },
-                        );
+                        if (val === "") {
+                          setValue("numberOfPackages", "" as any, {
+                            shouldValidate: true,
+                          });
+                          setValue("noOfPackages", "" as any, {
+                            shouldValidate: true,
+                          });
+                        } else {
+                          const num = Number.parseInt(val, 10);
+                          setValue("numberOfPackages", num, {
+                            shouldValidate: true,
+                          });
+                          setValue("noOfPackages", num, {
+                            shouldValidate: true,
+                          });
+                        }
                       }
                     }}
                     className={cn(
                       "h-9 bg-background font-mono w-full min-w-0",
-                      errors.numberOfPackages &&
+                      (errors.numberOfPackages || errors.noOfPackages) &&
                         "border-destructive ring-1 ring-destructive/30",
                     )}
                   />
-                  {errors.numberOfPackages && (
+                  {(errors.numberOfPackages || errors.noOfPackages) && (
                     <p className="text-xs text-destructive">
-                      {errors.numberOfPackages.message}
+                      {errors.numberOfPackages?.message ||
+                        errors.noOfPackages?.message}
                     </p>
                   )}
                 </div>

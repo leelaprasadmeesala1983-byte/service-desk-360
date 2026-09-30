@@ -8,7 +8,7 @@ export default async function CustomerPrintPage({
 }: {
   searchParams: Promise<{ id?: string; customer?: string }>;
 }) {
-  await requireUser();
+  const user = await requireUser();
   const params = await searchParams;
   const customerId = params.id || params.customer;
 
@@ -16,9 +16,14 @@ export default async function CustomerPrintPage({
     return notFound();
   }
 
-  const reportData = await getCustomerReport(decodeURIComponent(customerId), {
-    limit: 1000,
-  });
+  const viewer = { role: user.role, id: user.id };
+  const reportData = await getCustomerReport(
+    decodeURIComponent(customerId),
+    {
+      limit: 1000,
+    },
+    viewer,
+  );
 
   if (!reportData) {
     return notFound();

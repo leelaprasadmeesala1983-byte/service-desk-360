@@ -1,11 +1,12 @@
 "use client";
 
-import { X } from "lucide-react";
+import { Printer, X } from "lucide-react";
 
 import { DetailGrid, DetailRow } from "@/components/service-tickets/detail-row";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { formatDate, formatDateTime, formatRecordId } from "@/lib/format";
+import { printVendorDispatch } from "@/lib/utils/print-vendor-dispatch";
 import type { SendToVendor, SendToVendorRow } from "@/types/send-to-vendor";
 
 type SendToVendorViewDialogProps = {
@@ -246,19 +247,29 @@ export function SendToVendorViewDialog({
         </div>
 
         {/* STICKY FOOTER */}
-        <div className="sticky bottom-0 z-20 shrink-0 border-t border-border bg-background px-6 py-3.5 sm:px-6 shadow-xs">
-          <div className="flex items-center justify-end w-full">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={onClose}
-              className="h-8.5 text-xs font-semibold cursor-pointer"
-            >
-              Close
-            </Button>
-          </div>
-        </div>
+            <div className="flex items-center justify-end gap-2.5 w-full">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  printVendorDispatch(item as SendToVendorRow);
+                }}
+                className="h-8.5 text-xs font-semibold gap-1.5 cursor-pointer text-primary border-primary/30 hover:bg-primary/10"
+              >
+                <Printer className="size-3.5" />
+                Print / Save PDF
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onClose}
+                className="h-8.5 text-xs font-semibold cursor-pointer"
+              >
+                Close
+              </Button>
+            </div>
       </DialogContent>
     </Dialog>
   );

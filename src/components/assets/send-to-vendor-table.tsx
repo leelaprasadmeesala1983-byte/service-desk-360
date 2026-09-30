@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, FilePenLine, Pencil, Trash2 } from "lucide-react";
+import { Eye, FilePenLine, Pencil, Printer, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -30,6 +30,7 @@ type SendToVendorTableProps = {
   onView: (item: SendToVendorRow) => void;
   onEdit: (item: SendToVendorRow) => void;
   onDelete: (item: SendToVendorRow) => void;
+  onPrint?: (item: SendToVendorRow) => void;
   onUpdateStatus?: (item: SendToVendorRow) => void;
   onReceiveFromVendor?: (item: SendToVendorRow) => void;
   isSearch?: boolean;
@@ -48,6 +49,7 @@ export function SendToVendorTable({
   onView,
   onEdit,
   onDelete,
+  onPrint,
   onUpdateStatus,
   onReceiveFromVendor,
   isSearch = false,
@@ -242,6 +244,19 @@ export function SendToVendorTable({
                               className="size-7 text-primary hover:text-primary hover:bg-primary/10 cursor-pointer"
                             >
                               <FilePenLine className="size-3.5" />
+                            </Button>
+                          )}
+
+                          {onPrint && (
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              onClick={() => onPrint(item)}
+                              aria-label="Print / Save PDF Dispatch"
+                              title="Print / Save PDF Dispatch"
+                              className="size-7 text-primary hover:text-primary hover:bg-primary/10 cursor-pointer"
+                            >
+                              <Printer className="size-3.5" />
                             </Button>
                           )}
 

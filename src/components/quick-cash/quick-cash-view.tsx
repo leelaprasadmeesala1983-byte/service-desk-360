@@ -33,14 +33,12 @@ import type {
   DailyRegisterRow,
   MonthlySummary,
 } from "@/db/queries/cash-transactions";
-import {
-  deleteCashTransaction,
-  exportCashTransactions,
-} from "@/lib/actions/cash-transactions";
+import { exportCashTransactions } from "@/lib/actions/cash-transactions";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import { DailyHistoryView } from "./daily-history-view";
+import { DeleteTransactionModal } from "./delete-transaction-modal";
 import { MonthlySummaryView } from "./monthly-summary-view";
 import { OpeningBalanceModal } from "./opening-balance-modal";
 import { TransactionDetailModal } from "./transaction-detail-modal";
@@ -93,6 +91,9 @@ export function QuickCashView({
   const [selectedTransaction, setSelectedTransaction] =
     useState<CashTransactionRow | null>(null);
   const [isOpeningBalanceOpen, setIsOpeningBalanceOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletingTransaction, setDeletingTransaction] =
+    useState<CashTransactionRow | null>(null);
 
   const isRegisterClosed = todayRegister.status === "CLOSED";
   const totalPages = Math.max(1, Math.ceil(total / perPage));
@@ -163,28 +164,18 @@ export function QuickCashView({
     setIsFormOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (isRegisterClosed) {
       toast.error(
         "This daily session is closed. Past transactions cannot be deleted.",
       );
       return;
     }
-    if (!window.confirm("Are you sure you want to delete this transaction?"))
-      return;
-
-    try {
-      const result = await deleteCashTransaction(id);
-      if (result.ok) {
-        toast.success("Transaction deleted successfully");
-        setIsDetailOpen(false);
-        router.refresh();
-      } else {
-        toast.error(result.error || "Failed to delete transaction");
-      }
-    } catch {
-      toast.error("Failed to delete transaction");
-    }
+    const tx =
+      transactions.find((t) => t.id === id) ||
+      (selectedTransaction?.id === id ? selectedTransaction : null);
+    setDeletingTransaction(tx);
+    setDeleteModalOpen(true);
   };
 
   const handleFormOpen = (open: boolean) => {
@@ -509,6 +500,19 @@ export function QuickCashView({
         onOpenChange={setIsOpeningBalanceOpen}
         currentBalance={todayRegister.openingBalance}
         targetDate={selectedDate}
+      />
+
+      <DeleteTransactionModal
+        isOpen={deleteModalOpen}
+        onOpenChange={(open) => {
+          setDeleteModalOpen(open);
+          if (!open) setDeletingTransaction(null);
+        }}
+        transaction={deletingTransaction}
+        onSuccess={() => {
+          setIsDetailOpen(false);
+          router.refresh();
+        }}
       />
     </div>
   );

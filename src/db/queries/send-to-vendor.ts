@@ -187,6 +187,7 @@ export async function listSendToVendor(
       docketAwbNumber: row.docketAwbNumber,
       bookingDate: row.bookingDate,
       numberOfPackages: row.numberOfPackages,
+      noOfPackages: row.numberOfPackages,
       dispatchRemarks: row.dispatchRemarks ?? "",
       vendorReturnDate: row.vendorReturnDate ?? undefined,
       repairRemarks: row.repairRemarks ?? undefined,
@@ -306,6 +307,7 @@ export async function getSendToVendorById(
     docketAwbNumber: row.docketAwbNumber,
     bookingDate: row.bookingDate,
     numberOfPackages: row.numberOfPackages,
+    noOfPackages: row.numberOfPackages,
     dispatchRemarks: row.dispatchRemarks ?? "",
     vendorReturnDate: row.vendorReturnDate,
     repairRemarks: row.repairRemarks,
@@ -400,7 +402,10 @@ export async function createSendToVendorRecord(
             courierName: input.courierName.trim(),
             docketAwbNumber: input.docketAwbNumber.trim(),
             bookingDate,
-            numberOfPackages: 1,
+            numberOfPackages: Math.max(
+              1,
+              Math.floor(input.noOfPackages ?? input.numberOfPackages ?? 1),
+            ),
             dispatchRemarks: input.dispatchRemarks
               ? input.dispatchRemarks.trim()
               : "",
@@ -486,7 +491,10 @@ export async function createSendToVendorRecord(
           courierName: input.courierName.trim(),
           docketAwbNumber: input.docketAwbNumber.trim(),
           bookingDate,
-          numberOfPackages: Math.max(1, Math.floor(input.numberOfPackages)),
+          numberOfPackages: Math.max(
+            1,
+            Math.floor(input.noOfPackages ?? input.numberOfPackages ?? 1),
+          ),
           dispatchRemarks: input.dispatchRemarks
             ? input.dispatchRemarks.trim()
             : "",
@@ -617,10 +625,11 @@ export async function updateSendToVendorRecord(
     valuesToUpdate.docketAwbNumber = input.docketAwbNumber.trim();
   if (input.bookingDate !== undefined)
     valuesToUpdate.bookingDate = new Date(input.bookingDate);
-  if (input.numberOfPackages !== undefined)
+  const rawPackages = input.noOfPackages ?? input.numberOfPackages;
+  if (rawPackages !== undefined)
     valuesToUpdate.numberOfPackages = Math.max(
       1,
-      Math.floor(input.numberOfPackages),
+      Math.floor(rawPackages),
     );
   if (input.dispatchRemarks !== undefined)
     valuesToUpdate.dispatchRemarks = input.dispatchRemarks.trim();

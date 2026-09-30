@@ -39,7 +39,7 @@ export function TransactionDetailModal({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Type & Status */}
+          {/* Type */}
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-muted-foreground">
               Type
@@ -53,6 +53,29 @@ export function TransactionDetailModal({
               )}
             >
               {transaction.type === "CASH_IN" ? "+ Cash In" : "- Cash Out"}
+            </span>
+          </div>
+
+          {/* Category */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-muted-foreground">
+              Transaction Category
+            </span>
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                (transaction.category === "Courier In" ||
+                (!transaction.category && transaction.type === "CASH_IN"))
+                  ? "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/40"
+                  : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40",
+              )}
+            >
+              {transaction.category === "Courier In" ||
+              transaction.category === "Courier Out"
+                ? transaction.category
+                : transaction.type === "CASH_IN"
+                  ? "Courier In"
+                  : "Courier Out"}
             </span>
           </div>
 

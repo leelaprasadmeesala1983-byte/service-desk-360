@@ -19,6 +19,7 @@ type CashTransactionRow = {
   seq: number;
   recordId: string;
   type: "CASH_IN" | "CASH_OUT";
+  category: string | null;
   amount: string;
   description: string;
   sourceRecordId: string | null;
@@ -63,11 +64,20 @@ function mapRow(row: {
   createdByName: string | null;
   technicianName: string | null;
 }): CashTransactionRow {
+  const category =
+    row.transaction.category === "Courier In" ||
+    row.transaction.category === "Courier Out"
+      ? row.transaction.category
+      : row.transaction.type === "CASH_IN"
+        ? "Courier In"
+        : "Courier Out";
+
   return {
     id: row.transaction.id,
     seq: row.transaction.seq,
     recordId: formatRecordId("CSH", row.transaction.seq),
     type: row.transaction.type,
+    category,
     amount: row.transaction.amount ?? "0",
     description: row.transaction.description,
     sourceRecordId: row.transaction.sourceRecordId,

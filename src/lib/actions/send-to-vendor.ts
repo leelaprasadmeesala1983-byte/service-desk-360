@@ -45,6 +45,7 @@ export async function createSendToVendor(
   if (!parsed.success) return invalid(parsed.error);
 
   const data = parsed.data;
+  const packagesCount = data.noOfPackages ?? data.numberOfPackages;
 
   try {
     const created = await createSendToVendorRecord(
@@ -61,7 +62,8 @@ export async function createSendToVendor(
         courierName: data.courierName,
         docketAwbNumber: data.docketAwbNumber,
         bookingDate: data.bookingDate,
-        numberOfPackages: data.numberOfPackages,
+        numberOfPackages: packagesCount,
+        noOfPackages: packagesCount,
         dispatchRemarks: data.dispatchRemarks || "",
       },
       current.id,
@@ -91,6 +93,7 @@ export async function updateSendToVendor(
   if (!parsed.success) return invalid(parsed.error);
 
   const data = parsed.data;
+  const packagesCount = data.noOfPackages ?? data.numberOfPackages;
 
   try {
     const updated = await updateSendToVendorRecord(
@@ -108,7 +111,8 @@ export async function updateSendToVendor(
         courierName: data.courierName,
         docketAwbNumber: data.docketAwbNumber,
         bookingDate: data.bookingDate,
-        numberOfPackages: data.numberOfPackages,
+        numberOfPackages: packagesCount,
+        noOfPackages: packagesCount,
         dispatchRemarks: data.dispatchRemarks || "",
       },
       { role: current.role, id: current.id },

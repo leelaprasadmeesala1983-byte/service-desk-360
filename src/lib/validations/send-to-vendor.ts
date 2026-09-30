@@ -81,13 +81,22 @@ export const sendToVendorFormSchema = z.object({
       message: "Booking Date is required.",
     }),
 
-  numberOfPackages: z
+  numberOfPackages: z.coerce
     .number({
       required_error: "No. of Packages is required.",
       invalid_type_error: "Please enter a valid number of packages.",
     })
-    .int("Please enter a valid number of packages.")
+    .int("Please enter a valid whole number of packages.")
     .min(1, "Number of packages must be at least 1."),
+
+  noOfPackages: z.coerce
+    .number({
+      required_error: "No. of Packages is required.",
+      invalid_type_error: "Please enter a valid number of packages.",
+    })
+    .int("Please enter a valid whole number of packages.")
+    .min(1, "Number of packages must be at least 1.")
+    .optional(),
 
   dispatchRemarks: z
     .string()
