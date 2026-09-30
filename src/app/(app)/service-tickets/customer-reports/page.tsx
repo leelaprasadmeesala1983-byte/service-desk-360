@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { CustomerReportsView } from "@/components/service-tickets/customer-reports/customer-reports-view";
 import { getCustomerReports } from "@/db/queries/customer-reports";
-import { requireUser } from "@/lib/session";
+import { requireAdmin } from "@/lib/session";
 
 export const metadata: Metadata = {
   title: "Customer Reports & Analytics | Service Desk 360",
@@ -12,11 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default async function CustomerReportsPage() {
-  const user = await requireUser();
-
-  if (user.role !== "ADMIN") {
-    redirect("/service-tickets");
-  }
+  const user = await requireAdmin();
 
   const viewer = { role: user.role, id: user.id };
   const initialData = await getCustomerReports(

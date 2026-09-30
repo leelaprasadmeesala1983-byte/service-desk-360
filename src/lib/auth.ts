@@ -14,9 +14,11 @@ export const auth = betterAuth({
     schema,
   }),
 
-  baseURL: process.env.BETTER_AUTH_URL,
+  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
 
-  trustedOrigins: process.env.CORS_ORIGIN ? [process.env.CORS_ORIGIN] : [],
+  trustedOrigins: process.env.CORS_ORIGIN
+    ? [process.env.CORS_ORIGIN]
+    : ["http://localhost:3000"],
 
   emailAndPassword: {
     // Resets do not go through better-auth's emailed-token route: the reset
