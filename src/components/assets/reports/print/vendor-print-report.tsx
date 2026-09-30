@@ -11,7 +11,20 @@ type VendorPrintReportProps = {
 };
 
 export function VendorPrintReport({ data }: VendorPrintReportProps) {
-  const { summary, materials } = data;
+  const summary = data?.summary || {
+    vendorName: "Vendor",
+    contactPerson: "",
+    phoneNumber: "",
+    email: "",
+    address: "",
+    totalMaterials: 0,
+    sentToVendor: 0,
+    vendorReceived: 0,
+    underRepair: 0,
+    returnedToCustomer: 0,
+    totalRepairCost: 0,
+  };
+  const materials = Array.isArray(data?.materials) ? data.materials : [];
   const now = new Date();
   const generatedDate = formatDate(now);
   const generatedTime = formatDateTime(now).split(",")[1]?.trim() || "";

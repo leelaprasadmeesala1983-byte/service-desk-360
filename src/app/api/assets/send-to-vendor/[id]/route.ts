@@ -71,11 +71,14 @@ export async function PUT(
     }
 
     const data = parsed.data;
+    const packagesCount = data.noOfPackages ?? data.numberOfPackages;
     const viewer = { role: user.role, id: user.id };
     const updated = await updateSendToVendorRecord(
       id,
       {
         assetId: data.assetId || null,
+        items: data.items,
+        vendorId: data.vendorId || null,
         vendorName: data.vendorName,
         contactPerson: data.contactPerson,
         phoneNumber: data.phoneNumber,
@@ -85,7 +88,8 @@ export async function PUT(
         courierName: data.courierName,
         docketAwbNumber: data.docketAwbNumber,
         bookingDate: data.bookingDate,
-        numberOfPackages: data.numberOfPackages,
+        numberOfPackages: packagesCount,
+        noOfPackages: packagesCount,
         dispatchRemarks: data.dispatchRemarks || "",
       },
       viewer,

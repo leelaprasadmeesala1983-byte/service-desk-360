@@ -8,7 +8,7 @@ export default async function VendorPrintPage({
 }: {
   searchParams: Promise<{ id?: string; vendor?: string }>;
 }) {
-  await requireUser();
+  const user = await requireUser();
   const params = await searchParams;
   const vendorId = params.id || params.vendor;
 
@@ -16,9 +16,14 @@ export default async function VendorPrintPage({
     return notFound();
   }
 
-  const reportData = await getVendorReport(decodeURIComponent(vendorId), {
-    limit: 1000,
-  });
+  const viewer = { role: user.role, id: user.id };
+  const reportData = await getVendorReport(
+    decodeURIComponent(vendorId),
+    {
+      limit: 1000,
+    },
+    viewer,
+  );
 
   if (!reportData) {
     return notFound();

@@ -12,6 +12,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   addCashTransaction,
@@ -19,6 +26,7 @@ import {
   updateCashTransaction,
 } from "@/lib/actions/cash-transactions";
 import { formatLocalDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 type CashTransactionFormProps = {
   isOpen: boolean;
@@ -40,8 +48,10 @@ export function CashTransactionForm({
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
   const [isLoading, setIsLoading] = useState(false);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     type: "CASH_IN",
+    category: "",
     amount: "",
     description: "",
     date: formatLocalDate(new Date()),
@@ -55,12 +65,18 @@ export function CashTransactionForm({
       getCashTransaction(editingId)
         .then((tx) => {
           if (tx) {
+            const category =
+              tx.category === "Courier In" || tx.category === "Courier Out"
+                ? tx.category
+                : "";
             setFormData({
               type: tx.type,
+              category,
               amount: tx.amount,
               description: tx.description,
               date: tx.date,
             });
+            setCategoryError(null);
           }
         })
         .catch((error) => {
@@ -72,19 +88,35 @@ export function CashTransactionForm({
       // Reset form when adding new transaction
       setFormData({
         type: "CASH_IN",
+        category: "",
         amount: "",
         description: "",
         date: formatLocalDate(new Date()),
       });
+      setCategoryError(null);
     }
   }, [editingId, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    if (!formData.category) {
+      setCategoryError("Please select a transaction category.");
+      toast.error("Please select a transaction category.");
+      return;
+    }
+
     const input = {
       id: editingId || undefined,
       type: formData.type,
+      transactionType: formData.type,
+      category: formData.category,
+      transactionCategory:
+        formData.category === "Courier In"
+          ? "COURIER_IN"
+          : formData.category === "Courier Out"
+            ? "COURIER_OUT"
+            : formData.category,
       amount: formData.amount,
       description: formData.description,
       date: formData.date,
@@ -110,6 +142,9 @@ export function CashTransactionForm({
         }
         router.refresh();
       } else {
+        if (result.fieldErrors?.category?.[0]) {
+          setCategoryError(result.fieldErrors.category[0]);
+        }
         toast.error(result.error || "Something went wrong");
       }
     });
@@ -140,7 +175,10 @@ export function CashTransactionForm({
                   <button
                     type="button"
                     onClick={() =>
-                      setFormData({ ...formData, type: "CASH_IN" })
+                      setFormData((prev) => ({
+                        ...prev,
+                        type: "CASH_IN",
+                      }))
                     }
                     className={`flex-1 rounded-full py-2.5 px-4 font-semibold transition-all ${
                       formData.type === "CASH_IN"
@@ -153,7 +191,10 @@ export function CashTransactionForm({
                   <button
                     type="button"
                     onClick={() =>
-                      setFormData({ ...formData, type: "CASH_OUT" })
+                      setFormData((prev) => ({
+                        ...prev,
+                        type: "CASH_OUT",
+                      }))
                     }
                     className={`flex-1 rounded-full py-2.5 px-4 font-semibold transition-all ${
                       formData.type === "CASH_OUT"
@@ -164,6 +205,38 @@ export function CashTransactionForm({
                     - Cash Out
                   </button>
                 </div>
+              </div>
+
+              {/* Transaction Category */}
+              <div className="space-y-2">
+                <Label htmlFor="category">Transaction Category *</Label>
+                <Select
+                  value={formData.category}
+                  onValueChange={(val) => {
+                    setFormData((prev) => ({ ...prev, category: val || "" }));
+                    if (val) setCategoryError(null);
+                  }}
+                >
+                  <SelectTrigger
+                    id="category"
+                    className={cn(
+                      "w-full",
+                      categoryError &&
+                        "border-destructive focus-visible:ring-destructive",
+                    )}
+                  >
+                    <SelectValue placeholder="Select Transaction Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Courier In">Courier In</SelectItem>
+                    <SelectItem value="Courier Out">Courier Out</SelectItem>
+                  </SelectContent>
+                </Select>
+                {categoryError && (
+                  <p className="text-xs text-destructive font-medium">
+                    {categoryError}
+                  </p>
+                )}
               </div>
 
               {/* Available Balance */}

@@ -12,6 +12,7 @@ import {
   updateSendToVendor,
   updateVendorDispatchRepairStatus,
 } from "@/lib/actions/send-to-vendor";
+import { printVendorDispatch } from "@/lib/utils/print-vendor-dispatch";
 import type { SendToVendorFormValues } from "@/lib/validations/send-to-vendor";
 import type {
   SendToVendorListResponse,
@@ -69,6 +70,15 @@ export function SendToVendorView({
   const [statusRecord, setStatusRecord] = useState<SendToVendorRow | null>(
     null,
   );
+
+  // Print Action
+  const handlePrint = useCallback((record: SendToVendorRow) => {
+    printVendorDispatch(record, () => {
+      toast.error(
+        "Please allow pop-ups for ServiceDesk 360 to print the dispatch document.",
+      );
+    });
+  }, []);
 
   // Debounce search input by 300ms
   useEffect(() => {
@@ -232,6 +242,7 @@ export function SendToVendorView({
         onView={(item) => setViewRecord(item)}
         onEdit={(item) => setEditRecord(item)}
         onDelete={(item) => setDeleteRecord(item)}
+        onPrint={handlePrint}
         onUpdateStatus={(item) => setStatusRecord(item)}
         isSearch={Boolean(debouncedSearch)}
         onResetSearch={() => setSearch("")}

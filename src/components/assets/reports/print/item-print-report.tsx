@@ -11,6 +11,7 @@ type ItemPrintReportProps = {
 };
 
 export function ItemPrintReport({ data }: ItemPrintReportProps) {
+  const timeline = Array.isArray(data?.timeline) ? data.timeline : [];
   const now = new Date();
   const generatedDate = formatDate(now);
   const generatedTime = formatDateTime(now).split(",")[1]?.trim() || "";
@@ -170,11 +171,11 @@ export function ItemPrintReport({ data }: ItemPrintReportProps) {
           </span>
 
           <div className="relative pl-6 space-y-6 before:absolute before:top-2 before:bottom-2 before:left-2.5 before:w-0.5 before:bg-zinc-300">
-            {data.timeline.map((event, idx) => (
+            {timeline.map((event, idx) => (
               <div key={event.id || idx} className="relative group text-xs">
                 {/* Timeline Dot */}
                 <div className="absolute -left-6 top-0.5 flex size-5 items-center justify-center rounded-full bg-white border-2 border-zinc-900">
-                  {idx === data.timeline.length - 1 ? (
+                  {idx === timeline.length - 1 ? (
                     <CheckCircle2 className="size-3 text-emerald-600" />
                   ) : (
                     <Circle className="size-2 fill-zinc-900 text-zinc-900" />

@@ -23,6 +23,7 @@ export interface SendToVendor {
   docketAwbNumber: string;
   bookingDate: Date | string;
   numberOfPackages: number;
+  noOfPackages?: number;
   dispatchRemarks: string;
   vendorReturnDate?: Date | string | null;
   repairRemarks?: string | null;
@@ -82,6 +83,7 @@ export interface SendToVendorRow {
   docketAwbNumber: string;
   bookingDate: Date | string;
   numberOfPackages: number;
+  noOfPackages?: number;
   dispatchRemarks: string;
   vendorReturnDate?: Date | string | null;
   repairRemarks?: string | null;
@@ -130,6 +132,7 @@ export interface CreateSendToVendorInput {
   docketAwbNumber: string;
   bookingDate: Date | string;
   numberOfPackages: number;
+  noOfPackages?: number;
   dispatchRemarks?: string;
 }
 

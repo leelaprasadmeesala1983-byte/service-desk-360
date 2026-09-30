@@ -11,7 +11,19 @@ type CustomerPrintReportProps = {
 };
 
 export function CustomerPrintReport({ data }: CustomerPrintReportProps) {
-  const { summary, materials } = data;
+  const summary = data?.summary || {
+    customerName: "Customer",
+    customerNumber: "",
+    email: "",
+    address: "",
+    totalMaterialsReceived: 0,
+    totalSentToVendor: 0,
+    currentlyUnderRepair: 0,
+    vendorReceived: 0,
+    returnedToCustomer: 0,
+    totalRepairCost: 0,
+  };
+  const materials = Array.isArray(data?.materials) ? data.materials : [];
   const now = new Date();
   const generatedDate = formatDate(now);
   const generatedTime = formatDateTime(now).split(",")[1]?.trim() || "";

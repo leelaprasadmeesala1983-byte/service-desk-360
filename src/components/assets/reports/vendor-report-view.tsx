@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Eye,
   Loader2,
   Printer,
   RefreshCw,
@@ -26,7 +27,18 @@ import {
 } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { VendorReportData, VendorReportOption } from "@/types/reports";
+import {
+  type UnifiedReportRecord,
+  normalizeVendorRecord,
+  printSingleReportRecord,
+} from "@/lib/utils/print-report-record";
+import { printVendorReportDirect } from "@/lib/utils/print-reports";
+import type {
+  VendorMaterialItem,
+  VendorReportData,
+  VendorReportOption,
+} from "@/types/reports";
+import { ReportRecordDetailDialog } from "./report-record-detail-dialog";
 
 type VendorReportViewProps = {
   initialOptions?: VendorReportOption[];
@@ -47,6 +59,11 @@ export function VendorReportView({
   const [reportData, setReportData] = useState<VendorReportData | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Individual Record Dialog State
+  const [selectedRecord, setSelectedRecord] =
+    useState<UnifiedReportRecord | null>(null);
+  const [recordDialogOpen, setRecordDialogOpen] = useState(false);
 
   // Pagination
   const [page, setPage] = useState(1);
@@ -147,17 +164,32 @@ export function VendorReportView({
     }
   };
 
+  const handleViewRecord = (item: VendorMaterialItem) => {
+    const unified = normalizeVendorRecord(
+      item,
+      reportData?.summary.address,
+      reportData?.summary.vendorName,
+    );
+    setSelectedRecord(unified);
+    setRecordDialogOpen(true);
+  };
+
+  const handlePrintRecord = (item: VendorMaterialItem) => {
+    const unified = normalizeVendorRecord(
+      item,
+      reportData?.summary.address,
+      reportData?.summary.vendorName,
+    );
+    printSingleReportRecord(unified);
+  };
+
   const handlePrint = () => {
-    if (!selectedVendorId) {
-      toast.error("Please select a vendor first.");
+    if (!reportData) {
+      toast.error("Please select a vendor and load report data first.");
       return;
     }
-    const printUrl = `/reports/print/vendor?id=${encodeURIComponent(selectedVendorId)}`;
-    window.open(
-      printUrl,
-      "_blank",
-      "noopener,noreferrer,width=1000,height=800",
-    );
+    // Direct client print ensures instant generation with 0 failures
+    printVendorReportDirect(reportData);
   };
 
   const filteredDropdownOptions = vendorOptions.filter((v) => {
@@ -325,26 +357,27 @@ export function VendorReportView({
             </span>
           </div>
 
-          {/* 4. SIMPLE VENDOR MATERIAL TABLE */}
+          {/* 4. VENDOR MATERIAL TABLE WITH ACTIONS */}
           <div className="border border-border bg-card overflow-hidden rounded-xl shadow-xs">
             <div className="overflow-x-auto max-w-full">
-              <Table className="min-w-[900px] text-xs">
+              <Table className="min-w-[950px] text-xs">
                 <TableHeader>
                   <TableRow className="bg-muted/40">
                     <TableHead className="w-28 font-bold">Track ID</TableHead>
-                    <TableHead className="w-40">Customer</TableHead>
-                    <TableHead className="w-48">Product</TableHead>
-                    <TableHead className="w-32">Serial</TableHead>
-                    <TableHead className="w-28">Sent</TableHead>
-                    <TableHead className="w-32">Status</TableHead>
+                    <TableHead className="w-36">Customer</TableHead>
+                    <TableHead className="w-44">Product</TableHead>
+                    <TableHead className="w-28">Serial</TableHead>
+                    <TableHead className="w-24">Sent</TableHead>
+                    <TableHead className="w-28">Status</TableHead>
                     <TableHead className="w-24 text-right">Cost</TableHead>
+                    <TableHead className="w-24 text-right font-bold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {reportData.materials.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={7}
+                        colSpan={8}
                         className="py-8 text-center text-muted-foreground"
                       >
                         No material records found for this vendor.
@@ -387,6 +420,30 @@ export function VendorReportView({
                         </TableCell>
                         <TableCell className="text-right font-mono font-bold text-foreground whitespace-nowrap">
                           {formatCurrency(item.repairCost)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              onClick={() => handleViewRecord(item)}
+                              aria-label="View Record Details"
+                              title="View Record Details"
+                              className="size-7 text-foreground/70 hover:text-foreground hover:bg-muted cursor-pointer"
+                            >
+                              <Eye className="size-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              onClick={() => handlePrintRecord(item)}
+                              aria-label="Print / PDF Record"
+                              title="Print / PDF Record"
+                              className="size-7 text-primary hover:text-primary hover:bg-primary/10 cursor-pointer"
+                            >
+                              <Printer className="size-3.5" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -460,6 +517,16 @@ export function VendorReportView({
           )}
         </>
       )}
+
+      {/* Detail Dialog */}
+      <ReportRecordDetailDialog
+        open={recordDialogOpen}
+        record={selectedRecord}
+        onClose={() => {
+          setRecordDialogOpen(false);
+          setSelectedRecord(null);
+        }}
+      />
     </div>
   );
 }

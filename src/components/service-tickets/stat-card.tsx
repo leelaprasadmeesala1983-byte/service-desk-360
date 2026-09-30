@@ -92,16 +92,17 @@ function StatCard({
           </div>
         )}
       </div>
-      <div className="mt-2">
+      <div className="mt-2 min-w-0">
         <p
           className={cn(
-            "text-2xl font-bold tracking-tight sm:text-[26px] leading-tight",
+            "text-xl sm:text-2xl md:text-[26px] font-bold tracking-tight leading-tight truncate",
             currentTone.text,
           )}
+          title={typeof value === "string" || typeof value === "number" ? String(value) : undefined}
         >
           {value}
         </p>
-        {hint && <p className="text-muted-foreground mt-0.5 text-xs">{hint}</p>}
+        {hint && <p className="text-muted-foreground mt-0.5 text-xs truncate">{hint}</p>}
       </div>
     </div>
   );

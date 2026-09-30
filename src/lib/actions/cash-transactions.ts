@@ -29,6 +29,7 @@ const PATH = "/quick-cash";
 async function getCashTransaction(id: string): Promise<{
   id: string;
   type: "CASH_IN" | "CASH_OUT";
+  category: string;
   amount: string;
   description: string;
   date: string; // ISO date string YYYY-MM-DD
@@ -54,6 +55,13 @@ async function getCashTransaction(id: string): Promise<{
     return {
       id: transaction.id,
       type: transaction.type,
+      category:
+        transaction.category === "Courier In" ||
+        transaction.category === "Courier Out"
+          ? transaction.category
+          : transaction.type === "CASH_IN"
+            ? "Courier In"
+            : "Courier Out",
       amount: String(Math.abs(Number(transaction.amount) || 0)),
       description: transaction.description,
       date: formatLocalDate(transaction.createdAt),
@@ -64,9 +72,39 @@ async function getCashTransaction(id: string): Promise<{
   }
 }
 
-const cashTransactionSchema = z.object({
+const normalizeCashTransactionInput = (input: unknown) => {
+  if (typeof input !== "object" || input === null) return input;
+  const raw = input as Record<string, unknown>;
+  const type = (raw.type || raw.transactionType) as string | undefined;
+  let category = (raw.category || raw.transactionCategory) as
+    | string
+    | undefined;
+
+  if (category === "COURIER_IN" || category === "Courier In") {
+    category = "Courier In";
+  } else if (category === "COURIER_OUT" || category === "Courier Out") {
+    category = "Courier Out";
+  } else if (!category) {
+    category = "";
+  }
+
+  return {
+    ...raw,
+    type,
+    category,
+  };
+};
+
+const baseCashTransactionObject = z.object({
   id: z.string().min(1).optional(),
   type: z.enum(["CASH_IN", "CASH_OUT"]),
+  category: z
+    .string()
+    .trim()
+    .min(1, "Please select a transaction category.")
+    .refine((v) => v === "Courier In" || v === "Courier Out", {
+      message: "Please select a transaction category.",
+    }),
   amount: numericField.refine((v) => v !== null && Number(v) > 0, {
     message: "Amount must be greater than 0",
   }),
@@ -75,6 +113,18 @@ const cashTransactionSchema = z.object({
     message: "Invalid date",
   }),
 });
+
+const cashTransactionSchema = z.preprocess(
+  normalizeCashTransactionInput,
+  baseCashTransactionObject,
+);
+
+const updateCashTransactionSchema = z.preprocess(
+  normalizeCashTransactionInput,
+  baseCashTransactionObject.extend({
+    id: z.string().min(1, "Transaction ID is required"),
+  }),
+);
 
 function invalid(error: ZodError): ActionResult {
   return actionError(
@@ -136,6 +186,7 @@ async function addCashTransaction(input: unknown): Promise<ActionResult> {
       .insert(cashTransaction)
       .values({
         type: data.type as "CASH_IN" | "CASH_OUT",
+        category: data.category,
         amount: normalizedAmount,
         description: data.description,
         customerName: current.name || "Admin",
@@ -165,10 +216,7 @@ async function updateCashTransaction(input: unknown): Promise<ActionResult> {
     if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
       return actionError("Admins only.");
 
-    const baseSchema = cashTransactionSchema.extend({
-      id: z.string().min(1),
-    });
-    const parsed = baseSchema.safeParse(input);
+    const parsed = updateCashTransactionSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     const data = parsed.data;
 
@@ -252,6 +300,7 @@ async function updateCashTransaction(input: unknown): Promise<ActionResult> {
       .update(cashTransaction)
       .set({
         type: data.type as "CASH_IN" | "CASH_OUT",
+        category: data.category,
         amount: normalizedAmount,
         description: data.description,
         createdAt: txDate,
@@ -503,7 +552,14 @@ async function exportCashTransactions(
       : formatLocalDate(new Date());
 
   if (format === "csv") {
-    const headers = ["Date", "Type", "Service ID", "Added By", "Amount (₹)"];
+    const headers = [
+      "Date",
+      "Type",
+      "Category",
+      "Service ID",
+      "Added By",
+      "Amount (₹)",
+    ];
     const escapeCSV = (field: unknown) => {
       if (field === null || field === undefined) return "";
       const str = String(field);
@@ -514,9 +570,16 @@ async function exportCashTransactions(
     };
 
     const csvRows = rows.map((r) => {
+      const cat =
+        r.category === "Courier In" || r.category === "Courier Out"
+          ? r.category
+          : r.type === "CASH_IN"
+            ? "Courier In"
+            : "Courier Out";
       return [
         formatLocalDate(r.createdAt),
         r.type === "CASH_IN" ? "Cash In" : "Cash Out",
+        cat,
         r.sourceRecordLabel || "",
         r.createdByName || r.technicianName || "",
         r.type === "CASH_IN" ? `+${r.amount}` : `-${r.amount}`,
@@ -530,15 +593,24 @@ async function exportCashTransactions(
   } else {
     const rowsHtml = rows
       .map(
-        (r) => `
+        (r) => {
+          const cat =
+            r.category === "Courier In" || r.category === "Courier Out"
+              ? r.category
+              : r.type === "CASH_IN"
+                ? "Courier In"
+                : "Courier Out";
+          return `
       <tr>
         <td>${formatLocalDate(r.createdAt)}</td>
         <td>${r.type === "CASH_IN" ? "Cash In" : "Cash Out"}</td>
+        <td>${cat}</td>
         <td>${r.sourceRecordLabel || ""}</td>
         <td>${r.createdByName || r.technicianName || ""}</td>
         <td>${r.type === "CASH_IN" ? "+" : "-"}${r.amount}</td>
       </tr>
-    `,
+    `;
+        },
       )
       .join("");
 
@@ -565,6 +637,7 @@ async function exportCashTransactions(
           <tr>
             <th>Date</th>
             <th>Type</th>
+            <th>Category</th>
             <th>Service ID</th>
             <th>Added By</th>
             <th>Amount</th>

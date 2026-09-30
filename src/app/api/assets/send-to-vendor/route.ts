@@ -61,9 +61,12 @@ export async function POST(request: NextRequest) {
     }
 
     const data = parsed.data;
+    const packagesCount = data.noOfPackages ?? data.numberOfPackages;
     const created = await createSendToVendorRecord(
       {
         assetId: data.assetId || null,
+        items: data.items,
+        vendorId: data.vendorId || null,
         vendorName: data.vendorName,
         contactPerson: data.contactPerson,
         phoneNumber: data.phoneNumber,
@@ -73,7 +76,8 @@ export async function POST(request: NextRequest) {
         courierName: data.courierName,
         docketAwbNumber: data.docketAwbNumber,
         bookingDate: data.bookingDate,
-        numberOfPackages: data.numberOfPackages,
+        numberOfPackages: packagesCount,
+        noOfPackages: packagesCount,
         dispatchRemarks: data.dispatchRemarks || "",
       },
       user.id,

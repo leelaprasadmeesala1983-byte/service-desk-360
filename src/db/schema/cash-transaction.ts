@@ -25,6 +25,7 @@ const cashTransaction = pgTable(
     seq: serial("seq").notNull(),
 
     type: cashTransactionTypeEnum("type").notNull(),
+    category: text("category"), // "Cash In", "Courier In", "Cash Out", "Courier Out"
     amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
     description: text("description").notNull(),
 

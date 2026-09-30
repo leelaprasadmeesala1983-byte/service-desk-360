@@ -76,7 +76,7 @@ export function CashTransactionList({
                 Date
               </TableHead>
               <TableHead className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">
-                Type
+                Type / Category
               </TableHead>
               <TableHead className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">
                 Service ID
@@ -102,23 +102,31 @@ export function CashTransactionList({
                 </TableCell>
               </TableRow>
             ) : (
-              transactions.map((tx) => (
-                <TableRow key={tx.id}>
-                  <TableCell className="text-sm">
-                    {formatDate(tx.createdAt)}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={cn(
-                        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                        tx.type === "CASH_IN"
-                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                          : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-                      )}
-                    >
-                      {tx.type === "CASH_IN" ? "Cash In" : "Cash Out"}
-                    </span>
-                  </TableCell>
+              transactions.map((tx) => {
+                const category =
+                  tx.category === "Courier In" || tx.category === "Courier Out"
+                    ? tx.category
+                    : tx.type === "CASH_IN"
+                      ? "Courier In"
+                      : "Courier Out";
+
+                return (
+                  <TableRow key={tx.id}>
+                    <TableCell className="text-sm">
+                      {formatDate(tx.createdAt)}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap",
+                          category === "Courier In"
+                            ? "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/40"
+                            : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40",
+                        )}
+                      >
+                        {category}
+                      </span>
+                    </TableCell>
                   <TableCell className="text-sm font-mono">
                     {tx.sourceRecordLabel ? tx.sourceRecordLabel : "—"}
                   </TableCell>
@@ -191,8 +199,9 @@ export function CashTransactionList({
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
+              );
+            })
+          )}
           </TableBody>
         </Table>
       </div>
