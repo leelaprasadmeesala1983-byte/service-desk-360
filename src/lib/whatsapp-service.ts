@@ -7,11 +7,49 @@
  *
  * Optional approved Content Template SIDs (HX...). When one is unset, the
  * message is sent as free-form text, which works in the Twilio sandbox and
- * inside WhatsApp's 24-hour reply window:
- *   TWILIO_TEMPLATE_TICKET_CREATED             {{1}} customer, {{2}} ticket id
- *   TWILIO_TEMPLATE_TICKET_ASSIGNED_CUSTOMER   {{1}} customer, {{2}} technician(s), {{3}} ticket id
- *   TWILIO_TEMPLATE_TICKET_ASSIGNED_TECHNICIAN {{1}} technician, {{2}} ticket id, {{3}} customer, {{4}} issue
+ * inside WhatsApp's 24-hour reply window.
+ *
+ *   TWILIO_TEMPLATE_USER_CREDENTIALS         {{1}} name, {{2}} login link, {{3}} username (email), {{4}} temporary password, {{5}} support phone
+ *
+ *   TWILIO_TEMPLATE_SERVICE_CREATED          {{1}} customer, {{2}} ticket id
+ *   TWILIO_TEMPLATE_INSTALLATION_CREATED     {{1}} customer, {{2}} ticket id
+ *   TWILIO_TEMPLATE_PROJECT_CREATED          {{1}} customer, {{2}} ticket id
+ *
+ *   TWILIO_TEMPLATE_SERVICE_TECHNICIAN       {{1}} technician, {{2}} ticket id, {{3}} customer, {{4}} phone, {{5}} address, {{6}} issue, {{7}} link
+ *   TWILIO_TEMPLATE_SERVICE_CUSTOMER         {{1}} customer, {{2}} technician(s), {{3}} ticket id
+ *   TWILIO_TEMPLATE_INSTALLATION_TECHNICIAN  {{1}} technician, {{2}} ticket id, {{3}} customer, {{4}} contact, {{5}} address, {{6}} details, {{7}} link
+ *   TWILIO_TEMPLATE_INSTALLATION_CUSTOMER    {{1}} customer, {{2}} ticket id, {{3}} technician(s), {{4}} address
+ *   TWILIO_TEMPLATE_PROJECT_TECHNICIAN       {{1}} technician, {{2}} ticket id, {{3}} company, {{4}} customer, {{5}} mobile, {{6}} location, {{7}} link
+ *   TWILIO_TEMPLATE_PROJECT_CUSTOMER         {{1}} customer, {{2}} ticket id, {{3}} company, {{4}} technician(s)
  */
+
+type TicketType = "SERVICE" | "INSTALLATION" | "PROJECT";
+
+const TICKET_PATHS: Record<TicketType, string> = {
+  SERVICE: "/service-tickets/service-management",
+  INSTALLATION: "/service-tickets/installation-management",
+  PROJECT: "/service-tickets/project-management",
+};
+
+const TICKET_LABELS: Record<TicketType, string> = {
+  SERVICE: "service request",
+  INSTALLATION: "installation",
+  PROJECT: "project",
+};
+
+function templateSid(name: string): string | undefined {
+  return process.env[`TWILIO_TEMPLATE_${name}`] || undefined;
+}
+
+/** Support number shown in messages: the WhatsApp sender number. */
+function supportPhone(): string {
+  return (process.env.TWILIO_WHATSAPP_FROM ?? "").replace(/^whatsapp:/, "");
+}
+
+/** WhatsApp rejects empty template variables and newlines. */
+function clean(value: string | null | undefined): string {
+  return (value ?? "").replace(/\s+/g, " ").trim() || "-";
+}
 
 type SendResult = { success: boolean; messageId?: string; error?: string };
 
@@ -98,62 +136,94 @@ async function sendWhatsAppMessage(
  * Tell the ticket owner (customer) their ticket was created.
  */
 async function notifyTicketCreated(
+  ticketType: TicketType,
   phoneNumber: string,
   customerName: string,
   ticketId: string,
 ): Promise<SendResult> {
   return sendWhatsAppMessage(
     phoneNumber,
-    `Hello ${customerName}, your ticket ${ticketId} has been created. Soon the technician will reach out to you.`,
-    process.env.TWILIO_TEMPLATE_TICKET_CREATED,
-    [customerName, ticketId],
+    `Hello ${customerName}, your ${TICKET_LABELS[ticketType]} ${ticketId} has been created. Soon the technician will reach out to you.`,
+    templateSid(`${ticketType}_CREATED`),
+    [clean(customerName), clean(ticketId)],
   );
 }
 
 /**
- * Tell the ticket owner (customer) which technicians were assigned.
+ * WhatsApp is best-effort: a failed message must never fail the ticket.
  */
-async function notifyTicketOwnerAssignment(
-  phoneNumber: string,
-  customerName: string,
-  ticketId: string,
-  technicianNames: string[],
-): Promise<SendResult> {
-  const technicians = technicianNames.join(", ");
-  return sendWhatsAppMessage(
-    phoneNumber,
-    `Hello ${customerName}, technician ${technicians} has been assigned to your ticket ${ticketId} and will reach out to you soon.`,
-    process.env.TWILIO_TEMPLATE_TICKET_ASSIGNED_CUSTOMER,
-    [customerName, technicians, ticketId],
-  );
+async function sendWhatsAppSafely(
+  phone: string | null | undefined,
+  send: () => Promise<SendResult>,
+): Promise<void> {
+  if (!phone?.trim()) return;
+  try {
+    const result = await send();
+    if (!result.success) {
+      console.warn(`WhatsApp to ${phone} not sent: ${result.error}`);
+    }
+  } catch (error) {
+    console.error(`WhatsApp to ${phone} failed:`, error);
+  }
 }
 
+type AssignedParams = {
+  ticketType: TicketType;
+  ticketId: string;
+  owner: { name: string; phone: string | null | undefined };
+  /** Service/installation address, or the project location. */
+  address: string;
+  /** Service issue title, installation details or project description. */
+  details: string;
+  /** Project only. */
+  company?: string;
+  technicians: { name: string; phone: string | null }[];
+};
+
 /**
- * Send technician assignment notification
+ * Notify the ticket owner and each newly assigned technician, using the
+ * per-tab templates.
  */
-async function notifyTechnicianAssignment(
-  phoneNumber: string,
-  technicianName: string,
-  ticketId: string,
-  ticketType: "SERVICE" | "INSTALLATION" | "PROJECT",
-  customerName: string,
-  description: string,
-): Promise<SendResult> {
-  const recordType = {
-    SERVICE: "service request",
-    INSTALLATION: "installation",
-    PROJECT: "project",
-  }[ticketType];
+async function notifyTicketAssigned(params: AssignedParams): Promise<void> {
+  const { ticketType, ticketId, owner, address, details, company } = params;
+  const technicianNames = params.technicians.map((t) => t.name).join(", ");
+  const link = process.env.APP_URL
+    ? `${process.env.APP_URL.replace(/\/$/, "")}${TICKET_PATHS[ticketType]}`
+    : "-";
 
-  // Template variables can't hold newlines.
-  const issue = description.replace(/\s+/g, " ").trim();
+  const ownerVars: Record<TicketType, string[]> = {
+    SERVICE: [owner.name, technicianNames, ticketId],
+    INSTALLATION: [owner.name, ticketId, technicianNames, address],
+    PROJECT: [owner.name, ticketId, company ?? "", technicianNames],
+  };
+  const ownerBody = `Hello ${owner.name}, technician ${technicianNames} has been assigned to your ticket ${ticketId} and will reach out to you soon.`;
 
-  return sendWhatsAppMessage(
-    phoneNumber,
-    `Hello ${technicianName}, you have been assigned a new ${recordType}. Ticket: ${ticketId}. Customer: ${customerName}. Issue: ${issue}. Please open the Service Desk app for full details.`,
-    process.env.TWILIO_TEMPLATE_TICKET_ASSIGNED_TECHNICIAN,
-    [technicianName, ticketId, customerName, issue],
+  await sendWhatsAppSafely(owner.phone, () =>
+    sendWhatsAppMessage(
+      owner.phone as string,
+      ownerBody,
+      templateSid(`${ticketType}_CUSTOMER`),
+      ownerVars[ticketType].map(clean),
+    ),
   );
+
+  for (const tech of params.technicians) {
+    const techVars: Record<TicketType, string[]> = {
+      SERVICE: [tech.name, ticketId, owner.name, owner.phone ?? "", address, details, link],
+      INSTALLATION: [tech.name, ticketId, owner.name, owner.phone ?? "", address, details, link],
+      PROJECT: [tech.name, ticketId, company ?? "", owner.name, owner.phone ?? "", address, link],
+    };
+    const techBody = `Hello ${tech.name}, you have been assigned a new ${TICKET_LABELS[ticketType]}. Ticket: ${ticketId}. Customer: ${owner.name}. Issue: ${clean(details)}. Please open the Service Desk app for full details.`;
+
+    await sendWhatsAppSafely(tech.phone, () =>
+      sendWhatsAppMessage(
+        tech.phone as string,
+        techBody,
+        templateSid(`${ticketType}_TECHNICIAN`),
+        techVars[ticketType].map(clean),
+      ),
+    );
+  }
 }
 
 /**
@@ -166,20 +236,14 @@ async function notifyUserCreation(
   password: string,
   appUrl: string,
 ): Promise<SendResult> {
-  const message = `
-Welcome ${userName}!
+  const message = `Welcome ${userName}! Your Service Desk account has been created. Email: ${email} Password: ${password} Login: ${appUrl} Please change your password on first login.`;
 
-Your Service Desk account has been created successfully.
-
-Email: ${email}
-Password: ${password}
-
-Access the app: ${appUrl}
-
-Please change your password on first login for security.
-  `.trim();
-
-  return sendWhatsAppMessage(phoneNumber, message);
+  return sendWhatsAppMessage(
+    phoneNumber,
+    message,
+    templateSid("USER_CREDENTIALS"),
+    [userName, appUrl, email, password, supportPhone()].map(clean),
+  );
 }
 
 /**
@@ -194,9 +258,9 @@ async function sendNotification(
 
 export {
   sendWhatsAppMessage,
-  notifyTechnicianAssignment,
+  sendWhatsAppSafely,
+  notifyTicketAssigned,
   notifyTicketCreated,
-  notifyTicketOwnerAssignment,
   notifyUserCreation,
   sendNotification,
 };

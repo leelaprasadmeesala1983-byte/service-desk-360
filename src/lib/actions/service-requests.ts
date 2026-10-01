@@ -32,16 +32,16 @@ import {
 } from "@/lib/notifications";
 import { requireUser } from "@/lib/session";
 import {
-  notifyTechnicianAssignment,
-  notifyTicketCreated,
-  notifyTicketOwnerAssignment,
-} from "@/lib/whatsapp-service";
-import {
   createServiceRequestSchema,
   deleteRecordSchema,
   editServiceRequestSchema,
   technicianServiceRequestSchema,
 } from "@/lib/validations/service-ticket";
+import {
+  notifyTicketAssigned,
+  notifyTicketCreated,
+  sendWhatsAppSafely,
+} from "@/lib/whatsapp-service";
 
 import { type ActionResult, actionError, actionOk } from "./result";
 
@@ -52,22 +52,6 @@ function invalid(error: ZodError): ActionResult {
     "Please correct the highlighted fields.",
     error.flatten().fieldErrors,
   );
-}
-
-/** WhatsApp is best-effort: a failed message must never fail the ticket. */
-async function sendWhatsAppSafely(
-  phone: string | null | undefined,
-  send: () => Promise<{ success: boolean; error?: string }>,
-): Promise<void> {
-  if (!phone?.trim()) return;
-  try {
-    const result = await send();
-    if (!result.success) {
-      console.warn(`WhatsApp to ${phone} not sent: ${result.error}`);
-    }
-  } catch (error) {
-    console.error(`WhatsApp to ${phone} failed:`, error);
-  }
 }
 
 async function createServiceRequest(input: unknown): Promise<ActionResult> {
@@ -101,6 +85,7 @@ async function createServiceRequest(input: unknown): Promise<ActionResult> {
   if (row) {
     await sendWhatsAppSafely(data.phone, () =>
       notifyTicketCreated(
+        "SERVICE",
         data.phone,
         data.customerName,
         formatRecordId("SERVICE", row.seq),
@@ -204,28 +189,14 @@ async function updateServiceRequest(input: unknown): Promise<ActionResult> {
         .from(user)
         .where(inArray(user.id, newTechs));
 
-      await sendWhatsAppSafely(data.phone, () =>
-        notifyTicketOwnerAssignment(
-          data.phone,
-          data.customerName,
-          label,
-          techs.map((t) => t.name),
-        ),
-      );
-
-      for (const tech of techs) {
-        if (!tech.phone) continue;
-        await sendWhatsAppSafely(tech.phone, () =>
-          notifyTechnicianAssignment(
-            tech.phone as string,
-            tech.name,
-            label,
-            "SERVICE",
-            data.customerName,
-            `${data.issueTitle} — ${data.description}`,
-          ),
-        );
-      }
+      await notifyTicketAssigned({
+        ticketType: "SERVICE",
+        ticketId: label,
+        owner: { name: data.customerName, phone: data.phone },
+        address: data.address,
+        details: data.issueTitle,
+        technicians: techs,
+      });
     }
 
     const keptTechs = technicianIds.filter((id) => prevIds.has(id));

@@ -15,6 +15,7 @@ import {
   editUserSchema,
   setUserStatusSchema,
 } from "@/lib/validations/user";
+import { notifyUserCreation, sendWhatsAppSafely } from "@/lib/whatsapp-service";
 
 import { type ActionResult, actionError, actionOk } from "./result";
 
@@ -83,6 +84,16 @@ async function createUser(input: unknown): Promise<ActionResult> {
     accountId: id,
     password: await ctx.password.hash(data.password),
   });
+
+  await sendWhatsAppSafely(data.phone, () =>
+    notifyUserCreation(
+      data.phone,
+      fullName(data.firstName, data.lastName),
+      email,
+      data.password,
+      process.env.APP_URL ?? "",
+    ),
+  );
 
   revalidatePath(USERS_PATH);
   return actionOk();
