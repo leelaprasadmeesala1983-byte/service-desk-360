@@ -104,11 +104,8 @@ export function CashTransactionList({
             ) : (
               transactions.map((tx) => {
                 const category =
-                  tx.category === "Courier In" || tx.category === "Courier Out"
-                    ? tx.category
-                    : tx.type === "CASH_IN"
-                      ? "Courier In"
-                      : "Courier Out";
+                  tx.category ||
+                  (tx.type === "CASH_IN" ? "Cash In" : "Cash Out");
 
                 return (
                   <TableRow key={tx.id}>
@@ -119,7 +116,7 @@ export function CashTransactionList({
                       <span
                         className={cn(
                           "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap",
-                          category === "Courier In"
+                          tx.type === "CASH_IN"
                             ? "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/40"
                             : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40",
                         )}
