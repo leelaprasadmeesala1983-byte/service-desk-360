@@ -1,9 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
   reactCompiler: true,
   experimental: {
+    // Keep the build light for small hosts (Hostinger): fewer parallel
+    // workers and lower peak memory in webpack.
+    cpus: 1,
+    webpackMemoryOptimizations: true,
     serverActions: {
       bodySizeLimit: "20mb",
     },

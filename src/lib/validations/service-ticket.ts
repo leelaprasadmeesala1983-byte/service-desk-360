@@ -123,7 +123,7 @@ const assignedTechniciansField = z.preprocess(
     }
     return value;
   },
-  z.array(z.string()).min(1, "Technician is required"),
+  z.array(z.string()),
 );
 
 // --- Service Request -------------------------------------------------------

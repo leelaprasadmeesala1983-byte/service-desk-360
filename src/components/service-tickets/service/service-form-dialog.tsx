@@ -632,9 +632,11 @@ function ServiceFormDialog({
                   control={form.control}
                   name="assignedTechnicianIds"
                   label="Assign Technician"
-                  required
+                  disabled={!isEdit}
                   options={assigneeOptions}
-                  placeholder="Select Technician"
+                  placeholder={
+                    isEdit ? "Select Technician" : "Assign after creating"
+                  }
                   className="sm:col-span-1"
                   error={errors.assignedTechnicianIds?.message}
                 />

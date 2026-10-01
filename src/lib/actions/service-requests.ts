@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { ZodError } from "zod";
 
@@ -13,6 +13,7 @@ import {
   logMultipleTechniciansWorkDates,
   logTechnicianWorkDate,
 } from "@/db/queries/technician-reports";
+import { user } from "@/db/schema/auth";
 import { serviceRequest } from "@/db/schema/service-request";
 import { syncServiceRequestAmount } from "@/lib/actions/cash-transactions";
 import { recordStatusChangeEvent } from "@/lib/actions/work-history";
@@ -31,6 +32,11 @@ import {
 } from "@/lib/notifications";
 import { requireUser } from "@/lib/session";
 import {
+  notifyTechnicianAssignment,
+  notifyTicketCreated,
+  notifyTicketOwnerAssignment,
+} from "@/lib/whatsapp-service";
+import {
   createServiceRequestSchema,
   deleteRecordSchema,
   editServiceRequestSchema,
@@ -48,6 +54,22 @@ function invalid(error: ZodError): ActionResult {
   );
 }
 
+/** WhatsApp is best-effort: a failed message must never fail the ticket. */
+async function sendWhatsAppSafely(
+  phone: string | null | undefined,
+  send: () => Promise<{ success: boolean; error?: string }>,
+): Promise<void> {
+  if (!phone?.trim()) return;
+  try {
+    const result = await send();
+    if (!result.success) {
+      console.warn(`WhatsApp to ${phone} not sent: ${result.error}`);
+    }
+  } catch (error) {
+    console.error(`WhatsApp to ${phone} failed:`, error);
+  }
+}
+
 async function createServiceRequest(input: unknown): Promise<ActionResult> {
   const current = await requireUser();
   if (current.role !== "ADMIN") return actionError("Admins only.");
@@ -56,7 +78,8 @@ async function createServiceRequest(input: unknown): Promise<ActionResult> {
   if (!parsed.success) return invalid(parsed.error);
   const data = parsed.data;
 
-  const technicianIds = data.assignedTechnicianIds;
+  // Technicians are assigned later, from the edit screen.
+  const technicianIds: string[] = [];
 
   const [row] = await db
     .insert(serviceRequest)
@@ -75,28 +98,14 @@ async function createServiceRequest(input: unknown): Promise<ActionResult> {
     })
     .returning({ id: serviceRequest.id, seq: serviceRequest.seq });
 
-  if (technicianIds.length > 0 && row) {
-    await logMultipleTechniciansWorkDates({
-      technicianIds,
-      workType: "SERVICE",
-      referenceId: row.id,
-      createdById: current.id,
-    });
-
-    for (const techId of technicianIds) {
-      await notifyAssignment(
-        {
-          recordType: "SERVICE",
-          recordId: row.id,
-          recordLabel: formatRecordId("SERVICE", row.seq),
-        },
-        {
-          technicianId: techId,
-          actorId: current.id,
-          description: `${data.issueTitle} — ${data.description}`,
-        },
-      );
-    }
+  if (row) {
+    await sendWhatsAppSafely(data.phone, () =>
+      notifyTicketCreated(
+        data.phone,
+        data.customerName,
+        formatRecordId("SERVICE", row.seq),
+      ),
+    );
   }
 
   revalidatePath(PATH);
@@ -187,6 +196,36 @@ async function updateServiceRequest(input: unknown): Promise<ActionResult> {
           description: `${data.issueTitle} — ${data.description}`,
         },
       );
+    }
+
+    if (newTechs.length > 0) {
+      const techs = await db
+        .select({ id: user.id, name: user.name, phone: user.phone })
+        .from(user)
+        .where(inArray(user.id, newTechs));
+
+      await sendWhatsAppSafely(data.phone, () =>
+        notifyTicketOwnerAssignment(
+          data.phone,
+          data.customerName,
+          label,
+          techs.map((t) => t.name),
+        ),
+      );
+
+      for (const tech of techs) {
+        if (!tech.phone) continue;
+        await sendWhatsAppSafely(tech.phone, () =>
+          notifyTechnicianAssignment(
+            tech.phone as string,
+            tech.name,
+            label,
+            "SERVICE",
+            data.customerName,
+            `${data.issueTitle} — ${data.description}`,
+          ),
+        );
+      }
     }
 
     const keptTechs = technicianIds.filter((id) => prevIds.has(id));
