@@ -35,12 +35,8 @@ export function DeleteTransactionModal({
   if (!transaction) return null;
 
   const category =
-    transaction.category === "Courier In" ||
-    transaction.category === "Courier Out"
-      ? transaction.category
-      : transaction.type === "CASH_IN"
-        ? "Courier In"
-        : "Courier Out";
+    transaction.category ||
+    (transaction.type === "CASH_IN" ? "Cash In" : "Cash Out");
 
   const handleDelete = async () => {
     if (!transaction.id || isDeleting) return;
@@ -133,7 +129,7 @@ export function DeleteTransactionModal({
                 <span
                   className={cn(
                     "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                    category === "Courier In"
+                    transaction.type === "CASH_IN"
                       ? "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/40"
                       : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40",
                   )}

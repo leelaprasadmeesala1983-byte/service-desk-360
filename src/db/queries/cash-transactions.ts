@@ -65,12 +65,8 @@ function mapRow(row: {
   technicianName: string | null;
 }): CashTransactionRow {
   const category =
-    row.transaction.category === "Courier In" ||
-    row.transaction.category === "Courier Out"
-      ? row.transaction.category
-      : row.transaction.type === "CASH_IN"
-        ? "Courier In"
-        : "Courier Out";
+    row.transaction.category ||
+    (row.transaction.type === "CASH_IN" ? "Cash In" : "Cash Out");
 
   return {
     id: row.transaction.id,

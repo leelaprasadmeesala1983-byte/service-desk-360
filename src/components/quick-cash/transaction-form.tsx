@@ -28,6 +28,19 @@ import {
 import { formatLocalDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+const CASH_IN_CATEGORIES = [
+  { value: "SERVICE_AMOUNT", label: "Service Amount" },
+  { value: "OTHERS", label: "Others" },
+] as const;
+
+const CASH_OUT_CATEGORIES = [
+  { value: "COURIER_IN", label: "Courier In" },
+  { value: "COURIER_OUT", label: "Courier Out" },
+  { value: "PETROL_ALLOWANCE", label: "Petrol Allowance" },
+  { value: "FOOD_ALLOWANCE", label: "Food Allowance" },
+  { value: "OTHERS", label: "Others" },
+] as const;
+
 type CashTransactionFormProps = {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -49,9 +62,13 @@ export function CashTransactionForm({
   const [isPending, startTransition] = useTransition();
   const [isLoading, setIsLoading] = useState(false);
   const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [otherCategoryError, setOtherCategoryError] = useState<string | null>(
+    null,
+  );
   const [formData, setFormData] = useState({
     type: "CASH_IN",
     category: "",
+    otherCategory: "",
     amount: "",
     description: "",
     date: formatLocalDate(new Date()),
@@ -65,18 +82,16 @@ export function CashTransactionForm({
       getCashTransaction(editingId)
         .then((tx) => {
           if (tx) {
-            const category =
-              tx.category === "Courier In" || tx.category === "Courier Out"
-                ? tx.category
-                : "";
             setFormData({
               type: tx.type,
-              category,
+              category: tx.category || "",
+              otherCategory: tx.otherCategory || "",
               amount: tx.amount,
               description: tx.description,
               date: tx.date,
             });
             setCategoryError(null);
+            setOtherCategoryError(null);
           }
         })
         .catch((error) => {
@@ -89,34 +104,58 @@ export function CashTransactionForm({
       setFormData({
         type: "CASH_IN",
         category: "",
+        otherCategory: "",
         amount: "",
         description: "",
         date: formatLocalDate(new Date()),
       });
       setCategoryError(null);
+      setOtherCategoryError(null);
     }
   }, [editingId, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    let hasError = false;
+
     if (!formData.category) {
       setCategoryError("Please select a transaction category.");
-      toast.error("Please select a transaction category.");
+      hasError = true;
+    }
+
+    if (formData.category === "OTHERS" && !formData.otherCategory?.trim()) {
+      setOtherCategoryError("Please enter a category name.");
+      hasError = true;
+    }
+
+    if (hasError) {
+      if (!formData.category) {
+        toast.error("Please select a transaction category.");
+      } else {
+        toast.error("Please enter a category name.");
+      }
       return;
     }
 
-    const input = {
+    const isOthers = formData.category === "OTHERS";
+    const input: {
+      id?: string;
+      type: string;
+      transactionType: string;
+      category: string;
+      transactionCategory: string;
+      otherCategory?: string;
+      amount: string;
+      description: string;
+      date: string;
+    } = {
       id: editingId || undefined,
       type: formData.type,
       transactionType: formData.type,
       category: formData.category,
-      transactionCategory:
-        formData.category === "Courier In"
-          ? "COURIER_IN"
-          : formData.category === "Courier Out"
-            ? "COURIER_OUT"
-            : formData.category,
+      transactionCategory: formData.category,
+      ...(isOthers ? { otherCategory: formData.otherCategory.trim() } : {}),
       amount: formData.amount,
       description: formData.description,
       date: formData.date,
@@ -144,6 +183,9 @@ export function CashTransactionForm({
       } else {
         if (result.fieldErrors?.category?.[0]) {
           setCategoryError(result.fieldErrors.category[0]);
+        }
+        if (result.fieldErrors?.otherCategory?.[0]) {
+          setOtherCategoryError(result.fieldErrors.otherCategory[0]);
         }
         toast.error(result.error || "Something went wrong");
       }
@@ -174,12 +216,18 @@ export function CashTransactionForm({
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        type: "CASH_IN",
-                      }))
-                    }
+                    onClick={() => {
+                      if (formData.type !== "CASH_IN") {
+                        setFormData((prev) => ({
+                          ...prev,
+                          type: "CASH_IN",
+                          category: "",
+                          otherCategory: "",
+                        }));
+                        setCategoryError(null);
+                        setOtherCategoryError(null);
+                      }
+                    }}
                     className={`flex-1 rounded-full py-2.5 px-4 font-semibold transition-all ${
                       formData.type === "CASH_IN"
                         ? "bg-green-600 text-white"
@@ -190,12 +238,18 @@ export function CashTransactionForm({
                   </button>
                   <button
                     type="button"
-                    onClick={() =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        type: "CASH_OUT",
-                      }))
-                    }
+                    onClick={() => {
+                      if (formData.type !== "CASH_OUT") {
+                        setFormData((prev) => ({
+                          ...prev,
+                          type: "CASH_OUT",
+                          category: "",
+                          otherCategory: "",
+                        }));
+                        setCategoryError(null);
+                        setOtherCategoryError(null);
+                      }
+                    }}
                     className={`flex-1 rounded-full py-2.5 px-4 font-semibold transition-all ${
                       formData.type === "CASH_OUT"
                         ? "bg-red-600 text-white"
@@ -213,8 +267,13 @@ export function CashTransactionForm({
                 <Select
                   value={formData.category}
                   onValueChange={(val) => {
-                    setFormData((prev) => ({ ...prev, category: val || "" }));
+                    setFormData((prev) => ({
+                      ...prev,
+                      category: val || "",
+                      otherCategory: val === "OTHERS" ? prev.otherCategory : "",
+                    }));
                     if (val) setCategoryError(null);
+                    if (val !== "OTHERS") setOtherCategoryError(null);
                   }}
                 >
                   <SelectTrigger
@@ -228,8 +287,14 @@ export function CashTransactionForm({
                     <SelectValue placeholder="Select Transaction Category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Courier In">Courier In</SelectItem>
-                    <SelectItem value="Courier Out">Courier Out</SelectItem>
+                    {(formData.type === "CASH_IN"
+                      ? CASH_IN_CATEGORIES
+                      : CASH_OUT_CATEGORIES
+                    ).map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {categoryError && (
@@ -238,6 +303,33 @@ export function CashTransactionForm({
                   </p>
                 )}
               </div>
+
+              {/* Other Category (Only shown when category === "OTHERS") */}
+              {formData.category === "OTHERS" && (
+                <div className="space-y-2">
+                  <Label htmlFor="otherCategory">Other Category *</Label>
+                  <Input
+                    id="otherCategory"
+                    placeholder="Enter category name"
+                    value={formData.otherCategory}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData((prev) => ({ ...prev, otherCategory: val }));
+                      if (val.trim()) setOtherCategoryError(null);
+                    }}
+                    className={cn(
+                      otherCategoryError &&
+                        "border-destructive focus-visible:ring-destructive",
+                    )}
+                    required
+                  />
+                  {otherCategoryError && (
+                    <p className="text-xs text-destructive font-medium">
+                      {otherCategoryError}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Available Balance */}
               {closingBalance && (

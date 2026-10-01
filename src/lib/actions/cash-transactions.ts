@@ -30,6 +30,7 @@ async function getCashTransaction(id: string): Promise<{
   id: string;
   type: "CASH_IN" | "CASH_OUT";
   category: string;
+  otherCategory?: string;
   amount: string;
   description: string;
   date: string; // ISO date string YYYY-MM-DD
@@ -52,16 +53,32 @@ async function getCashTransaction(id: string): Promise<{
       return null;
     }
 
+    const cat = transaction.category || "";
+    let categoryKey = "";
+    let otherCat = "";
+
+    if (cat === "Service Amount" || cat === "SERVICE_AMOUNT") {
+      categoryKey = "SERVICE_AMOUNT";
+    } else if (cat === "Courier In" || cat === "COURIER_IN") {
+      categoryKey = "COURIER_IN";
+    } else if (cat === "Courier Out" || cat === "COURIER_OUT") {
+      categoryKey = "COURIER_OUT";
+    } else if (cat === "Petrol Allowance" || cat === "PETROL_ALLOWANCE") {
+      categoryKey = "PETROL_ALLOWANCE";
+    } else if (cat === "Food Allowance" || cat === "FOOD_ALLOWANCE") {
+      categoryKey = "FOOD_ALLOWANCE";
+    } else if (cat === "Others" || cat === "OTHERS") {
+      categoryKey = "OTHERS";
+    } else if (cat) {
+      categoryKey = "OTHERS";
+      otherCat = cat;
+    }
+
     return {
       id: transaction.id,
       type: transaction.type,
-      category:
-        transaction.category === "Courier In" ||
-        transaction.category === "Courier Out"
-          ? transaction.category
-          : transaction.type === "CASH_IN"
-            ? "Courier In"
-            : "Courier Out",
+      category: categoryKey,
+      otherCategory: otherCat || undefined,
       amount: String(Math.abs(Number(transaction.amount) || 0)),
       description: transaction.description,
       date: formatLocalDate(transaction.createdAt),
@@ -72,39 +89,86 @@ async function getCashTransaction(id: string): Promise<{
   }
 }
 
+const CATEGORY_DISPLAY_MAP: Record<string, string> = {
+  SERVICE_AMOUNT: "Service Amount",
+  "Service Amount": "Service Amount",
+  COURIER_IN: "Courier In",
+  "Courier In": "Courier In",
+  COURIER_OUT: "Courier Out",
+  "Courier Out": "Courier Out",
+  PETROL_ALLOWANCE: "Petrol Allowance",
+  "Petrol Allowance": "Petrol Allowance",
+  FOOD_ALLOWANCE: "Food Allowance",
+  "Food Allowance": "Food Allowance",
+  OTHERS: "Others",
+  Others: "Others",
+};
+
+function resolveCategory(category: string, otherCategory?: string): string {
+  if (category === "OTHERS" || category === "Others") {
+    return otherCategory?.trim() || "Others";
+  }
+  return CATEGORY_DISPLAY_MAP[category] || category;
+}
+
 const normalizeCashTransactionInput = (input: unknown) => {
   if (typeof input !== "object" || input === null) return input;
   const raw = input as Record<string, unknown>;
   const type = (raw.type || raw.transactionType) as string | undefined;
-  let category = (raw.category || raw.transactionCategory) as
+  const rawCategory = (raw.transactionCategory || raw.category) as
     | string
     | undefined;
+  const otherCategory =
+    typeof raw.otherCategory === "string" ? raw.otherCategory.trim() : undefined;
 
-  if (category === "COURIER_IN" || category === "Courier In") {
-    category = "Courier In";
-  } else if (category === "COURIER_OUT" || category === "Courier Out") {
-    category = "Courier Out";
-  } else if (!category) {
+  let category = rawCategory;
+  if (!category) {
     category = "";
   }
 
   return {
     ...raw,
     type,
+    transactionType: type,
     category,
+    transactionCategory: rawCategory,
+    otherCategory:
+      category === "OTHERS" || category === "Others" ? otherCategory : undefined,
   };
 };
 
-const baseCashTransactionObject = z.object({
-  id: z.string().min(1).optional(),
-  type: z.enum(["CASH_IN", "CASH_OUT"]),
+const baseCashTransactionShape = {
+  type: z.enum(["CASH_IN", "CASH_OUT"], {
+    required_error: "Transaction type is required",
+  }),
   category: z
-    .string()
+    .string({
+      required_error: "Please select a transaction category.",
+      invalid_type_error: "Please select a transaction category.",
+    })
     .trim()
     .min(1, "Please select a transaction category.")
-    .refine((v) => v === "Courier In" || v === "Courier Out", {
-      message: "Please select a transaction category.",
-    }),
+    .refine(
+      (v) =>
+        [
+          "SERVICE_AMOUNT",
+          "Service Amount",
+          "COURIER_IN",
+          "Courier In",
+          "COURIER_OUT",
+          "Courier Out",
+          "PETROL_ALLOWANCE",
+          "Petrol Allowance",
+          "FOOD_ALLOWANCE",
+          "Food Allowance",
+          "OTHERS",
+          "Others",
+        ].includes(v),
+      {
+        message: "Please select a valid transaction category.",
+      },
+    ),
+  otherCategory: z.string().trim().optional(),
   amount: numericField.refine((v) => v !== null && Number(v) > 0, {
     message: "Amount must be greater than 0",
   }),
@@ -112,18 +176,71 @@ const baseCashTransactionObject = z.object({
   date: z.string().refine((v) => !Number.isNaN(Date.parse(v)), {
     message: "Invalid date",
   }),
-});
+};
+
+const validateCategoryByType = (
+  data: {
+    type: "CASH_IN" | "CASH_OUT";
+    category: string;
+    otherCategory?: string;
+  },
+  ctx: z.RefinementCtx,
+) => {
+  if (data.type === "CASH_IN") {
+    const validIn = ["SERVICE_AMOUNT", "Service Amount", "OTHERS", "Others"];
+    if (!validIn.includes(data.category)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Invalid category for Cash In.",
+        path: ["category"],
+      });
+    }
+  } else if (data.type === "CASH_OUT") {
+    const validOut = [
+      "COURIER_IN",
+      "Courier In",
+      "COURIER_OUT",
+      "Courier Out",
+      "PETROL_ALLOWANCE",
+      "Petrol Allowance",
+      "FOOD_ALLOWANCE",
+      "Food Allowance",
+      "OTHERS",
+      "Others",
+    ];
+    if (!validOut.includes(data.category)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Invalid category for Cash Out.",
+        path: ["category"],
+      });
+    }
+  }
+
+  if (data.category === "OTHERS" || data.category === "Others") {
+    if (!data.otherCategory || data.otherCategory.trim().length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please enter a category name.",
+        path: ["otherCategory"],
+      });
+    }
+  }
+};
 
 const cashTransactionSchema = z.preprocess(
   normalizeCashTransactionInput,
-  baseCashTransactionObject,
+  z.object(baseCashTransactionShape).superRefine(validateCategoryByType),
 );
 
 const updateCashTransactionSchema = z.preprocess(
   normalizeCashTransactionInput,
-  baseCashTransactionObject.extend({
-    id: z.string().min(1, "Transaction ID is required"),
-  }),
+  z
+    .object({
+      ...baseCashTransactionShape,
+      id: z.string().min(1, "Transaction ID is required"),
+    })
+    .superRefine(validateCategoryByType),
 );
 
 function invalid(error: ZodError): ActionResult {
@@ -182,11 +299,13 @@ async function addCashTransaction(input: unknown): Promise<ActionResult> {
       txDate = new Date(start.getTime() + 12 * 3600 * 1000);
     }
 
+    const finalCategory = resolveCategory(data.category, data.otherCategory);
+
     const [result] = await db
       .insert(cashTransaction)
       .values({
         type: data.type as "CASH_IN" | "CASH_OUT",
-        category: data.category,
+        category: finalCategory,
         amount: normalizedAmount,
         description: data.description,
         customerName: current.name || "Admin",
@@ -296,11 +415,13 @@ async function updateCashTransaction(input: unknown): Promise<ActionResult> {
       txDate = new Date(start.getTime() + 12 * 3600 * 1000);
     }
 
+    const finalCategory = resolveCategory(data.category, data.otherCategory);
+
     await db
       .update(cashTransaction)
       .set({
         type: data.type as "CASH_IN" | "CASH_OUT",
-        category: data.category,
+        category: finalCategory,
         amount: normalizedAmount,
         description: data.description,
         createdAt: txDate,
@@ -570,12 +691,7 @@ async function exportCashTransactions(
     };
 
     const csvRows = rows.map((r) => {
-      const cat =
-        r.category === "Courier In" || r.category === "Courier Out"
-          ? r.category
-          : r.type === "CASH_IN"
-            ? "Courier In"
-            : "Courier Out";
+      const cat = r.category || (r.type === "CASH_IN" ? "Cash In" : "Cash Out");
       return [
         formatLocalDate(r.createdAt),
         r.type === "CASH_IN" ? "Cash In" : "Cash Out",
@@ -594,12 +710,7 @@ async function exportCashTransactions(
     const rowsHtml = rows
       .map(
         (r) => {
-          const cat =
-            r.category === "Courier In" || r.category === "Courier Out"
-              ? r.category
-              : r.type === "CASH_IN"
-                ? "Courier In"
-                : "Courier Out";
+          const cat = r.category || (r.type === "CASH_IN" ? "Cash In" : "Cash Out");
           return `
       <tr>
         <td>${formatLocalDate(r.createdAt)}</td>
