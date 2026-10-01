@@ -1,131 +1,90 @@
 /**
- * WhatsApp Integration Service using Meta Business API
+ * WhatsApp notifications via Twilio.
  *
- * Setup required:
- * 1. Create Meta Business Account at business.facebook.com
- * 2. Create WhatsApp Business App
- * 3. Get Phone Number ID and Access Token
- * 4. Add environment variables to .env
+ * Required in .env:
+ *   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
+ *   TWILIO_WHATSAPP_FROM            e.g. whatsapp:+14155238886 (sandbox)
+ *
+ * Optional approved Content Template SIDs (HX...). When one is unset, the
+ * message is sent as free-form text, which works in the Twilio sandbox and
+ * inside WhatsApp's 24-hour reply window:
+ *   TWILIO_TEMPLATE_TICKET_CREATED             {{1}} customer, {{2}} ticket id
+ *   TWILIO_TEMPLATE_TICKET_ASSIGNED_CUSTOMER   {{1}} customer, {{2}} technician(s), {{3}} ticket id
+ *   TWILIO_TEMPLATE_TICKET_ASSIGNED_TECHNICIAN {{1}} technician, {{2}} ticket id, {{3}} customer, {{4}} issue
  */
 
-interface WhatsAppMessage {
-  messaging_product: string;
-  to: string;
-  type: string;
-  template?: {
-    name: string;
-    language: {
-      code: string;
-    };
-    components?: Array<{
-      type: string;
-      parameters?: Array<{
-        type: string;
-        text?: string;
-      }>;
-    }>;
-  };
-  text?: {
-    body: string;
-  };
-}
-
-const WHATSAPP_API_VERSION = "v18.0";
-const WHATSAPP_API_URL = `https://graph.instagram.com/${WHATSAPP_API_VERSION}`;
+type SendResult = { success: boolean; messageId?: string; error?: string };
 
 /**
- * Send a WhatsApp message using Meta Business API
+ * Send a WhatsApp message through the Twilio Messages API.
+ * Uses the content template when `contentSid` is given, else the plain body.
  */
 async function sendWhatsAppMessage(
   phoneNumber: string,
-  message: string,
-  templateName?: string,
-  templateParams?: string[],
-): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  body: string,
+  contentSid?: string,
+  variables?: string[],
+): Promise<SendResult> {
   try {
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const from = process.env.TWILIO_WHATSAPP_FROM;
 
-    if (!phoneNumberId || !accessToken) {
-      console.error("WhatsApp credentials not configured");
+    if (process.env.TWILIO_WHATSAPP_ENABLED === "false") {
+      return { success: false, error: "WhatsApp notifications are disabled" };
+    }
+
+    if (!accountSid || !authToken || !from) {
       return {
         success: false,
         error:
-          "WhatsApp credentials not configured. Set WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN in .env",
+          "Twilio not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_WHATSAPP_FROM in .env",
       };
     }
 
-    // Ensure phone number has country code (e.g., +91 for India, +1 for US)
-    const formattedPhone = phoneNumber.replace(/\D/g, "");
-    if (!formattedPhone.startsWith("91") && !formattedPhone.startsWith("1")) {
-      console.warn(`Phone number ${phoneNumber} may be missing country code`);
-    }
+    // Stored numbers are 10-digit Indian mobiles; add the country code.
+    let digits = phoneNumber.replace(/\D/g, "");
+    if (digits.length === 10) digits = `91${digits}`;
 
-    const url = `${WHATSAPP_API_URL}/${phoneNumberId}/messages`;
-
-    let payload: WhatsAppMessage;
-
-    if (templateName && templateParams) {
-      // Template-based message (for structured messages)
-      payload = {
-        messaging_product: "whatsapp",
-        to: formattedPhone,
-        type: "template",
-        template: {
-          name: templateName,
-          language: {
-            code: "en_US",
-          },
-          components: [
-            {
-              type: "body",
-              parameters: templateParams.map((param) => ({
-                type: "text",
-                text: param,
-              })),
-            },
-          ],
-        },
-      };
-    } else {
-      // Free-form text message
-      payload = {
-        messaging_product: "whatsapp",
-        to: formattedPhone,
-        type: "text",
-        text: {
-          body: message,
-        },
-      };
-    }
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(payload),
+    const params = new URLSearchParams({
+      To: `whatsapp:+${digits}`,
+      From: from.startsWith("whatsapp:") ? from : `whatsapp:${from}`,
     });
 
-    const data = (await response.json()) as {
-      messages?: Array<{ id: string }>;
-      error?: { message: string };
-    };
+    if (contentSid && variables) {
+      params.set("ContentSid", contentSid);
+      params.set(
+        "ContentVariables",
+        JSON.stringify(
+          Object.fromEntries(variables.map((v, i) => [String(i + 1), v])),
+        ),
+      );
+    } else {
+      params.set("Body", body);
+    }
+
+    const response = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`,
+        },
+        body: params,
+      },
+    );
+
+    const data = (await response.json()) as { sid?: string; message?: string };
 
     if (!response.ok) {
-      console.error("WhatsApp API error:", data.error?.message);
       return {
         success: false,
-        error: data.error?.message || "Failed to send WhatsApp message",
+        error: data.message || "Failed to send WhatsApp message",
       };
     }
 
-    const messageId = data.messages?.[0]?.id;
-    return {
-      success: true,
-      messageId,
-    };
+    return { success: true, messageId: data.sid };
   } catch (error) {
     console.error("WhatsApp service error:", error);
     return {
@@ -133,6 +92,40 @@ async function sendWhatsAppMessage(
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }
+}
+
+/**
+ * Tell the ticket owner (customer) their ticket was created.
+ */
+async function notifyTicketCreated(
+  phoneNumber: string,
+  customerName: string,
+  ticketId: string,
+): Promise<SendResult> {
+  return sendWhatsAppMessage(
+    phoneNumber,
+    `Hello ${customerName}, your ticket ${ticketId} has been created. Soon the technician will reach out to you.`,
+    process.env.TWILIO_TEMPLATE_TICKET_CREATED,
+    [customerName, ticketId],
+  );
+}
+
+/**
+ * Tell the ticket owner (customer) which technicians were assigned.
+ */
+async function notifyTicketOwnerAssignment(
+  phoneNumber: string,
+  customerName: string,
+  ticketId: string,
+  technicianNames: string[],
+): Promise<SendResult> {
+  const technicians = technicianNames.join(", ");
+  return sendWhatsAppMessage(
+    phoneNumber,
+    `Hello ${customerName}, technician ${technicians} has been assigned to your ticket ${ticketId} and will reach out to you soon.`,
+    process.env.TWILIO_TEMPLATE_TICKET_ASSIGNED_CUSTOMER,
+    [customerName, technicians, ticketId],
+  );
 }
 
 /**
@@ -145,28 +138,22 @@ async function notifyTechnicianAssignment(
   ticketType: "SERVICE" | "INSTALLATION" | "PROJECT",
   customerName: string,
   description: string,
-): Promise<{ success: boolean; messageId?: string; error?: string }> {
+): Promise<SendResult> {
   const recordType = {
-    SERVICE: "Service Request",
-    INSTALLATION: "Installation",
-    PROJECT: "Project",
+    SERVICE: "service request",
+    INSTALLATION: "installation",
+    PROJECT: "project",
   }[ticketType];
 
-  const message = `
-👋 Hello ${technicianName},
+  // Template variables can't hold newlines.
+  const issue = description.replace(/\s+/g, " ").trim();
 
-You have been assigned a new ${recordType}!
-
-📋 Ticket ID: ${ticketId}
-👤 Customer: ${customerName}
-📝 Description: ${description}
-
-Please log in to the Service Desk app to view complete details and start working on it.
-
-Thank you!
-  `.trim();
-
-  return sendWhatsAppMessage(phoneNumber, message);
+  return sendWhatsAppMessage(
+    phoneNumber,
+    `Hello ${technicianName}, you have been assigned a new ${recordType}. Ticket: ${ticketId}. Customer: ${customerName}. Issue: ${issue}. Please open the Service Desk app for full details.`,
+    process.env.TWILIO_TEMPLATE_TICKET_ASSIGNED_TECHNICIAN,
+    [technicianName, ticketId, customerName, issue],
+  );
 }
 
 /**
@@ -178,21 +165,18 @@ async function notifyUserCreation(
   email: string,
   password: string,
   appUrl: string,
-): Promise<{ success: boolean; messageId?: string; error?: string }> {
+): Promise<SendResult> {
   const message = `
-🎉 Welcome ${userName}!
+Welcome ${userName}!
 
 Your Service Desk account has been created successfully.
 
-🔐 Login Credentials:
-📧 Email: ${email}
-🔑 Password: ${password}
+Email: ${email}
+Password: ${password}
 
-🌐 Access the app: ${appUrl}
+Access the app: ${appUrl}
 
-⚠️ Please change your password on first login for security.
-
-Questions? Contact your administrator.
+Please change your password on first login for security.
   `.trim();
 
   return sendWhatsAppMessage(phoneNumber, message);
@@ -204,14 +188,15 @@ Questions? Contact your administrator.
 async function sendNotification(
   phoneNumber: string,
   message: string,
-): Promise<{ success: boolean; messageId?: string; error?: string }> {
+): Promise<SendResult> {
   return sendWhatsAppMessage(phoneNumber, message);
 }
 
 export {
   sendWhatsAppMessage,
   notifyTechnicianAssignment,
+  notifyTicketCreated,
+  notifyTicketOwnerAssignment,
   notifyUserCreation,
   sendNotification,
-  type WhatsAppMessage,
 };

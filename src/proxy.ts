@@ -53,7 +53,12 @@ export function proxy(request: NextRequest) {
     if (pathname !== "/") {
       loginUrl.searchParams.set("next", pathname);
     }
-    return NextResponse.redirect(loginUrl);
+    // The redirect depends on the cookie; keep CDNs/ISP caches from replaying
+    // it to signed-in users (that makes / -> /login -> / loop).
+    const response = NextResponse.redirect(loginUrl);
+    response.headers.set("Cache-Control", "private, no-store");
+    response.headers.set("Vary", "Cookie");
+    return response;
   }
 
   // 4. Allowed requests proceed
