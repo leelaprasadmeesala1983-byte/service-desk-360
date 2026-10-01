@@ -97,7 +97,6 @@ function mapRow(
 }
 
 function scopeServiceToViewer(viewer: Viewer) {
-  if (viewer.role === "SUPER_ADMIN") return undefined;
   if (viewer.role === "ADMIN") return eq(serviceRequest.createdById, viewer.id);
   return or(
     eq(serviceRequest.assignedTechnicianId, viewer.id),

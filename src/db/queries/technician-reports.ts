@@ -153,10 +153,7 @@ export async function logMultipleTechniciansWorkDates(params: {
  */
 export async function syncHistoricalWorkLogs(viewer?: Viewer): Promise<void> {
   try {
-    const isScopedAdmin =
-      viewer &&
-      (viewer.role as string) !== "SUPER_ADMIN" &&
-      viewer.role === "ADMIN";
+    const isScopedAdmin = viewer && viewer.role === "ADMIN";
 
     // 1. Service Requests
     const srWhere = isScopedAdmin
@@ -364,7 +361,7 @@ export async function getMonthlyTechnicianSummary(params: {
     isNull(user.deletedAt),
   ];
 
-  if ((viewer.role as string) !== "SUPER_ADMIN" && viewer.role === "ADMIN") {
+  if (viewer.role === "ADMIN") {
     techConditions.push(eq(user.createdById, viewer.id));
   } else if (viewer.role === "TECHNICIAN") {
     techConditions.push(eq(user.id, viewer.id));
@@ -588,7 +585,7 @@ export async function getTechnicianDetailedReport(params: {
     isNull(user.deletedAt),
   ];
 
-  if ((viewer.role as string) !== "SUPER_ADMIN" && viewer.role === "ADMIN") {
+  if (viewer.role === "ADMIN") {
     techConditions.push(eq(user.createdById, viewer.id));
   }
 
@@ -669,8 +666,7 @@ export async function getTechnicianDetailedReport(params: {
     }
   }
 
-  const isScopedAdmin =
-    (viewer.role as string) !== "SUPER_ADMIN" && viewer.role === "ADMIN";
+  const isScopedAdmin = viewer.role === "ADMIN";
 
   // Fetch Project details
   const projectsBreakdown: TaskWorkBreakdownItem[] = [];
@@ -838,81 +834,79 @@ export async function getRecordTechnicianWorkReport(params: {
 
   // Validate parent record authorization
   let authorized = true;
-  if ((viewer.role as string) !== "SUPER_ADMIN") {
-    if (workType === "SERVICE") {
-      const [sr] = await db
-        .select({
-          id: serviceRequest.id,
-          createdById: serviceRequest.createdById,
-          assignedTechnicianId: serviceRequest.assignedTechnicianId,
-          assignedTechnicianIds: serviceRequest.assignedTechnicianIds,
-        })
-        .from(serviceRequest)
-        .where(eq(serviceRequest.id, referenceId));
-      if (!sr) authorized = false;
-      else if (viewer.role === "ADMIN" && sr.createdById !== viewer.id) {
+  if (workType === "SERVICE") {
+    const [sr] = await db
+      .select({
+        id: serviceRequest.id,
+        createdById: serviceRequest.createdById,
+        assignedTechnicianId: serviceRequest.assignedTechnicianId,
+        assignedTechnicianIds: serviceRequest.assignedTechnicianIds,
+      })
+      .from(serviceRequest)
+      .where(eq(serviceRequest.id, referenceId));
+    if (!sr) authorized = false;
+    else if (viewer.role === "ADMIN" && sr.createdById !== viewer.id) {
+      authorized = false;
+    } else if (viewer.role === "TECHNICIAN") {
+      const techIds =
+        Array.isArray(sr.assignedTechnicianIds) &&
+        sr.assignedTechnicianIds.length > 0
+          ? sr.assignedTechnicianIds
+          : sr.assignedTechnicianId
+            ? [sr.assignedTechnicianId]
+            : [];
+      if (!techIds.includes(viewer.id) && sr.createdById !== viewer.id) {
         authorized = false;
-      } else if (viewer.role === "TECHNICIAN") {
-        const techIds =
-          Array.isArray(sr.assignedTechnicianIds) &&
-          sr.assignedTechnicianIds.length > 0
-            ? sr.assignedTechnicianIds
-            : sr.assignedTechnicianId
-              ? [sr.assignedTechnicianId]
-              : [];
-        if (!techIds.includes(viewer.id) && sr.createdById !== viewer.id) {
-          authorized = false;
-        }
       }
-    } else if (workType === "INSTALLATION") {
-      const [ins] = await db
-        .select({
-          id: installation.id,
-          createdById: installation.createdById,
-          assignedTechnicianId: installation.assignedTechnicianId,
-          assignedTechnicianIds: installation.assignedTechnicianIds,
-        })
-        .from(installation)
-        .where(eq(installation.id, referenceId));
-      if (!ins) authorized = false;
-      else if (viewer.role === "ADMIN" && ins.createdById !== viewer.id) {
+    }
+  } else if (workType === "INSTALLATION") {
+    const [ins] = await db
+      .select({
+        id: installation.id,
+        createdById: installation.createdById,
+        assignedTechnicianId: installation.assignedTechnicianId,
+        assignedTechnicianIds: installation.assignedTechnicianIds,
+      })
+      .from(installation)
+      .where(eq(installation.id, referenceId));
+    if (!ins) authorized = false;
+    else if (viewer.role === "ADMIN" && ins.createdById !== viewer.id) {
+      authorized = false;
+    } else if (viewer.role === "TECHNICIAN") {
+      const techIds =
+        Array.isArray(ins.assignedTechnicianIds) &&
+        ins.assignedTechnicianIds.length > 0
+          ? ins.assignedTechnicianIds
+          : ins.assignedTechnicianId
+            ? [ins.assignedTechnicianId]
+            : [];
+      if (!techIds.includes(viewer.id) && ins.createdById !== viewer.id) {
         authorized = false;
-      } else if (viewer.role === "TECHNICIAN") {
-        const techIds =
-          Array.isArray(ins.assignedTechnicianIds) &&
-          ins.assignedTechnicianIds.length > 0
-            ? ins.assignedTechnicianIds
-            : ins.assignedTechnicianId
-              ? [ins.assignedTechnicianId]
-              : [];
-        if (!techIds.includes(viewer.id) && ins.createdById !== viewer.id) {
-          authorized = false;
-        }
       }
-    } else if (workType === "PROJECT") {
-      const [prj] = await db
-        .select({
-          id: project.id,
-          createdById: project.createdById,
-          assignedTechnicianId: project.assignedTechnicianId,
-          assignedTechnicianIds: project.assignedTechnicianIds,
-        })
-        .from(project)
-        .where(eq(project.id, referenceId));
-      if (!prj) authorized = false;
-      else if (viewer.role === "ADMIN" && prj.createdById !== viewer.id) {
+    }
+  } else if (workType === "PROJECT") {
+    const [prj] = await db
+      .select({
+        id: project.id,
+        createdById: project.createdById,
+        assignedTechnicianId: project.assignedTechnicianId,
+        assignedTechnicianIds: project.assignedTechnicianIds,
+      })
+      .from(project)
+      .where(eq(project.id, referenceId));
+    if (!prj) authorized = false;
+    else if (viewer.role === "ADMIN" && prj.createdById !== viewer.id) {
+      authorized = false;
+    } else if (viewer.role === "TECHNICIAN") {
+      const techIds =
+        Array.isArray(prj.assignedTechnicianIds) &&
+        prj.assignedTechnicianIds.length > 0
+          ? prj.assignedTechnicianIds
+          : prj.assignedTechnicianId
+            ? [prj.assignedTechnicianId]
+            : [];
+      if (!techIds.includes(viewer.id) && prj.createdById !== viewer.id) {
         authorized = false;
-      } else if (viewer.role === "TECHNICIAN") {
-        const techIds =
-          Array.isArray(prj.assignedTechnicianIds) &&
-          prj.assignedTechnicianIds.length > 0
-            ? prj.assignedTechnicianIds
-            : prj.assignedTechnicianId
-              ? [prj.assignedTechnicianId]
-              : [];
-        if (!techIds.includes(viewer.id) && prj.createdById !== viewer.id) {
-          authorized = false;
-        }
       }
     }
   }

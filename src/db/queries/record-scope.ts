@@ -8,7 +8,6 @@ import { parseRecordIdSearch } from "@/lib/format";
 
 /**
  * Every transactional record query runs through the authenticated viewer:
- * - SUPER_ADMIN: intentional full organization visibility (no filter).
  * - ADMIN: strictly scoped to own transactional records (createdById === viewer.id).
  * - TECHNICIAN: restricted to assigned tickets/records or created records.
  */
@@ -19,7 +18,6 @@ type Viewer = { role: UserRole | string; id: string };
  * - Admin A sees only records created by Admin A.
  * - Admin B sees only records created by Admin B.
  * - Technician sees records assigned to them or created by them.
- * - Super Admin sees all records.
  */
 function scopeRecordToViewer(
   columns: {
@@ -29,7 +27,7 @@ function scopeRecordToViewer(
   },
   viewer?: Viewer,
 ): SQL | undefined {
-  if (!viewer || (viewer.role as string) === "SUPER_ADMIN") {
+  if (!viewer) {
     return undefined;
   }
 
@@ -54,12 +52,12 @@ function scopeRecordToViewer(
     : or(...techConditions);
 }
 
-/** Restricts an admin to their own created records; no-op for super admin. */
+/** Restricts an admin to their own created records. */
 function scopeAdminOwnership(
   createdByIdColumn: PgColumn,
   viewer?: Viewer,
 ): SQL | undefined {
-  if (!viewer || (viewer.role as string) === "SUPER_ADMIN") return undefined;
+  if (!viewer) return undefined;
   return eq(createdByIdColumn, viewer.id);
 }
 
@@ -69,7 +67,7 @@ function scopeToViewer(
   viewer?: Viewer,
   createdByIdColumn?: PgColumn,
 ): SQL | undefined {
-  if (!viewer || (viewer.role as string) === "SUPER_ADMIN") return undefined;
+  if (!viewer) return undefined;
   if (viewer.role === "ADMIN") {
     return createdByIdColumn ? eq(createdByIdColumn, viewer.id) : undefined;
   }

@@ -336,7 +336,7 @@ async function updateServiceRequest(input: unknown): Promise<ActionResult> {
 
 async function deleteServiceRequest(input: unknown): Promise<ActionResult> {
   const current = await requireUser();
-  if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
+  if (current.role !== "ADMIN")
     return actionError("Admins only.");
 
   const parsed = deleteRecordSchema.safeParse(input);

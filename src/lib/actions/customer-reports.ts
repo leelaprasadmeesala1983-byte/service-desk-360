@@ -22,10 +22,7 @@ export async function fetchCustomerReports(
 ): Promise<ActionResult<CustomerReportResult>> {
   try {
     const current = await requireUser();
-    if (
-      current.role !== "ADMIN" &&
-      (current.role as string) !== "SUPER_ADMIN"
-    ) {
+    if (current.role !== "ADMIN") {
       return actionError("Admins only.");
     }
 
@@ -48,10 +45,7 @@ export async function fetchCustomer360(
 ): Promise<ActionResult<Customer360Data>> {
   try {
     const current = await requireUser();
-    if (
-      current.role !== "ADMIN" &&
-      (current.role as string) !== "SUPER_ADMIN"
-    ) {
+    if (current.role !== "ADMIN") {
       return actionError("Admins only.");
     }
 
@@ -78,10 +72,7 @@ export async function exportCustomerReportsExcel(
 ): Promise<ActionResult<{ data: string; filename: string }>> {
   try {
     const current = await requireUser();
-    if (
-      current.role !== "ADMIN" &&
-      (current.role as string) !== "SUPER_ADMIN"
-    ) {
+    if (current.role !== "ADMIN") {
       return actionError("Admins only.");
     }
 

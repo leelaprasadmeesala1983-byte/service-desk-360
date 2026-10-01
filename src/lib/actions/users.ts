@@ -120,7 +120,6 @@ async function updateUser(input: unknown): Promise<ActionResult> {
 
   // Ownership / authorization check
   if (
-    (admin.role as string) !== "SUPER_ADMIN" &&
     target.id !== admin.id &&
     target.createdById !== admin.id
   ) {
@@ -194,7 +193,6 @@ async function setUserStatus(input: unknown): Promise<ActionResult> {
 
   // Ownership / authorization check
   if (
-    (admin.role as string) !== "SUPER_ADMIN" &&
     id !== admin.id &&
     target.createdById !== admin.id
   ) {
@@ -239,7 +237,6 @@ async function deleteUser(input: unknown): Promise<ActionResult> {
 
   // Ownership / authorization check
   if (
-    (admin.role as string) !== "SUPER_ADMIN" &&
     target.createdById !== admin.id
   ) {
     return actionError("You are not authorized to delete this user.");
@@ -289,7 +286,6 @@ async function adminUpdateUserPassword(input: unknown): Promise<ActionResult> {
 
   // Ownership / authorization check
   if (
-    (admin.role as string) !== "SUPER_ADMIN" &&
     target.id !== admin.id &&
     target.createdById !== admin.id
   ) {

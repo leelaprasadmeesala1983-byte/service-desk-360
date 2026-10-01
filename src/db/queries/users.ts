@@ -46,7 +46,7 @@ const USER_COLUMNS = {
 } as const;
 
 function buildUserScopeCondition(viewer?: Viewer): SQL | undefined {
-  if (!viewer || (viewer.role as string) === "SUPER_ADMIN") {
+  if (!viewer) {
     return undefined;
   }
 
@@ -126,11 +126,7 @@ function listAssignableTechnicians(
     isNull(user.deletedAt),
   ];
 
-  if (
-    viewer &&
-    (viewer.role as string) !== "SUPER_ADMIN" &&
-    viewer.role === "ADMIN"
-  ) {
+  if (viewer && viewer.role === "ADMIN") {
     clauses.push(eq(user.createdById, viewer.id));
   } else if (viewer && viewer.role === "TECHNICIAN") {
     clauses.push(eq(user.id, viewer.id));
