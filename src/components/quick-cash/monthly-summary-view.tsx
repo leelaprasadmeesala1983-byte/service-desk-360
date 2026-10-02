@@ -6,15 +6,10 @@ import {
   ChevronRight,
   Download,
   FileDown,
-  PiggyBank,
-  TrendingDown,
-  TrendingUp,
-  Wallet,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { StatCard } from "@/components/service-tickets/stat-card";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -311,35 +306,7 @@ export function MonthlySummaryView({
         </div>
       </div>
 
-      {/* 3. Monthly Summary Stat Cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 md:gap-3.5">
-        <StatCard
-          label="Opening Balance"
-          value={`₹${Number(summary.openingBalance).toFixed(2)}`}
-          tone="default"
-          icon={Wallet}
-        />
-        <StatCard
-          label="Total Cash In"
-          value={`+₹${Number(summary.totalCashIn).toFixed(2)}`}
-          tone="open"
-          icon={TrendingUp}
-        />
-        <StatCard
-          label="Total Cash Out"
-          value={`-₹${Number(summary.totalCashOut).toFixed(2)}`}
-          tone="rejected"
-          icon={TrendingDown}
-        />
-        <StatCard
-          label="Closing Balance"
-          value={`₹${Number(summary.closingBalance).toFixed(2)}`}
-          tone="closed"
-          icon={PiggyBank}
-        />
-      </div>
-
-      {/* 4. Monthly Transactions Card */}
+      {/* 3. Monthly Transactions Card */}
       <div className="border-border bg-card flex flex-col rounded-xl border shadow-2xs">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-3.5 sm:p-4.5">
           <div className="space-y-0.5">
