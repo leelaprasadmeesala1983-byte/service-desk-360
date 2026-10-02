@@ -415,7 +415,10 @@ function InstallationFormDialog({
                   control={form.control}
                   name="assignedTechnicianIds"
                   label="Assign Technician"
-                  placeholder="Select Technician"
+                  disabled={!isEdit}
+                  placeholder={
+                    isEdit ? "Select Technician" : "Assign after creating"
+                  }
                   options={assigneeOptions}
                   hint="Only technicians appear in this list."
                   error={errors.assignedTechnicianIds?.message}

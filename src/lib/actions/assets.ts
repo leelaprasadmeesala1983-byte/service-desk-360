@@ -75,7 +75,7 @@ export async function updateAsset(
   targetProductId?: string,
 ): Promise<ActionResult<Asset>> {
   const current = await requireUser();
-  if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
+  if (current.role !== "ADMIN")
     return actionError("Admins only.");
 
   if (!id) return actionError("Asset ID is required.");
@@ -117,7 +117,7 @@ export async function updateAsset(
 
 export async function deleteAsset(input: unknown): Promise<ActionResult> {
   const current = await requireUser();
-  if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
+  if (current.role !== "ADMIN")
     return actionError("Admins only.");
 
   const parsed = deleteAssetSchema.safeParse(input);

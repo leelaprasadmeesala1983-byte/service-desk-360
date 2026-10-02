@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { ZodError } from "zod";
 
@@ -10,6 +10,7 @@ import {
   logMultipleTechniciansWorkDates,
   logTechnicianWorkDate,
 } from "@/db/queries/technician-reports";
+import { user } from "@/db/schema/auth";
 import { installation } from "@/db/schema/installation";
 import { syncServiceRequestAmount } from "@/lib/actions/cash-transactions";
 import { recordStatusChangeEvent } from "@/lib/actions/work-history";
@@ -29,6 +30,11 @@ import {
   editInstallationSchema,
   technicianInstallationSchema,
 } from "@/lib/validations/service-ticket";
+import {
+  notifyTicketAssigned,
+  notifyTicketCreated,
+  sendWhatsAppSafely,
+} from "@/lib/whatsapp-service";
 
 import { type ActionResult, actionError, actionOk } from "./result";
 
@@ -49,11 +55,8 @@ async function createInstallation(input: unknown): Promise<ActionResult> {
   if (!parsed.success) return invalid(parsed.error);
   const data = parsed.data;
 
-  const technicianIds = Array.isArray(data.assignedTechnicianIds)
-    ? data.assignedTechnicianIds
-    : data.assignedTechnicianId
-      ? [data.assignedTechnicianId]
-      : [];
+  // Technicians are assigned later, from the edit screen.
+  const technicianIds: string[] = [];
 
   const [row] = await db
     .insert(installation)
@@ -74,28 +77,15 @@ async function createInstallation(input: unknown): Promise<ActionResult> {
     })
     .returning({ id: installation.id, seq: installation.seq });
 
-  if (technicianIds.length > 0 && row) {
-    await logMultipleTechniciansWorkDates({
-      technicianIds,
-      workType: "INSTALLATION",
-      referenceId: row.id,
-      createdById: current.id,
-    });
-
-    for (const techId of technicianIds) {
-      await notifyAssignment(
-        {
-          recordType: "INSTALLATION",
-          recordId: row.id,
-          recordLabel: formatRecordId("INSTALLATION", row.seq),
-        },
-        {
-          technicianId: techId,
-          actorId: current.id,
-          description: data.description,
-        },
-      );
-    }
+  if (row) {
+    await sendWhatsAppSafely(data.contactNumber, () =>
+      notifyTicketCreated(
+        "INSTALLATION",
+        data.contactNumber,
+        data.customerName,
+        formatRecordId("INSTALLATION", row.seq),
+      ),
+    );
   }
 
   revalidatePath(PATH);
@@ -229,6 +219,22 @@ async function updateInstallation(input: unknown): Promise<ActionResult> {
           description: data.description,
         },
       );
+    }
+
+    if (newTechs.length > 0) {
+      const techs = await db
+        .select({ name: user.name, phone: user.phone })
+        .from(user)
+        .where(inArray(user.id, newTechs));
+
+      await notifyTicketAssigned({
+        ticketType: "INSTALLATION",
+        ticketId: label,
+        owner: { name: data.customerName, phone: data.contactNumber },
+        address: data.address,
+        details: data.description,
+        technicians: techs,
+      });
     }
 
     const keptTechs = technicianIds.filter((id) => prevIds.has(id));
@@ -422,7 +428,7 @@ async function updateInstallation(input: unknown): Promise<ActionResult> {
 
 async function deleteInstallation(input: unknown): Promise<ActionResult> {
   const current = await requireUser();
-  if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
+  if (current.role !== "ADMIN")
     return actionError("Admins only.");
 
   const parsed = deleteRecordSchema.safeParse(input);

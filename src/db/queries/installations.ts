@@ -108,7 +108,6 @@ function mapRow(
 }
 
 function scopeInstallationToViewer(viewer: Viewer) {
-  if (viewer.role === "SUPER_ADMIN") return undefined;
   if (viewer.role === "ADMIN") return eq(installation.createdById, viewer.id);
   return or(
     eq(installation.assignedTechnicianId, viewer.id),

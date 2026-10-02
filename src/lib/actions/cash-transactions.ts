@@ -37,19 +37,14 @@ async function getCashTransaction(id: string): Promise<{
 } | null> {
   try {
     const current = await requireUser();
-    if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
-      return null;
+    if (current.role !== "ADMIN") return null;
 
     const transaction = await db.query.cashTransaction.findFirst({
       where: eq(cashTransaction.id, id),
     });
 
     if (!transaction) return null;
-    if (
-      (current.role as string) !== "SUPER_ADMIN" &&
-      transaction.createdById &&
-      transaction.createdById !== current.id
-    ) {
+    if (transaction.createdById && transaction.createdById !== current.id) {
       return null;
     }
 
@@ -116,10 +111,11 @@ const normalizeCashTransactionInput = (input: unknown) => {
   const raw = input as Record<string, unknown>;
   const type = (raw.type || raw.transactionType) as string | undefined;
   const rawCategory = (raw.transactionCategory || raw.category) as
-    | string
-    | undefined;
+    string | undefined;
   const otherCategory =
-    typeof raw.otherCategory === "string" ? raw.otherCategory.trim() : undefined;
+    typeof raw.otherCategory === "string"
+      ? raw.otherCategory.trim()
+      : undefined;
 
   let category = rawCategory;
   if (!category) {
@@ -133,7 +129,9 @@ const normalizeCashTransactionInput = (input: unknown) => {
     category,
     transactionCategory: rawCategory,
     otherCategory:
-      category === "OTHERS" || category === "Others" ? otherCategory : undefined,
+      category === "OTHERS" || category === "Others"
+        ? otherCategory
+        : undefined,
   };
 };
 
@@ -257,8 +255,7 @@ function invalid(error: ZodError): ActionResult {
 async function addCashTransaction(input: unknown): Promise<ActionResult> {
   try {
     const current = await requireUser();
-    if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
-      return actionError("Admins only.");
+    if (current.role !== "ADMIN") return actionError("Admins only.");
 
     const parsed = cashTransactionSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
@@ -332,8 +329,7 @@ async function addCashTransaction(input: unknown): Promise<ActionResult> {
 async function updateCashTransaction(input: unknown): Promise<ActionResult> {
   try {
     const current = await requireUser();
-    if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
-      return actionError("Admins only.");
+    if (current.role !== "ADMIN") return actionError("Admins only.");
 
     const parsed = updateCashTransactionSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
@@ -344,11 +340,7 @@ async function updateCashTransaction(input: unknown): Promise<ActionResult> {
     });
     if (!existing) return actionError("Transaction not found.");
 
-    if (
-      (current.role as string) !== "SUPER_ADMIN" &&
-      existing.createdById &&
-      existing.createdById !== current.id
-    ) {
+    if (existing.createdById && existing.createdById !== current.id) {
       return actionError(
         "You do not have permission to modify this transaction.",
       );
@@ -469,19 +461,14 @@ async function updateCashTransaction(input: unknown): Promise<ActionResult> {
 async function deleteCashTransaction(id: string): Promise<ActionResult> {
   try {
     const current = await requireUser();
-    if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
-      return actionError("Admins only.");
+    if (current.role !== "ADMIN") return actionError("Admins only.");
 
     const existing = await db.query.cashTransaction.findFirst({
       where: eq(cashTransaction.id, id),
     });
     if (!existing) return actionError("Transaction not found.");
 
-    if (
-      (current.role as string) !== "SUPER_ADMIN" &&
-      existing.createdById &&
-      existing.createdById !== current.id
-    ) {
+    if (existing.createdById && existing.createdById !== current.id) {
       return actionError(
         "You do not have permission to delete this transaction.",
       );
@@ -515,8 +502,7 @@ async function setOpeningBalance(input: {
 }): Promise<ActionResult> {
   try {
     const current = await requireUser();
-    if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
-      return actionError("Admins only.");
+    if (current.role !== "ADMIN") return actionError("Admins only.");
 
     const parsed = z
       .object({
@@ -662,7 +648,7 @@ async function exportCashTransactions(
   const rows = await listAllFilteredCashTransactions({
     from,
     to,
-    userId: (current.role as string) === "SUPER_ADMIN" ? undefined : current.id,
+    userId: current.id,
   });
 
   const dateSuffix =
@@ -708,10 +694,10 @@ async function exportCashTransactions(
     return { data: csvContent, filename: `Quick_Cash_${dateSuffix}.csv` };
   } else {
     const rowsHtml = rows
-      .map(
-        (r) => {
-          const cat = r.category || (r.type === "CASH_IN" ? "Cash In" : "Cash Out");
-          return `
+      .map((r) => {
+        const cat =
+          r.category || (r.type === "CASH_IN" ? "Cash In" : "Cash Out");
+        return `
       <tr>
         <td>${formatLocalDate(r.createdAt)}</td>
         <td>${r.type === "CASH_IN" ? "Cash In" : "Cash Out"}</td>
@@ -721,8 +707,7 @@ async function exportCashTransactions(
         <td>${r.type === "CASH_IN" ? "+" : "-"}${r.amount}</td>
       </tr>
     `;
-        },
-      )
+      })
       .join("");
 
     const htmlContent = `

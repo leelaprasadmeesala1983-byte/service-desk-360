@@ -38,8 +38,7 @@ export default async function QuickCashPage({
   }>;
 }) {
   const current = await requireAdmin();
-  const userId =
-    (current.role as string) === "SUPER_ADMIN" ? undefined : current.id;
+  const userId = current.id;
   const params = await searchParams;
 
   const now = new Date();

@@ -84,7 +84,7 @@ export async function updateSendToVendor(
   input: unknown,
 ): Promise<ActionResult<SendToVendor>> {
   const current = await requireUser();
-  if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
+  if (current.role !== "ADMIN")
     return actionError("Admins only.");
 
   if (!id) return actionError("Send to Vendor ID is required.");
@@ -139,7 +139,7 @@ export async function updateVendorDispatchRepairStatus(
   targetWorkflowStage?: string,
 ): Promise<ActionResult<SendToVendor>> {
   const current = await requireUser();
-  if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
+  if (current.role !== "ADMIN")
     return actionError("Admins only.");
 
   if (!id) return actionError("Vendor Dispatch ID is required.");
@@ -175,7 +175,7 @@ export async function deleteSendToVendor(
   input: unknown,
 ): Promise<ActionResult> {
   const current = await requireUser();
-  if (current.role !== "ADMIN" && (current.role as string) !== "SUPER_ADMIN")
+  if (current.role !== "ADMIN")
     return actionError("Admins only.");
 
   const parsed = deleteSendToVendorSchema.safeParse(input);

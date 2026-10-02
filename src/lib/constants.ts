@@ -1,4 +1,4 @@
-type UserRole = "ADMIN" | "TECHNICIAN" | "SUPER_ADMIN";
+type UserRole = "ADMIN" | "TECHNICIAN";
 type UserStatus = "ACTIVE" | "INACTIVE";
 type RecordStatus = "OPEN" | "IN_PROGRESS" | "CLOSED" | "REJECTED";
 type RecordType = "SERVICE" | "INSTALLATION" | "PROJECT";
@@ -13,12 +13,11 @@ type ServiceCategory =
   | "GENERAL_SUPPORT"
   | "OTHER";
 
-const USER_ROLES: UserRole[] = ["ADMIN", "TECHNICIAN", "SUPER_ADMIN"];
+const USER_ROLES: UserRole[] = ["ADMIN", "TECHNICIAN"];
 
 const USER_ROLE_LABELS: Record<UserRole, string> = {
   ADMIN: "Admin",
   TECHNICIAN: "Technician",
-  SUPER_ADMIN: "Super Admin",
 };
 
 const USER_STATUSES: UserStatus[] = ["ACTIVE", "INACTIVE"];

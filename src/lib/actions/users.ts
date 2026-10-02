@@ -15,6 +15,7 @@ import {
   editUserSchema,
   setUserStatusSchema,
 } from "@/lib/validations/user";
+import { notifyUserCreation, sendWhatsAppSafely } from "@/lib/whatsapp-service";
 
 import { type ActionResult, actionError, actionOk } from "./result";
 
@@ -84,6 +85,16 @@ async function createUser(input: unknown): Promise<ActionResult> {
     password: await ctx.password.hash(data.password),
   });
 
+  await sendWhatsAppSafely(data.phone, () =>
+    notifyUserCreation(
+      data.phone,
+      fullName(data.firstName, data.lastName),
+      email,
+      data.password,
+      process.env.APP_URL ?? "",
+    ),
+  );
+
   revalidatePath(USERS_PATH);
   return actionOk();
 }
@@ -109,7 +120,6 @@ async function updateUser(input: unknown): Promise<ActionResult> {
 
   // Ownership / authorization check
   if (
-    (admin.role as string) !== "SUPER_ADMIN" &&
     target.id !== admin.id &&
     target.createdById !== admin.id
   ) {
@@ -183,7 +193,6 @@ async function setUserStatus(input: unknown): Promise<ActionResult> {
 
   // Ownership / authorization check
   if (
-    (admin.role as string) !== "SUPER_ADMIN" &&
     id !== admin.id &&
     target.createdById !== admin.id
   ) {
@@ -228,7 +237,6 @@ async function deleteUser(input: unknown): Promise<ActionResult> {
 
   // Ownership / authorization check
   if (
-    (admin.role as string) !== "SUPER_ADMIN" &&
     target.createdById !== admin.id
   ) {
     return actionError("You are not authorized to delete this user.");
@@ -278,7 +286,6 @@ async function adminUpdateUserPassword(input: unknown): Promise<ActionResult> {
 
   // Ownership / authorization check
   if (
-    (admin.role as string) !== "SUPER_ADMIN" &&
     target.id !== admin.id &&
     target.createdById !== admin.id
   ) {

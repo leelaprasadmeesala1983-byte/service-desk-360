@@ -96,7 +96,6 @@ function mapRow(
 }
 
 function scopeProjectToViewer(viewer: Viewer) {
-  if (viewer.role === "SUPER_ADMIN") return undefined;
   if (viewer.role === "ADMIN") return eq(project.createdById, viewer.id);
   return or(
     eq(project.assignedTechnicianId, viewer.id),

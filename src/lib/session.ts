@@ -42,12 +42,7 @@ const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     lastName: user.lastName ?? "",
     phone: user.phone ?? null,
     department: user.department ?? null,
-    role:
-      user.role === "SUPER_ADMIN"
-        ? "SUPER_ADMIN"
-        : user.role === "ADMIN"
-          ? "ADMIN"
-          : "TECHNICIAN",
+    role: user.role === "ADMIN" ? "ADMIN" : "TECHNICIAN",
     status: "ACTIVE",
   };
 });
@@ -60,7 +55,7 @@ async function requireUser(): Promise<CurrentUser> {
 
 async function requireAdmin(): Promise<CurrentUser> {
   const user = await requireUser();
-  if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+  if (user.role !== "ADMIN") {
     redirect("/service-tickets");
   }
   return user;

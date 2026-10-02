@@ -45,7 +45,7 @@ export async function PUT(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (user.role !== "ADMIN" && (user.role as string) !== "SUPER_ADMIN") {
+  if (user.role !== "ADMIN") {
     return NextResponse.json(
       { error: "Forbidden. Admins only." },
       { status: 403 },
@@ -114,7 +114,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (user.role !== "ADMIN" && (user.role as string) !== "SUPER_ADMIN") {
+  if (user.role !== "ADMIN") {
     return NextResponse.json(
       { error: "Forbidden. Admins only." },
       { status: 403 },
