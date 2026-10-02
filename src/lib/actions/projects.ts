@@ -65,7 +65,7 @@ async function createProject(
     .values({
       companyName: data.companyName,
       customerName: data.customerName,
-      email: data.email,
+      email: data.email ?? null,
       mobileNo: data.mobileNo,
       location: data.location,
       estimationNo: data.estimationNo,
@@ -73,8 +73,6 @@ async function createProject(
       status: data.status,
       assignedTechnicianId: technicianIds[0] ?? null,
       assignedTechnicianIds: technicianIds,
-      pdfUrl: data.pdfUrl,
-      pdfName: data.pdfName,
       createdById: current.id,
     })
     .returning({ id: project.id, seq: project.seq });
@@ -143,7 +141,7 @@ async function updateProject(
       .set({
         companyName: data.companyName,
         customerName: data.customerName,
-        email: data.email,
+        email: data.email ?? null,
         mobileNo: data.mobileNo,
         location: data.location,
         estimationNo: data.estimationNo,
@@ -151,8 +149,6 @@ async function updateProject(
         status: data.status,
         assignedTechnicianId: technicianIds[0] ?? null,
         assignedTechnicianIds: technicianIds,
-        pdfUrl: data.pdfUrl,
-        pdfName: data.pdfName,
       })
       .where(eq(project.id, data.id));
 
@@ -210,8 +206,6 @@ async function updateProject(
           format: (v) =>
             RECORD_STATUS_LABELS[v as keyof typeof RECORD_STATUS_LABELS] ?? "—",
         },
-        { key: "pdfUrl", label: "PDF document", opaque: true },
-        { key: "pdfName", label: "PDF name" },
       ]);
       if (changes.length > 0) {
         for (const techId of remainingTechIds) {

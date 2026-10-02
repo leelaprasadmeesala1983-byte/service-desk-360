@@ -438,8 +438,6 @@ async function getDashboardData(viewer: Viewer): Promise<DashboardData> {
         technicianName: row.technicianName,
         technicianNames: row.technicianName ? [row.technicianName] : [],
         technicianDepartment: row.technicianDepartment,
-        pdfUrl: p.pdfUrl,
-        pdfName: p.pdfName,
         createdByName: row.createdByName,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,

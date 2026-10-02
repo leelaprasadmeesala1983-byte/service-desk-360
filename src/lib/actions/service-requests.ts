@@ -81,6 +81,11 @@ async function createServiceRequest(input: unknown): Promise<ActionResult> {
   // Technicians are assigned later, from the edit screen.
   const technicianIds: string[] = [];
 
+  const categoryLabel =
+    data.category === "OTHER" && data.otherCategory
+      ? data.otherCategory
+      : SERVICE_CATEGORY_LABELS[data.category] || data.category;
+
   const [row] = await db
     .insert(serviceRequest)
     .values({
@@ -88,8 +93,10 @@ async function createServiceRequest(input: unknown): Promise<ActionResult> {
       phone: data.phone,
       email: data.email ?? null,
       category: data.category,
+      otherCategory:
+        data.category === "OTHER" ? (data.otherCategory ?? null) : null,
       address: data.address,
-      issueTitle: data.issueTitle,
+      issueTitle: categoryLabel,
       description: data.description,
       status: data.status,
       assignedTechnicianId: technicianIds[0] ?? null,
@@ -134,6 +141,11 @@ async function updateServiceRequest(input: unknown): Promise<ActionResult> {
 
     const technicianIds = data.assignedTechnicianIds;
 
+    const categoryLabel =
+      data.category === "OTHER" && data.otherCategory
+        ? data.otherCategory
+        : SERVICE_CATEGORY_LABELS[data.category] || data.category;
+
     await db
       .update(serviceRequest)
       .set({
@@ -141,8 +153,10 @@ async function updateServiceRequest(input: unknown): Promise<ActionResult> {
         phone: data.phone,
         email: data.email ?? null,
         category: data.category,
+        otherCategory:
+          data.category === "OTHER" ? (data.otherCategory ?? null) : null,
         address: data.address,
-        issueTitle: data.issueTitle,
+        issueTitle: categoryLabel,
         description: data.description,
         status: data.status,
         assignedTechnicianId: technicianIds[0] ?? null,
@@ -169,7 +183,7 @@ async function updateServiceRequest(input: unknown): Promise<ActionResult> {
       data.id,
       "SERVICE",
       data.amount ?? null,
-      `Service ${label}: ${data.issueTitle}`,
+      `Service ${label}: ${categoryLabel}`,
       data.customerName,
       technicianIds[0] ?? null,
       current.id,
@@ -193,7 +207,7 @@ async function updateServiceRequest(input: unknown): Promise<ActionResult> {
         {
           technicianId: techId,
           actorId: current.id,
-          description: `${data.issueTitle} — ${data.description}`,
+          description: `${categoryLabel} — ${data.description}`,
         },
       );
     }
@@ -222,7 +236,7 @@ async function updateServiceRequest(input: unknown): Promise<ActionResult> {
             label,
             "SERVICE",
             data.customerName,
-            `${data.issueTitle} — ${data.description}`,
+            `${categoryLabel} — ${data.description}`,
           ),
         );
       }
@@ -236,14 +250,15 @@ async function updateServiceRequest(input: unknown): Promise<ActionResult> {
         { key: "email", label: "Email" },
         {
           key: "category",
-          label: "Category",
+          label: "Issue Type",
           format: (v) =>
-            SERVICE_CATEGORY_LABELS[
-              v as keyof typeof SERVICE_CATEGORY_LABELS
-            ] ?? "—",
+            v === "OTHER" && data.otherCategory
+              ? data.otherCategory
+              : SERVICE_CATEGORY_LABELS[
+                  v as keyof typeof SERVICE_CATEGORY_LABELS
+                ] ?? "—",
         },
         { key: "address", label: "Address", opaque: true },
-        { key: "issueTitle", label: "Issue title" },
         { key: "description", label: "Description", opaque: true },
         {
           key: "amount",
@@ -313,13 +328,21 @@ async function updateServiceRequest(input: unknown): Promise<ActionResult> {
     createdById: current.id,
   });
 
+  const existingCategoryLabel =
+    existing.category === "OTHER" &&
+    (existing.otherCategory || existing.issueTitle)
+      ? existing.otherCategory || existing.issueTitle
+      : SERVICE_CATEGORY_LABELS[existing.category] ||
+        existing.category ||
+        "Service Request";
+
   // Sync amount to Quick Cash: creates/updates/deletes based on new amount value
   try {
     await syncServiceRequestAmount(
       data.id,
       "SERVICE",
       data.amount ?? null,
-      `Service ${label}: ${existing.issueTitle}`,
+      `Service ${label}: ${existingCategoryLabel}`,
       existing.customerName,
       existing.assignedTechnicianId ?? null,
       current.id,
@@ -405,7 +428,7 @@ async function exportServiceRequestsExcel(params: {
       "Customer Name",
       "Mobile Number",
       "Email",
-      "Category",
+      "Issue Type",
       "Address",
       "Created Date",
       "Updated Date",
@@ -417,7 +440,9 @@ async function exportServiceRequestsExcel(params: {
       r.customerName,
       r.phone || "—",
       r.email || "—",
-      SERVICE_CATEGORY_LABELS[r.category] || r.category || "—",
+      r.category === "OTHER" && (r.otherCategory || r.issueTitle)
+        ? r.otherCategory || r.issueTitle
+        : SERVICE_CATEGORY_LABELS[r.category] || r.category || "—",
       r.address || "—",
       formatDate(r.createdAt),
       formatDate(r.updatedAt),

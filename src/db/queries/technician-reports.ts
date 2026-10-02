@@ -770,7 +770,7 @@ export async function getTechnicianDetailedReport(params: {
       servicesBreakdown.push({
         recordId: formatRecordId("SERVICE", srv.seq),
         referenceId: srv.id,
-        title: srv.issueTitle,
+        title: srv.issueTitle || "Service Request",
         customerName: srv.customerName,
         status: srv.status,
         firstWorkDate: dates[0] || "—",

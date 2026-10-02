@@ -25,8 +25,9 @@ const serviceRequest = pgTable(
     category: serviceCategoryEnum("category")
       .notNull()
       .default("GENERAL_SUPPORT"),
+    otherCategory: text("other_category"),
     address: text("address").notNull(),
-    issueTitle: text("issue_title").notNull(),
+    issueTitle: text("issue_title"),
     description: text("description").notNull(),
     status: recordStatusEnum("status").notNull().default("OPEN"),
 

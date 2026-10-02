@@ -155,7 +155,7 @@ export function exportInstallationToPdf(record: InstallationRow): void {
   );
   drawTwoColumnRow(
     "Email Address",
-    record.email,
+    record.email || "—",
     "S.No / Reference ID",
     record.referenceNo || "—",
   );

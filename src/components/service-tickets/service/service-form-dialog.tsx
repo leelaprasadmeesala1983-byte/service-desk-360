@@ -163,8 +163,11 @@ function ServiceFormDialog({
           phone: record.phone ?? "",
           email: record.email ?? "",
           category: record.category ?? "GENERAL_SUPPORT",
+          otherCategory:
+            record.category === "OTHER"
+              ? record.otherCategory || record.issueTitle || ""
+              : record.otherCategory || "",
           address: record.address ?? "",
-          issueTitle: record.issueTitle ?? "",
           description: record.description ?? "",
           status: record.status ?? "OPEN",
           assignedTechnicianIds: initialTechnicianIds,
@@ -189,8 +192,8 @@ function ServiceFormDialog({
           phone: "",
           email: "",
           category: "GENERAL_SUPPORT",
+          otherCategory: "",
           address: "",
-          issueTitle: "",
           description: "",
           status: "OPEN",
           assignedTechnicianIds: [],
@@ -209,6 +212,15 @@ function ServiceFormDialog({
       form.clearErrors("assignedTechnicianIds");
     }
   }, [hasAssignedTechnicians, form]);
+
+  const watchedCategory = form.watch("category");
+
+  useEffect(() => {
+    if (watchedCategory !== "OTHER") {
+      form.setValue("otherCategory", "");
+      form.clearErrors("otherCategory");
+    }
+  }, [watchedCategory, form]);
 
   /*
    * Reset the form whenever a different record is opened.
@@ -254,8 +266,11 @@ function ServiceFormDialog({
         phone: record.phone ?? "",
         email: record.email ?? "",
         category: record.category ?? "GENERAL_SUPPORT",
+        otherCategory:
+          record.category === "OTHER"
+            ? record.otherCategory || record.issueTitle || ""
+            : record.otherCategory || "",
         address: record.address ?? "",
-        issueTitle: record.issueTitle ?? "",
         description: record.description ?? "",
         status: record.status ?? "OPEN",
         assignedTechnicianIds: currentTechIds,
@@ -278,8 +293,8 @@ function ServiceFormDialog({
       phone: "",
       email: "",
       category: "GENERAL_SUPPORT",
+      otherCategory: "",
       address: "",
-      issueTitle: "",
       description: "",
       status: "OPEN",
       assignedTechnicianIds: [],
@@ -427,6 +442,10 @@ function ServiceFormDialog({
           amount: normalizedAmount,
           closedDescription: normalizedClosedDescription,
           imageUrl: normalizedImageUrl,
+          otherCategory:
+            raw.category === "OTHER" && typeof raw.otherCategory === "string"
+              ? raw.otherCategory.trim()
+              : undefined,
         };
 
         startTransition(async () => {
@@ -548,16 +567,15 @@ function ServiceFormDialog({
                   {record.email || "—"}
                 </DetailRow>
 
-                <DetailRow label="Category">
-                  {SERVICE_CATEGORY_LABELS[record.category]}
+                <DetailRow label="Issue Type">
+                  {record.category === "OTHER" &&
+                  (record.otherCategory || record.issueTitle)
+                    ? record.otherCategory || record.issueTitle
+                    : (SERVICE_CATEGORY_LABELS[record.category] ?? "—")}
                 </DetailRow>
 
                 <DetailRow label="Customer Address" wide>
                   {record.address}
-                </DetailRow>
-
-                <DetailRow label="Issue Title" wide>
-                  {record.issueTitle}
                 </DetailRow>
 
                 <DetailRow label="Issue Description" wide>
@@ -599,10 +617,25 @@ function ServiceFormDialog({
                 <ControlledSelect
                   control={form.control}
                   name="category"
-                  label="Category"
+                  label="Issue Type"
                   required
                   options={CATEGORY_OPTIONS}
                 />
+
+                {watchedCategory === "OTHER" && (
+                  <Field
+                    label="Other Issue Type"
+                    required
+                    className="sm:col-span-2"
+                    error={errors.otherCategory?.message}
+                  >
+                    <Input
+                      placeholder="Enter custom issue type"
+                      className="h-10 rounded-md"
+                      {...form.register("otherCategory")}
+                    />
+                  </Field>
+                )}
 
                 <Field
                   label="Customer Address"
@@ -613,18 +646,6 @@ function ServiceFormDialog({
                   <Input
                     className="h-10 rounded-md"
                     {...form.register("address")}
-                  />
-                </Field>
-
-                <Field
-                  label="Issue Title"
-                  required
-                  className="sm:col-span-2"
-                  error={errors.issueTitle?.message}
-                >
-                  <Input
-                    className="h-10 rounded-md"
-                    {...form.register("issueTitle")}
                   />
                 </Field>
 

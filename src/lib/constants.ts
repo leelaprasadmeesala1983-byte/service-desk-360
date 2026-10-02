@@ -10,7 +10,8 @@ type ServiceCategory =
   | "STORAGE_ISSUE"
   | "POWER_ISSUE"
   | "CABLE_WIRING"
-  | "GENERAL_SUPPORT";
+  | "GENERAL_SUPPORT"
+  | "OTHER";
 
 const USER_ROLES: UserRole[] = ["ADMIN", "TECHNICIAN", "SUPER_ADMIN"];
 
@@ -56,6 +57,7 @@ const SERVICE_CATEGORIES: ServiceCategory[] = [
   "POWER_ISSUE",
   "CABLE_WIRING",
   "GENERAL_SUPPORT",
+  "OTHER",
 ];
 
 const SERVICE_CATEGORY_LABELS: Record<ServiceCategory, string> = {
@@ -67,6 +69,7 @@ const SERVICE_CATEGORY_LABELS: Record<ServiceCategory, string> = {
   POWER_ISSUE: "Power Issue",
   CABLE_WIRING: "Cable / Wiring",
   GENERAL_SUPPORT: "General Support",
+  OTHER: "Other",
 };
 
 /** Seeds the Department dropdown before any admin adds a custom one. */

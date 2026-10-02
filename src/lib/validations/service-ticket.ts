@@ -21,6 +21,7 @@ const serviceCategoryField = z.enum([
   "POWER_ISSUE",
   "CABLE_WIRING",
   "GENERAL_SUPPORT",
+  "OTHER",
 ]);
 
 /** "" from an unset Assign Technician dropdown is stored as null. */
@@ -105,53 +106,68 @@ const urlField = z
     "Enter a valid URL or an image data URL.",
   );
 
-const assignedTechniciansField = z.preprocess(
-  (value) => {
-    if (value === null || value === undefined || value === "") {
-      return [];
-    }
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      return trimmed ? [trimmed] : [];
-    }
-    if (Array.isArray(value)) {
-      return value
-        .filter(
-          (v): v is string => typeof v === "string" && v.trim().length > 0,
-        )
-        .map((v) => v.trim());
-    }
-    return value;
-  },
-  z.array(z.string()),
-);
+const assignedTechniciansField = z.preprocess((value) => {
+  if (value === null || value === undefined || value === "") {
+    return [];
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed ? [trimmed] : [];
+  }
+  if (Array.isArray(value)) {
+    return value
+      .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+      .map((v) => v.trim());
+  }
+  return value;
+}, z.array(z.string()));
 
 // --- Service Request -------------------------------------------------------
 
-const serviceRequestCoreSchema = z.object({
+const serviceRequestCoreShape = {
   customerName: requiredText("Customer name"),
   phone: phoneField,
   email: optionalEmailField,
   category: serviceCategoryField,
+  otherCategory: z.string().trim().optional(),
   address: requiredText("Customer address"),
-  issueTitle: requiredText("Issue title"),
   description: requiredText("Issue description"),
   status: recordStatusField,
   assignedTechnicianIds: assignedTechniciansField,
   assignedTechnicianId: z.string().optional(),
-});
+};
 
-const createServiceRequestSchema = serviceRequestCoreSchema;
+const validateServiceRequestCategory = (
+  data: { category: string; otherCategory?: string },
+  ctx: z.RefinementCtx,
+) => {
+  if (
+    data.category === "OTHER" &&
+    (!data.otherCategory || data.otherCategory.trim().length === 0)
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["otherCategory"],
+      message: "Custom issue type is required when Other is selected",
+    });
+  }
+};
+
+const createServiceRequestSchema = z
+  .object(serviceRequestCoreShape)
+  .superRefine(validateServiceRequestCategory);
 
 /** Edit adds the work-outcome fields shown only on the edit screen. */
-const editServiceRequestSchema = serviceRequestCoreSchema
-  .extend({
+const editServiceRequestSchema = z
+  .object({
+    ...serviceRequestCoreShape,
     id: z.string().min(1),
     amount: amountField,
     closedDescription: optionalText,
     imageUrl: urlField,
   })
   .superRefine((data, ctx) => {
+    validateServiceRequestCategory(data, ctx);
     if (data.status === "CLOSED" && !data.closedDescription) {
       ctx.addIssue({
         code: "custom",
@@ -191,7 +207,7 @@ const optionalAssignedTechniciansField = z.preprocess((value) => {
 const installationCoreSchema = z.object({
   customerName: requiredText("Customer name"),
   contactNumber: phoneField,
-  email: emailField,
+  email: optionalEmailField,
   address: requiredText("Address"),
   description: requiredText("Installation description"),
   status: recordStatusField,
@@ -279,25 +295,12 @@ const technicianInstallationSchema = z
     }
   });
 
-const pdfUrlField = z
-  .string()
-  .trim()
-  .optional()
-  .transform((value) => (value ? value : null))
-  .refine(
-    (value) =>
-      value === null ||
-      /^https?:\/\/\S+$/i.test(value) ||
-      /^data:application\/pdf;base64,/i.test(value),
-    "Enter a valid PDF URL or PDF data.",
-  );
-
 // --- Project ------------------------------------------------------------
 
 const projectCoreSchema = z.object({
   companyName: requiredText("Company name"),
   customerName: requiredText("Customer name"),
-  email: emailField,
+  email: optionalEmailField,
   mobileNo: phoneField,
   location: requiredText("Location"),
   estimationNo: requiredText("Estimation number"),
@@ -305,8 +308,6 @@ const projectCoreSchema = z.object({
   status: recordStatusField,
   assignedTechnicianIds: optionalAssignedTechniciansField,
   assignedTechnicianId: z.string().optional(),
-  pdfUrl: pdfUrlField,
-  pdfName: optionalText,
 });
 
 const createProjectSchema = projectCoreSchema;

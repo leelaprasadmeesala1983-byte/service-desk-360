@@ -32,7 +32,12 @@ function ServiceDetailsDialog({
             <span className="font-mono text-xs text-muted-foreground">
               {record?.recordId}
             </span>
-            {record?.issueTitle}
+            {record?.category === "OTHER" &&
+            (record.otherCategory || record.issueTitle)
+              ? record.otherCategory || record.issueTitle
+              : record?.category
+                ? SERVICE_CATEGORY_LABELS[record.category]
+                : ""}
             {record && <StatusBadge status={record.status} />}
           </DialogTitle>
         </DialogHeader>
@@ -43,8 +48,11 @@ function ServiceDetailsDialog({
               <DetailRow label="Customer Name">{record.customerName}</DetailRow>
               <DetailRow label="Phone Number">{record.phone}</DetailRow>
               <DetailRow label="Email Address">{record.email || "—"}</DetailRow>
-              <DetailRow label="Category">
-                {SERVICE_CATEGORY_LABELS[record.category]}
+              <DetailRow label="Issue Type">
+                {record.category === "OTHER" &&
+                (record.otherCategory || record.issueTitle)
+                  ? record.otherCategory || record.issueTitle
+                  : (SERVICE_CATEGORY_LABELS[record.category] ?? "—")}
               </DetailRow>
               <DetailRow label="Assigned Technician">
                 {record.technicianNames && record.technicianNames.length > 0

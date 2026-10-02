@@ -392,11 +392,7 @@ function InstallationFormDialog({
                     {...form.register("contactNumber")}
                   />
                 </Field>
-                <Field
-                  label="Email Address"
-                  required
-                  error={errors.email?.message}
-                >
+                <Field label="Email Address" error={errors.email?.message}>
                   <Input
                     type="email"
                     className="h-9 rounded-md"
