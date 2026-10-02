@@ -199,43 +199,18 @@ async function updateServiceRequest(input: unknown): Promise<ActionResult> {
 
     if (newTechs.length > 0) {
       const techs = await db
-        .select({ id: user.id, name: user.name, phone: user.phone })
+        .select({ name: user.name, phone: user.phone })
         .from(user)
         .where(inArray(user.id, newTechs));
 
-<<<<<<< HEAD
-      await sendWhatsAppSafely(data.phone, () =>
-        notifyTicketOwnerAssignment(
-          data.phone,
-          data.customerName,
-          label,
-          techs.map((t) => t.name),
-        ),
-      );
-
-      for (const tech of techs) {
-        if (!tech.phone) continue;
-        await sendWhatsAppSafely(tech.phone, () =>
-          notifyTechnicianAssignment(
-            tech.phone as string,
-            tech.name,
-            label,
-            "SERVICE",
-            data.customerName,
-            `${categoryLabel} — ${data.description}`,
-          ),
-        );
-      }
-=======
       await notifyTicketAssigned({
         ticketType: "SERVICE",
         ticketId: label,
         owner: { name: data.customerName, phone: data.phone },
         address: data.address,
-        details: data.issueTitle,
+        details: `${categoryLabel} — ${data.description}`,
         technicians: techs,
       });
->>>>>>> 8073a40950144c1de86390a33188d2ec2572b394
     }
 
     const keptTechs = technicianIds.filter((id) => prevIds.has(id));
@@ -250,9 +225,9 @@ async function updateServiceRequest(input: unknown): Promise<ActionResult> {
           format: (v) =>
             v === "OTHER" && data.otherCategory
               ? data.otherCategory
-              : SERVICE_CATEGORY_LABELS[
+              : (SERVICE_CATEGORY_LABELS[
                   v as keyof typeof SERVICE_CATEGORY_LABELS
-                ] ?? "—",
+                ] ?? "—"),
         },
         { key: "address", label: "Address", opaque: true },
         { key: "description", label: "Description", opaque: true },
@@ -384,8 +359,7 @@ async function updateServiceRequest(input: unknown): Promise<ActionResult> {
 
 async function deleteServiceRequest(input: unknown): Promise<ActionResult> {
   const current = await requireUser();
-  if (current.role !== "ADMIN")
-    return actionError("Admins only.");
+  if (current.role !== "ADMIN") return actionError("Admins only.");
 
   const parsed = deleteRecordSchema.safeParse(input);
   if (!parsed.success) return actionError("Invalid request.");
