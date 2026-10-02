@@ -21,7 +21,7 @@ type InstallationRow = {
   recordId: string;
   customerName: string;
   contactNumber: string;
-  email: string;
+  email: string | null;
   address: string;
   description: string;
   status: RecordStatus;

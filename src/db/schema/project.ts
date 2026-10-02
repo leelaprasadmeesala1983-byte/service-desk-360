@@ -20,7 +20,7 @@ const project = pgTable(
 
     companyName: text("company_name").notNull(),
     customerName: text("customer_name").notNull(),
-    email: text("email").notNull(),
+    email: text("email"),
     mobileNo: text("mobile_no").notNull(),
     location: text("location").notNull(),
     estimationNo: text("estimation_no").notNull(),
@@ -32,9 +32,6 @@ const project = pgTable(
       { onDelete: "set null" },
     ),
     assignedTechnicianIds: text("assigned_technician_ids").array(),
-
-    pdfUrl: text("pdf_url"),
-    pdfName: text("pdf_name"),
 
     createdById: text("created_by_id").references(() => user.id, {
       onDelete: "set null",

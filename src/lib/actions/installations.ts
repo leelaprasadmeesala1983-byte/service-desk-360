@@ -63,7 +63,7 @@ async function createInstallation(input: unknown): Promise<ActionResult> {
     .values({
       customerName: data.customerName,
       contactNumber: data.contactNumber,
-      email: data.email,
+      email: data.email ?? null,
       address: data.address,
       description: data.description,
       status: data.status,
@@ -130,7 +130,7 @@ async function updateInstallation(input: unknown): Promise<ActionResult> {
     const updateValues: Record<string, unknown> = {
       customerName: data.customerName,
       contactNumber: data.contactNumber,
-      email: data.email,
+      email: data.email ?? null,
       address: data.address,
       description: data.description,
       status: data.status,

@@ -104,7 +104,7 @@ function InstallationView({
       if (term) {
         const matchesText =
           row.customerName.toLowerCase().includes(term) ||
-          row.email.toLowerCase().includes(term) ||
+          (row.email?.toLowerCase().includes(term) ?? false) ||
           row.contactNumber.toLowerCase().includes(term) ||
           row.recordId.toLowerCase().includes(term) ||
           (row.referenceNo?.toLowerCase().includes(term) ?? false) ||

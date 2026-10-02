@@ -21,7 +21,7 @@ const installation = pgTable(
 
     customerName: text("customer_name").notNull(),
     contactNumber: text("contact_number").notNull(),
-    email: text("email").notNull(),
+    email: text("email"),
     address: text("address").notNull(),
     description: text("description").notNull(),
     status: recordStatusEnum("status").notNull().default("OPEN"),

@@ -65,7 +65,7 @@ export type Customer360Data = {
     email: string | null;
     category: ServiceCategory;
     address: string;
-    issueTitle: string;
+    issueTitle: string | null;
     description: string;
     status: RecordStatus;
     technicianName: string | null;
@@ -79,7 +79,7 @@ export type Customer360Data = {
     recordId: string;
     customerName: string;
     contactNumber: string;
-    email: string;
+    email: string | null;
     address: string;
     description: string;
     status: RecordStatus;
@@ -98,7 +98,7 @@ export type Customer360Data = {
     companyName: string;
     customerName: string;
     mobileNo: string;
-    email: string;
+    email: string | null;
     location: string;
     estimationNo: string;
     description: string;

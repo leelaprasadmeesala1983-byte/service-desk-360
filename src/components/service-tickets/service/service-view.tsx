@@ -108,6 +108,9 @@ function ServiceView({
           (row.email?.toLowerCase().includes(term) ?? false) ||
           row.phone.toLowerCase().includes(term) ||
           row.recordId.toLowerCase().includes(term) ||
+          (row.otherCategory?.toLowerCase().includes(term) ?? false) ||
+          (SERVICE_CATEGORY_LABELS[row.category]?.toLowerCase().includes(term) ??
+            false) ||
           (row.technicianNames?.some((n) => n.toLowerCase().includes(term)) ??
             false) ||
           (row.technicianName?.toLowerCase().includes(term) ?? false);
@@ -269,7 +272,10 @@ function ServiceView({
                       {row.phone || "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {SERVICE_CATEGORY_LABELS[row.category] ?? "—"}
+                      {row.category === "OTHER" &&
+                      (row.otherCategory || row.issueTitle)
+                        ? row.otherCategory || row.issueTitle
+                        : (SERVICE_CATEGORY_LABELS[row.category] ?? "—")}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {row.technicianNames && row.technicianNames.length > 0

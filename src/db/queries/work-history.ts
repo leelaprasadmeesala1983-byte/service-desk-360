@@ -60,7 +60,7 @@ export type ServiceRequestSummary = {
   address: string;
   status: RecordStatus;
   description: string;
-  issueTitle?: string;
+  issueTitle?: string | null;
   createdAt: Date;
   assignedTechnicianIds: string[];
   assignedTechnicians: TechnicianWorkSummary[];

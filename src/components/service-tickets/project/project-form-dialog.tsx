@@ -1,9 +1,9 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FileText, Loader2, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { type ChangeEvent, useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { type Resolver, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -63,7 +63,6 @@ function ProjectFormDialog({
   const isTechnician = viewerRole === "TECHNICIAN";
   const [isPending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
-  const [pdfMessage, setPdfMessage] = useState<string | null>(null);
 
   const schema = !isEdit
     ? createProjectSchema
@@ -102,8 +101,6 @@ function ProjectFormDialog({
           description: record.description,
           status: record.status,
           assignedTechnicianIds: initialAssignedIds,
-          pdfUrl: record.pdfUrl ?? "",
-          pdfName: record.pdfName ?? "",
         }
       : {
           companyName: "",
@@ -115,15 +112,12 @@ function ProjectFormDialog({
           description: "",
           status: "OPEN",
           assignedTechnicianIds: [],
-          pdfUrl: "",
-          pdfName: "",
         },
   });
 
   useEffect(() => {
     if (!open) return;
     setServerError(null);
-    setPdfMessage(null);
 
     const assignedIds = record
       ? Array.isArray(record.assignedTechnicianIds) &&
@@ -148,8 +142,6 @@ function ProjectFormDialog({
             description: record.description,
             status: record.status,
             assignedTechnicianIds: assignedIds,
-            pdfUrl: record.pdfUrl ?? "",
-            pdfName: record.pdfName ?? "",
           }
         : {
             companyName: "",
@@ -161,68 +153,9 @@ function ProjectFormDialog({
             description: "",
             status: "OPEN",
             assignedTechnicianIds: [],
-            pdfUrl: "",
-            pdfName: "",
           },
     );
   }, [open, record, form]);
-
-  const handlePdfChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const isPdfType =
-      file.type === "application/pdf" ||
-      file.name.toLowerCase().endsWith(".pdf");
-
-    if (!isPdfType) {
-      setPdfMessage("Unsupported file type. Please upload a PDF.");
-      event.target.value = "";
-      return;
-    }
-
-    if (file.size > 15 * 1024 * 1024) {
-      setPdfMessage("File must be 15MB or smaller.");
-      event.target.value = "";
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result !== "string" || !result) {
-        setPdfMessage("Unable to read the selected file.");
-        return;
-      }
-      setPdfMessage(null);
-      form.setValue("pdfUrl", result, {
-        shouldDirty: true,
-        shouldTouch: true,
-        shouldValidate: true,
-      });
-      form.setValue("pdfName", file.name, {
-        shouldDirty: true,
-        shouldTouch: true,
-        shouldValidate: true,
-      });
-    };
-    reader.onerror = () => setPdfMessage("Unable to read the selected file.");
-    reader.readAsDataURL(file);
-  };
-
-  const removePdf = () => {
-    setPdfMessage(null);
-    form.setValue("pdfUrl", "", {
-      shouldDirty: true,
-      shouldTouch: true,
-      shouldValidate: true,
-    });
-    form.setValue("pdfName", "", {
-      shouldDirty: true,
-      shouldTouch: true,
-      shouldValidate: true,
-    });
-  };
 
   const submit = form.handleSubmit((raw) => {
     setServerError(null);
@@ -326,11 +259,7 @@ function ProjectFormDialog({
                     {...form.register("customerName")}
                   />
                 </Field>
-                <Field
-                  label="Email Address"
-                  required
-                  error={errors.email?.message}
-                >
+                <Field label="Email Address" error={errors.email?.message}>
                   <Input
                     type="email"
                     className="h-9 rounded-md"
@@ -399,70 +328,6 @@ function ProjectFormDialog({
                     className="min-h-20 rounded-md"
                     {...form.register("description")}
                   />
-                </Field>
-
-                <Field
-                  label="Project PDF Document"
-                  className="sm:col-span-2"
-                  error={errors.pdfUrl?.message ?? pdfMessage ?? undefined}
-                >
-                  <div className="space-y-3">
-                    {!form.watch("pdfUrl") ? (
-                      <label
-                        htmlFor="project-pdf-upload"
-                        className="border-border bg-muted/20 hover:bg-muted/40 flex min-h-32 w-full cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-4 text-center transition"
-                      >
-                        <FileText className="mb-2 size-5" />
-                        <span className="text-sm font-medium">
-                          Project PDF Document
-                        </span>
-                        <span className="mt-1 text-xs text-muted-foreground">
-                          Optional: Attach project scope, proposal, or quotation
-                          document in PDF format (up to 15MB).
-                        </span>
-                        <div className="mt-4 rounded border bg-background px-3 py-1.5 text-xs font-medium shadow-sm transition-colors hover:bg-muted">
-                          Select PDF
-                        </div>
-                        <input
-                          id="project-pdf-upload"
-                          type="file"
-                          accept="application/pdf"
-                          className="hidden"
-                          onChange={handlePdfChange}
-                        />
-                      </label>
-                    ) : (
-                      <div className="border-border relative flex flex-col items-center justify-center overflow-hidden rounded-md border bg-muted/30 p-6">
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="icon"
-                          className="absolute right-2 top-2 size-7 rounded-full shadow-sm"
-                          onClick={removePdf}
-                          aria-label="Remove PDF"
-                        >
-                          <X className="size-4" />
-                        </Button>
-                        <FileText className="mb-3 size-10 text-muted-foreground" />
-                        <span className="max-w-[80%] truncate text-sm font-medium">
-                          {form.watch("pdfName") || "Document.pdf"}
-                        </span>
-                        <label
-                          htmlFor="project-pdf-upload-replace"
-                          className="mt-4 cursor-pointer rounded border bg-background px-3 py-1.5 text-xs font-medium shadow-sm transition-colors hover:bg-muted"
-                        >
-                          Replace PDF
-                        </label>
-                        <input
-                          id="project-pdf-upload-replace"
-                          type="file"
-                          accept="application/pdf"
-                          className="hidden"
-                          onChange={handlePdfChange}
-                        />
-                      </div>
-                    )}
-                  </div>
                 </Field>
               </>
             )}
