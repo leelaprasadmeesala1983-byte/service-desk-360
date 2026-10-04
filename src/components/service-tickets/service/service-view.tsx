@@ -109,7 +109,9 @@ function ServiceView({
           row.phone.toLowerCase().includes(term) ||
           row.recordId.toLowerCase().includes(term) ||
           (row.otherCategory?.toLowerCase().includes(term) ?? false) ||
-          (SERVICE_CATEGORY_LABELS[row.category]?.toLowerCase().includes(term) ??
+          (SERVICE_CATEGORY_LABELS[row.category]
+            ?.toLowerCase()
+            .includes(term) ??
             false) ||
           (row.technicianNames?.some((n) => n.toLowerCase().includes(term)) ??
             false) ||

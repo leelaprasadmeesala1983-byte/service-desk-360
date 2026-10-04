@@ -1,4 +1,9 @@
-import { formatCurrency, formatDate, formatDateTime, formatRecordId } from "@/lib/format";
+import {
+  formatCurrency,
+  formatDate,
+  formatDateTime,
+  formatRecordId,
+} from "@/lib/format";
 import type {
   CustomerMaterialItem,
   CustomerReportData,

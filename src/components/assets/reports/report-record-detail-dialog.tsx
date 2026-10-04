@@ -6,11 +6,11 @@ import { DetailGrid, DetailRow } from "@/components/service-tickets/detail-row";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { formatCurrency, formatDate } from "@/lib/format";
-import {
-  type UnifiedReportRecord,
-  printSingleReportRecord,
-} from "@/lib/utils/print-report-record";
 import { cn } from "@/lib/utils";
+import {
+  printSingleReportRecord,
+  type UnifiedReportRecord,
+} from "@/lib/utils/print-report-record";
 
 type ReportRecordDetailDialogProps = {
   open: boolean;
@@ -158,7 +158,9 @@ export function ReportRecordDetailDialog({
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Complaint / Issue</p>
+                  <p className="text-xs text-muted-foreground">
+                    Complaint / Issue
+                  </p>
                   <p className="font-medium text-foreground mt-0.5 italic">
                     {record.complaint || "Service & Repair"}
                   </p>

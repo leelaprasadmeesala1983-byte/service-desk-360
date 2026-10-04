@@ -16,9 +16,27 @@ export const auth = betterAuth({
 
   baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
 
-  trustedOrigins: process.env.CORS_ORIGIN
-    ? [process.env.CORS_ORIGIN]
-    : ["http://localhost:3000"],
+  trustedOrigins: (request) => {
+    const list = [
+      process.env.BETTER_AUTH_URL || "http://localhost:3000",
+      process.env.CORS_ORIGIN || "",
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://127.0.0.1:3000",
+      "http://127.0.0.1:3001",
+    ];
+    const host =
+      request?.headers?.get?.("host") ||
+      request?.headers?.get?.("x-forwarded-host");
+    if (host) {
+      list.push(`http://${host}`, `https://${host}`);
+    }
+    const origin = request?.headers?.get?.("origin");
+    if (origin) {
+      list.push(origin);
+    }
+    return list.filter(Boolean);
+  },
 
   emailAndPassword: {
     // Resets do not go through better-auth's emailed-token route: the reset

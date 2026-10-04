@@ -119,10 +119,7 @@ async function updateUser(input: unknown): Promise<ActionResult> {
   if (!target) return actionError("That user no longer exists.");
 
   // Ownership / authorization check
-  if (
-    target.id !== admin.id &&
-    target.createdById !== admin.id
-  ) {
+  if (target.id !== admin.id && target.createdById !== admin.id) {
     return actionError("You are not authorized to update this user.");
   }
 
@@ -192,10 +189,7 @@ async function setUserStatus(input: unknown): Promise<ActionResult> {
   if (!target) return actionError("That user no longer exists.");
 
   // Ownership / authorization check
-  if (
-    id !== admin.id &&
-    target.createdById !== admin.id
-  ) {
+  if (id !== admin.id && target.createdById !== admin.id) {
     return actionError("You are not authorized to change this user's status.");
   }
 
@@ -236,9 +230,7 @@ async function deleteUser(input: unknown): Promise<ActionResult> {
   if (!target) return actionOk();
 
   // Ownership / authorization check
-  if (
-    target.createdById !== admin.id
-  ) {
+  if (target.createdById !== admin.id) {
     return actionError("You are not authorized to delete this user.");
   }
 
@@ -285,10 +277,7 @@ async function adminUpdateUserPassword(input: unknown): Promise<ActionResult> {
   if (!target) return actionError("That user no longer exists.");
 
   // Ownership / authorization check
-  if (
-    target.id !== admin.id &&
-    target.createdById !== admin.id
-  ) {
+  if (target.id !== admin.id && target.createdById !== admin.id) {
     return actionError(
       "You are not authorized to update this user's password.",
     );

@@ -101,13 +101,13 @@ export function normalizeVendorDispatchDocumentData(
 
   const createdDate = formatDateTime(row.createdAt);
 
-  const rawStatus = (row.repairStatus || row.status || "SENT_TO_VENDOR").replace(
-    /_/g,
-    " ",
-  );
+  const rawStatus = (
+    row.repairStatus ||
+    row.status ||
+    "SENT_TO_VENDOR"
+  ).replace(/_/g, " ");
 
-  const packagesCount =
-    Number(row.noOfPackages ?? row.numberOfPackages) || 1;
+  const packagesCount = Number(row.noOfPackages ?? row.numberOfPackages) || 1;
 
   return {
     dispatchId,

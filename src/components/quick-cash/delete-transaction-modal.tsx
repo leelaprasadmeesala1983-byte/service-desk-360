@@ -124,7 +124,9 @@ export function DeleteTransactionModal({
             </div>
 
             <div className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground text-[11px]">Category</span>
+              <span className="text-muted-foreground text-[11px]">
+                Category
+              </span>
               <div>
                 <span
                   className={cn(
@@ -156,7 +158,9 @@ export function DeleteTransactionModal({
 
             {transaction.sourceRecordLabel && (
               <div className="flex flex-col gap-0.5">
-                <span className="text-muted-foreground text-[11px]">Service ID</span>
+                <span className="text-muted-foreground text-[11px]">
+                  Service ID
+                </span>
                 <span className="font-mono text-xs text-foreground">
                   {transaction.sourceRecordLabel}
                 </span>
@@ -164,15 +168,21 @@ export function DeleteTransactionModal({
             )}
 
             <div className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground text-[11px]">Added By</span>
+              <span className="text-muted-foreground text-[11px]">
+                Added By
+              </span>
               <span className="text-xs text-foreground truncate">
-                {transaction.createdByName || transaction.customerName || "Admin"}
+                {transaction.createdByName ||
+                  transaction.customerName ||
+                  "Admin"}
               </span>
             </div>
           </div>
 
           <div className="flex flex-col gap-0.5 border-t border-border/60 pt-2">
-            <span className="text-muted-foreground text-[11px]">Description</span>
+            <span className="text-muted-foreground text-[11px]">
+              Description
+            </span>
             <p className="text-xs text-foreground break-words line-clamp-3 bg-background/60 rounded p-1.5 border border-border/40">
               {transaction.description || "—"}
             </p>

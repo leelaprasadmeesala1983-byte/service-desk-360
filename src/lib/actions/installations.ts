@@ -428,8 +428,7 @@ async function updateInstallation(input: unknown): Promise<ActionResult> {
 
 async function deleteInstallation(input: unknown): Promise<ActionResult> {
   const current = await requireUser();
-  if (current.role !== "ADMIN")
-    return actionError("Admins only.");
+  if (current.role !== "ADMIN") return actionError("Admins only.");
 
   const parsed = deleteRecordSchema.safeParse(input);
   if (!parsed.success) return actionError("Invalid request.");
