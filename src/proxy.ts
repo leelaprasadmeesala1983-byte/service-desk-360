@@ -30,6 +30,21 @@ function isPublicRoute(pathname: string): boolean {
   );
 }
 
+function hasSessionCookie(request: NextRequest): boolean {
+  if (Boolean(getSessionCookie(request))) {
+    return true;
+  }
+  const knownCookies = [
+    "better-auth.session_token",
+    "__Secure-better-auth.session_token",
+    "better-auth.session_data",
+    "__Secure-better-auth.session_data",
+    "better_auth.session_token",
+    "session_token",
+  ];
+  return knownCookies.some((name) => Boolean(request.cookies.get(name)?.value));
+}
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -42,9 +57,14 @@ export function proxy(request: NextRequest) {
 
   // 2. Optimistic cookie check at edge proxy.
   // Full session verification is authoritatively performed in server components/layouts.
-  const hasSession = Boolean(getSessionCookie(request));
+  const hasSession = hasSessionCookie(request);
 
-  // 3. Unauthenticated access to protected route -> redirect to /login
+  // 3. Authenticated user accessing public login route -> redirect to home
+  if (hasSession && pathname === "/login") {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  // 4. Unauthenticated access to protected route -> redirect to /login
   if (!hasSession && !isPublic) {
     if (pathname === "/login") {
       return NextResponse.next();
@@ -61,7 +81,7 @@ export function proxy(request: NextRequest) {
     return response;
   }
 
-  // 4. Allowed requests proceed
+  // 5. Allowed requests proceed
   return NextResponse.next();
 }
 

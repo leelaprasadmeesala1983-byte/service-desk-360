@@ -1,6 +1,6 @@
 "use server";
 
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { ZodError } from "zod";
 
@@ -16,6 +16,7 @@ import {
 } from "@/db/queries/technician-reports";
 import { user } from "@/db/schema/auth";
 import { project } from "@/db/schema/project";
+import { workHistory } from "@/db/schema/work-history";
 import { recordStatusChangeEvent } from "@/lib/actions/work-history";
 import { RECORD_STATUS_LABELS, type RecordStatus } from "@/lib/constants";
 import { buildExcelSpreadsheet, getExportFilename } from "@/lib/excel-export";
@@ -60,8 +61,7 @@ async function createProject(
   if (!parsed.success) return invalid(parsed.error);
   const data = parsed.data;
 
-  // Technicians are assigned later, from the edit screen.
-  const technicianIds: string[] = [];
+  const technicianIds = data.assignedTechnicianIds ?? [];
 
   const [row] = await db
     .insert(project)
@@ -77,21 +77,77 @@ async function createProject(
       assignedTechnicianId: technicianIds[0] ?? null,
       assignedTechnicianIds: technicianIds,
       createdById: current.id,
+      createdAt: data.createdAt,
+      updatedAt: data.createdAt,
     })
     .returning({ id: project.id, seq: project.seq });
 
   if (row) {
+    const label = formatRecordId("PROJECT", row.seq);
+
+    const createdDateObj =
+      data.createdAt instanceof Date
+        ? data.createdAt
+        : new Date(data.createdAt ?? new Date());
+    const createdDateStr = createdDateObj.toISOString().split("T")[0];
+
+    await db.insert(workHistory).values({
+      workType: "PROJECT",
+      referenceId: row.id,
+      technicianIds: technicianIds,
+      workDate: createdDateStr,
+      workDateTime: createdDateObj,
+      status: data.status,
+      description: `${data.companyName}: ${data.description}`,
+      attachments: [],
+      createdById: current.id,
+      createdAt: createdDateObj,
+      updatedAt: createdDateObj,
+      isInitial: true,
+    });
+
+    if (technicianIds.length > 0) {
+      await logMultipleTechniciansWorkDates({
+        technicianIds,
+        workType: "PROJECT",
+        referenceId: row.id,
+        createdById: current.id,
+      });
+
+      for (const techId of technicianIds) {
+        await notifyAssignment(
+          { recordType: "PROJECT", recordId: row.id, recordLabel: label },
+          {
+            technicianId: techId,
+            actorId: current.id,
+            description: `${data.companyName}: ${data.description}`,
+          },
+        );
+      }
+
+      const techs = await db
+        .select({ name: user.name, phone: user.phone })
+        .from(user)
+        .where(inArray(user.id, technicianIds));
+
+      await notifyTicketAssigned({
+        ticketType: "PROJECT",
+        ticketId: label,
+        owner: { name: data.customerName, phone: data.mobileNo },
+        address: data.location,
+        details: data.description,
+        company: data.companyName,
+        technicians: techs,
+      });
+    }
+
     await sendWhatsAppSafely(data.mobileNo, () =>
-      notifyTicketCreated(
-        "PROJECT",
-        data.mobileNo,
-        data.customerName,
-        formatRecordId("PROJECT", row.seq),
-      ),
+      notifyTicketCreated("PROJECT", data.mobileNo, data.customerName, label),
     );
   }
 
   revalidatePath(PATH);
+  revalidatePath("/service-tickets/technician-reports");
   revalidatePath("/", "layout");
   const created = row
     ? await getProject(row.id, { role: current.role, id: current.id })
@@ -139,18 +195,20 @@ async function updateProject(
         status: data.status,
         assignedTechnicianId: technicianIds[0] ?? null,
         assignedTechnicianIds: technicianIds,
+        updatedAt: data.updatedAt,
       })
       .where(eq(project.id, data.id));
 
-    if (existing.status !== "CLOSED" && data.status === "CLOSED") {
-      await recordStatusChangeEvent({
-        workType: "PROJECT",
-        referenceId: data.id,
-        previousStatus: existing.status,
-        newStatus: data.status,
-        actorId: current.id,
-      });
-    }
+    // Synchronize current status with existing Log Request(s) / work history records for this project
+    await db
+      .update(workHistory)
+      .set({ status: data.status })
+      .where(
+        and(
+          eq(workHistory.workType, "PROJECT"),
+          eq(workHistory.referenceId, data.id),
+        ),
+      );
 
     const existingTechIds = existing.assignedTechnicianIds?.length
       ? existing.assignedTechnicianIds
@@ -252,18 +310,19 @@ async function updateProject(
 
   await db
     .update(project)
-    .set({ status: data.status })
+    .set({ status: data.status, updatedAt: data.updatedAt })
     .where(eq(project.id, data.id));
 
-  if (existing.status !== "CLOSED" && data.status === "CLOSED") {
-    await recordStatusChangeEvent({
-      workType: "PROJECT",
-      referenceId: data.id,
-      previousStatus: existing.status,
-      newStatus: data.status,
-      actorId: current.id,
-    });
-  }
+  // Synchronize current status with existing Log Request(s) / work history records for this project
+  await db
+    .update(workHistory)
+    .set({ status: data.status })
+    .where(
+      and(
+        eq(workHistory.workType, "PROJECT"),
+        eq(workHistory.referenceId, data.id),
+      ),
+    );
 
   // Auto-log work date for technician
   await logTechnicianWorkDate({
@@ -289,6 +348,7 @@ async function updateProject(
   );
 
   revalidatePath(PATH);
+  revalidatePath("/service-tickets/technician-reports");
   revalidatePath("/", "layout");
   const updated = await getProject(data.id, {
     role: current.role,
@@ -299,8 +359,7 @@ async function updateProject(
 
 async function deleteProject(input: unknown): Promise<ActionResult> {
   const current = await requireUser();
-  if (current.role !== "ADMIN")
-    return actionError("Admins only.");
+  if (current.role !== "ADMIN") return actionError("Admins only.");
 
   const parsed = deleteRecordSchema.safeParse(input);
   if (!parsed.success) return actionError("Invalid request.");
@@ -314,6 +373,7 @@ async function deleteProject(input: unknown): Promise<ActionResult> {
 
   await db.delete(project).where(eq(project.id, parsed.data.id));
   revalidatePath(PATH);
+  revalidatePath("/service-tickets/technician-reports");
   revalidatePath("/", "layout");
   return actionOk();
 }

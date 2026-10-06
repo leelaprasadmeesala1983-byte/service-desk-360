@@ -178,7 +178,7 @@ async function getUserStats(viewer?: Viewer): Promise<UserStats> {
     if (row.status === "ACTIVE") stats.active += row.value;
     else stats.inactive += row.value;
     if (row.role === "ADMIN") stats.admins += row.value;
-    else stats.technicians += row.value;
+    else if (row.role === "TECHNICIAN") stats.technicians += row.value;
   }
 
   return stats;

@@ -98,11 +98,19 @@ function StatCard({
             "text-xl sm:text-2xl md:text-[26px] font-bold tracking-tight leading-tight truncate",
             currentTone.text,
           )}
-          title={typeof value === "string" || typeof value === "number" ? String(value) : undefined}
+          title={
+            typeof value === "string" || typeof value === "number"
+              ? String(value)
+              : undefined
+          }
         >
           {value}
         </p>
-        {hint && <p className="text-muted-foreground mt-0.5 text-xs truncate">{hint}</p>}
+        {hint && (
+          <p className="text-muted-foreground mt-0.5 text-xs truncate">
+            {hint}
+          </p>
+        )}
       </div>
     </div>
   );

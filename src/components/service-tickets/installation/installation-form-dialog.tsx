@@ -30,6 +30,7 @@ import {
   updateInstallation,
 } from "@/lib/actions/installations";
 import { RECORD_STATUS_LABELS, type UserRole } from "@/lib/constants";
+import { formatDateTime, formatLocalDateTime } from "@/lib/format";
 import {
   createInstallationSchema,
   editInstallationSchema,
@@ -42,6 +43,7 @@ type InstallationFormDialogProps = {
   viewerRole: UserRole;
   technicians: { id: string; name: string }[];
   record?: InstallationRow;
+  onSuccess?: (savedRecord?: InstallationRow, isEdit?: boolean) => void;
 };
 
 const STATUS_OPTIONS = (["OPEN", "IN_PROGRESS", "CLOSED"] as const).map(
@@ -67,6 +69,7 @@ function InstallationFormDialog({
   viewerRole,
   technicians,
   record,
+  onSuccess,
 }: InstallationFormDialogProps) {
   const router = useRouter();
   const isEdit = Boolean(record);
@@ -123,6 +126,9 @@ function InstallationFormDialog({
           paymentMode: record.paymentMode ?? "",
           paymentStatus: record.paymentStatus ?? "PAID",
           amount: record.amount ?? "",
+          updatedAt: record.updatedAt
+            ? formatLocalDateTime(record.updatedAt)
+            : formatLocalDateTime(new Date()),
         }
       : {
           customerName: "",
@@ -139,6 +145,7 @@ function InstallationFormDialog({
           paymentMode: "",
           paymentStatus: "PAID",
           amount: "",
+          createdAt: formatLocalDateTime(new Date()),
         },
   });
 
@@ -187,6 +194,9 @@ function InstallationFormDialog({
         paymentMode: record.paymentMode ?? "",
         paymentStatus: record.paymentStatus ?? "PAID",
         amount: record.amount ?? "",
+        updatedAt: record.updatedAt
+          ? formatLocalDateTime(record.updatedAt)
+          : formatLocalDateTime(new Date()),
       });
       return;
     }
@@ -206,6 +216,7 @@ function InstallationFormDialog({
       paymentMode: "",
       paymentStatus: "PAID",
       amount: "",
+      createdAt: formatLocalDateTime(new Date()),
     });
   }, [open, record, form]);
 
@@ -228,6 +239,7 @@ function InstallationFormDialog({
           accountPassword: "",
           accountMobile: "",
           referenceNo: "",
+          createdAt: formatLocalDateTime(new Date()),
         });
       }
     }
@@ -301,6 +313,9 @@ function InstallationFormDialog({
               isEdit ? "Installation updated" : "Installation created",
             );
             handleOpenChange(false);
+            if (onSuccess) {
+              onSuccess(result.data, isEdit);
+            }
             router.refresh();
           } catch (error) {
             console.error("Installation submit failed:", error);
@@ -415,10 +430,7 @@ function InstallationFormDialog({
                   control={form.control}
                   name="assignedTechnicianIds"
                   label="Assign Technician"
-                  disabled={!isEdit}
-                  placeholder={
-                    isEdit ? "Select Technician" : "Assign after creating"
-                  }
+                  placeholder="Select Technician"
                   options={assigneeOptions}
                   hint="Only technicians appear in this list."
                   error={errors.assignedTechnicianIds?.message}
@@ -433,6 +445,50 @@ function InstallationFormDialog({
               required
               options={STATUS_OPTIONS}
             />
+
+            {!isEdit && (
+              <Field
+                label="Created Date & Time"
+                required
+                className="sm:col-span-1"
+                error={errors.createdAt?.message}
+              >
+                <Input
+                  type="datetime-local"
+                  className="h-9 rounded-md"
+                  {...form.register("createdAt")}
+                />
+              </Field>
+            )}
+
+            {isEdit && (
+              <>
+                <Field label="Created Date & Time" className="sm:col-span-1">
+                  <Input
+                    type="text"
+                    readOnly
+                    disabled
+                    value={
+                      record?.createdAt ? formatDateTime(record.createdAt) : "—"
+                    }
+                    className="h-9 rounded-md bg-muted/50 cursor-not-allowed"
+                  />
+                </Field>
+
+                <Field
+                  label="Updated Date & Time"
+                  required
+                  className="sm:col-span-1"
+                  error={errors.updatedAt?.message}
+                >
+                  <Input
+                    type="datetime-local"
+                    className="h-9 rounded-md"
+                    {...form.register("updatedAt")}
+                  />
+                </Field>
+              </>
+            )}
 
             <Field
               label="Installation Description"

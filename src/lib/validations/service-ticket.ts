@@ -122,6 +122,22 @@ const assignedTechniciansField = z.preprocess((value) => {
   return value;
 }, z.array(z.string()));
 
+const dateTimeField = (label: string) =>
+  z.preprocess(
+    (value) => {
+      if (value instanceof Date) return value;
+      if (typeof value === "string" && value.trim()) {
+        const d = new Date(value.trim());
+        return Number.isNaN(d.getTime()) ? undefined : d;
+      }
+      return undefined;
+    },
+    z.date({
+      required_error: `${label} is required`,
+      invalid_type_error: `Enter a valid ${label.toLowerCase()}`,
+    }),
+  );
+
 // --- Service Request -------------------------------------------------------
 
 const serviceRequestCoreShape = {
@@ -154,7 +170,10 @@ const validateServiceRequestCategory = (
 };
 
 const createServiceRequestSchema = z
-  .object(serviceRequestCoreShape)
+  .object({
+    ...serviceRequestCoreShape,
+    createdAt: dateTimeField("Created Date & Time"),
+  })
   .superRefine(validateServiceRequestCategory);
 
 /** Edit adds the work-outcome fields shown only on the edit screen. */
@@ -165,6 +184,7 @@ const editServiceRequestSchema = z
     amount: amountField,
     closedDescription: optionalText,
     imageUrl: urlField,
+    updatedAt: dateTimeField("Updated Date & Time"),
   })
   .superRefine((data, ctx) => {
     validateServiceRequestCategory(data, ctx);
@@ -184,6 +204,7 @@ const technicianServiceRequestSchema = z.object({
   amount: amountField,
   closedDescription: optionalText,
   imageUrl: urlField,
+  updatedAt: dateTimeField("Updated Date & Time"),
 });
 
 const optionalAssignedTechniciansField = z.preprocess((value) => {
@@ -204,7 +225,7 @@ const optionalAssignedTechniciansField = z.preprocess((value) => {
 
 // --- Installation --------------------------------------------------------
 
-const installationCoreSchema = z.object({
+const installationCoreShape = {
   customerName: requiredText("Customer name"),
   contactNumber: phoneField,
   email: optionalEmailField,
@@ -217,7 +238,7 @@ const installationCoreSchema = z.object({
   accountPassword: optionalText,
   accountMobile: optionalMobileField,
   referenceNo: optionalText,
-});
+};
 
 const paymentModeField = z
   .enum(["ONLINE", "CASH"])
@@ -231,14 +252,19 @@ const paymentStatusField = z
   .nullable()
   .or(z.literal("").transform(() => null));
 
-const createInstallationSchema = installationCoreSchema;
+const createInstallationSchema = z.object({
+  ...installationCoreShape,
+  createdAt: dateTimeField("Created Date & Time"),
+});
 
-const editInstallationSchema = installationCoreSchema
-  .extend({
+const editInstallationSchema = z
+  .object({
+    ...installationCoreShape,
     id: z.string().min(1),
     paymentMode: paymentModeField,
     paymentStatus: paymentStatusField,
     amount: amountField,
+    updatedAt: dateTimeField("Updated Date & Time"),
   })
   .superRefine((data, ctx) => {
     if (data.paymentMode === "ONLINE") {
@@ -273,6 +299,7 @@ const technicianInstallationSchema = z
     paymentMode: paymentModeField,
     paymentStatus: paymentStatusField,
     amount: amountField,
+    updatedAt: dateTimeField("Updated Date & Time"),
   })
   .superRefine((data, ctx) => {
     if (data.paymentMode === "ONLINE") {
@@ -297,7 +324,7 @@ const technicianInstallationSchema = z
 
 // --- Project ------------------------------------------------------------
 
-const projectCoreSchema = z.object({
+const projectCoreShape = {
   companyName: requiredText("Company name"),
   customerName: requiredText("Customer name"),
   email: optionalEmailField,
@@ -308,18 +335,24 @@ const projectCoreSchema = z.object({
   status: recordStatusField,
   assignedTechnicianIds: optionalAssignedTechniciansField,
   assignedTechnicianId: z.string().optional(),
+};
+
+const createProjectSchema = z.object({
+  ...projectCoreShape,
+  createdAt: dateTimeField("Created Date & Time"),
 });
 
-const createProjectSchema = projectCoreSchema;
-
-const editProjectSchema = projectCoreSchema.extend({
+const editProjectSchema = z.object({
+  ...projectCoreShape,
   id: z.string().min(1),
+  updatedAt: dateTimeField("Updated Date & Time"),
 });
 
 /** A technician may only move the status (spec §4.4). */
 const technicianProjectSchema = z.object({
   id: z.string().min(1),
   status: recordStatusField,
+  updatedAt: dateTimeField("Updated Date & Time"),
 });
 
 const deleteRecordSchema = z.object({ id: z.string().min(1) });

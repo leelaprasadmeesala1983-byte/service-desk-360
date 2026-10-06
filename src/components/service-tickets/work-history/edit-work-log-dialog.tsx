@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { WorkHistoryItem } from "@/db/queries/work-history";
 import { updateWorkHistory } from "@/lib/actions/work-history";
-import { RECORD_STATUS_LABELS } from "@/lib/constants";
+import { RECORD_STATUS_LABELS, type RecordStatus } from "@/lib/constants";
 import {
   type EditWorkHistoryValues,
   editWorkHistorySchema,
@@ -35,6 +35,7 @@ type EditWorkLogDialogProps = {
   onOpenChange: (open: boolean) => void;
   entry?: WorkHistoryItem;
   technicians: { id: string; name: string }[];
+  parentStatus?: RecordStatus | string;
   onUpdated?: () => void;
 };
 
@@ -50,6 +51,7 @@ export function EditWorkLogDialog({
   onOpenChange,
   entry,
   technicians,
+  parentStatus,
   onUpdated,
 }: EditWorkLogDialogProps) {
   const [isPending, startTransition] = useTransition();
@@ -101,7 +103,25 @@ export function EditWorkLogDialog({
     }
   }, [entry, form]);
 
+  const currentStatus = form.watch("status");
+  const normFormStatus = String(currentStatus || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s_-]+/g, "");
+  const isStatusBlocked = normFormStatus === "OPEN";
+
   const onSubmit = (values: EditWorkHistoryValues) => {
+    const rawStatus = String(values.status || "")
+      .trim()
+      .toUpperCase()
+      .replace(/[\s_-]+/g, "");
+    if (rawStatus === "OPEN") {
+      toast.error(
+        "Log Request is available only for In Progress or Closed records.",
+      );
+      return;
+    }
+
     startTransition(async () => {
       const res = await updateWorkHistory(values);
       if (!res.ok) {
@@ -153,7 +173,19 @@ export function EditWorkLogDialog({
             >
               <Input
                 type="date"
-                {...form.register("workDate")}
+                {...form.register("workDate", {
+                  onChange: (e) => {
+                    const val = e.target.value;
+                    const curDt = form.getValues("workDateTime");
+                    const timePart =
+                      curDt && curDt.includes("T")
+                        ? curDt.split("T")[1]
+                        : "12:00";
+                    if (val) {
+                      form.setValue("workDateTime", `${val}T${timePart}`);
+                    }
+                  },
+                })}
                 className="h-9"
               />
             </Field>
@@ -165,7 +197,14 @@ export function EditWorkLogDialog({
             >
               <Input
                 type="datetime-local"
-                {...form.register("workDateTime")}
+                {...form.register("workDateTime", {
+                  onChange: (e) => {
+                    const val = e.target.value;
+                    if (val && val.includes("T")) {
+                      form.setValue("workDate", val.split("T")[0]);
+                    }
+                  },
+                })}
                 className="h-9"
               />
             </Field>
@@ -178,6 +217,12 @@ export function EditWorkLogDialog({
             options={STATUS_OPTIONS}
             required
           />
+
+          {isStatusBlocked && (
+            <div className="rounded-md bg-destructive/10 border border-destructive/20 p-2.5 text-xs text-destructive font-medium">
+              Log Request is available only for In Progress or Closed records.
+            </div>
+          )}
 
           <Field
             label="Work Description / Remarks"
@@ -201,7 +246,7 @@ export function EditWorkLogDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" disabled={isPending || isStatusBlocked}>
               {isPending && <Loader2 className="size-4 animate-spin mr-2" />}
               Save Changes
             </Button>

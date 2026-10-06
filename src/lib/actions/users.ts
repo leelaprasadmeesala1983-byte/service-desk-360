@@ -96,6 +96,8 @@ async function createUser(input: unknown): Promise<ActionResult> {
   );
 
   revalidatePath(USERS_PATH);
+  revalidatePath("/service-tickets");
+  revalidatePath("/", "layout");
   return actionOk();
 }
 
@@ -119,10 +121,7 @@ async function updateUser(input: unknown): Promise<ActionResult> {
   if (!target) return actionError("That user no longer exists.");
 
   // Ownership / authorization check
-  if (
-    target.id !== admin.id &&
-    target.createdById !== admin.id
-  ) {
+  if (target.id !== admin.id && target.createdById !== admin.id) {
     return actionError("You are not authorized to update this user.");
   }
 
@@ -138,8 +137,11 @@ async function updateUser(input: unknown): Promise<ActionResult> {
     }
   }
 
-  // The role is fixed at creation; any submitted role is ignored.
-  if (target.role === "ADMIN" && data.status === "INACTIVE") {
+  // Ensure at least one active admin remains if demoting or deactivating an admin
+  if (
+    target.role === "ADMIN" &&
+    (data.role === "TECHNICIAN" || data.status === "INACTIVE")
+  ) {
     const otherAdmins = await countActiveAdmins(data.id);
     if (otherAdmins === 0) {
       return actionError("At least one active admin must remain.");
@@ -158,6 +160,7 @@ async function updateUser(input: unknown): Promise<ActionResult> {
       lastName: data.lastName,
       name: fullName(data.firstName, data.lastName),
       phone: data.phone,
+      role: data.role,
       department: data.department,
       status: data.status,
     })
@@ -170,6 +173,7 @@ async function updateUser(input: unknown): Promise<ActionResult> {
   }
 
   revalidatePath(USERS_PATH);
+  revalidatePath("/service-tickets");
   revalidatePath("/", "layout");
   return actionOk();
 }
@@ -192,10 +196,7 @@ async function setUserStatus(input: unknown): Promise<ActionResult> {
   if (!target) return actionError("That user no longer exists.");
 
   // Ownership / authorization check
-  if (
-    id !== admin.id &&
-    target.createdById !== admin.id
-  ) {
+  if (id !== admin.id && target.createdById !== admin.id) {
     return actionError("You are not authorized to change this user's status.");
   }
 
@@ -215,6 +216,8 @@ async function setUserStatus(input: unknown): Promise<ActionResult> {
   }
 
   revalidatePath(USERS_PATH);
+  revalidatePath("/service-tickets");
+  revalidatePath("/", "layout");
   return actionOk();
 }
 
@@ -236,9 +239,7 @@ async function deleteUser(input: unknown): Promise<ActionResult> {
   if (!target) return actionOk();
 
   // Ownership / authorization check
-  if (
-    target.createdById !== admin.id
-  ) {
+  if (target.createdById !== admin.id) {
     return actionError("You are not authorized to delete this user.");
   }
 
@@ -262,6 +263,8 @@ async function deleteUser(input: unknown): Promise<ActionResult> {
   await ctx.internalAdapter.deleteUserSessions(id);
 
   revalidatePath(USERS_PATH);
+  revalidatePath("/service-tickets");
+  revalidatePath("/", "layout");
   return actionOk();
 }
 
@@ -285,10 +288,7 @@ async function adminUpdateUserPassword(input: unknown): Promise<ActionResult> {
   if (!target) return actionError("That user no longer exists.");
 
   // Ownership / authorization check
-  if (
-    target.id !== admin.id &&
-    target.createdById !== admin.id
-  ) {
+  if (target.id !== admin.id && target.createdById !== admin.id) {
     return actionError(
       "You are not authorized to update this user's password.",
     );

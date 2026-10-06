@@ -28,9 +28,9 @@ import {
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
-  type UnifiedReportRecord,
   normalizeCustomerRecord,
   printSingleReportRecord,
+  type UnifiedReportRecord,
 } from "@/lib/utils/print-report-record";
 import { printCustomerReportDirect } from "@/lib/utils/print-reports";
 import type {
@@ -385,7 +385,9 @@ export function CustomerReportView({
                     <TableHead className="w-32">Vendor</TableHead>
                     <TableHead className="w-28">Status</TableHead>
                     <TableHead className="w-32">Location</TableHead>
-                    <TableHead className="w-24 text-right font-bold">Actions</TableHead>
+                    <TableHead className="w-24 text-right font-bold">
+                      Actions
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

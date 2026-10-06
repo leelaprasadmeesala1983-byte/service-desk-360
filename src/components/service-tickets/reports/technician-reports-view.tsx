@@ -15,7 +15,7 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { Button } from "@/components/ui/button";
@@ -87,6 +87,12 @@ export function TechnicianReportsView({
   const [workTypeFilter, setWorkTypeFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setReport(initialReport);
+    setMonth(String(initialReport.month));
+    setYear(String(initialReport.year));
+  }, [initialReport]);
 
   // Individual Technician detail dialog state
   const [selectedTechId, setSelectedTechId] = useState<string | null>(null);

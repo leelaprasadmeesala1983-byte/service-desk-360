@@ -79,10 +79,12 @@ export function RecordWorkSummary({
                   ({tech.department})
                 </span>
               )}
-              <div className="text-[10px] text-muted-foreground">
-                {tech.firstWorkDate === tech.lastWorkDate
-                  ? `Work date: ${tech.firstWorkDate}`
-                  : `Active: ${tech.firstWorkDate} → ${tech.lastWorkDate}`}
+              <div className="mt-0.5 space-y-0.5 text-[10px] text-muted-foreground">
+                {tech.dates && tech.dates.length > 0 ? (
+                  tech.dates.map((d) => <div key={d}>Work date: {d}</div>)
+                ) : (
+                  <div>Work date: {tech.firstWorkDate}</div>
+                )}
               </div>
             </div>
             <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">

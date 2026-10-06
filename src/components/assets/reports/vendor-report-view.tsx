@@ -28,9 +28,9 @@ import {
 import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
-  type UnifiedReportRecord,
   normalizeVendorRecord,
   printSingleReportRecord,
+  type UnifiedReportRecord,
 } from "@/lib/utils/print-report-record";
 import { printVendorReportDirect } from "@/lib/utils/print-reports";
 import type {
@@ -370,7 +370,9 @@ export function VendorReportView({
                     <TableHead className="w-24">Sent</TableHead>
                     <TableHead className="w-28">Status</TableHead>
                     <TableHead className="w-24 text-right">Cost</TableHead>
-                    <TableHead className="w-24 text-right font-bold">Actions</TableHead>
+                    <TableHead className="w-24 text-right font-bold">
+                      Actions
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

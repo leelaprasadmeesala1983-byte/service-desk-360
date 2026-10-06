@@ -473,9 +473,7 @@ export function SendToVendorFormDialog({
 
     const rawPkg = values.noOfPackages ?? values.numberOfPackages;
     const parsedPackages =
-      typeof rawPkg === "number"
-        ? rawPkg
-        : Number.parseInt(String(rawPkg), 10);
+      typeof rawPkg === "number" ? rawPkg : Number.parseInt(String(rawPkg), 10);
 
     if (
       rawPkg === undefined ||
@@ -486,7 +484,8 @@ export function SendToVendorFormDialog({
     ) {
       form.setError("numberOfPackages", {
         type: "manual",
-        message: "No. of Packages is required and must be a positive whole number.",
+        message:
+          "No. of Packages is required and must be a positive whole number.",
       });
       return;
     }

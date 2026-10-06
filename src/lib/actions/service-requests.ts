@@ -1,11 +1,12 @@
 "use server";
 
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { ZodError } from "zod";
 
 import { db } from "@/db";
 import {
+  type ServiceRequestRow,
   getServiceRequest,
   listServiceRequests,
 } from "@/db/queries/service-requests";
@@ -15,6 +16,7 @@ import {
 } from "@/db/queries/technician-reports";
 import { user } from "@/db/schema/auth";
 import { serviceRequest } from "@/db/schema/service-request";
+import { workHistory } from "@/db/schema/work-history";
 import { syncServiceRequestAmount } from "@/lib/actions/cash-transactions";
 import { recordStatusChangeEvent } from "@/lib/actions/work-history";
 import {
@@ -54,7 +56,9 @@ function invalid(error: ZodError): ActionResult {
   );
 }
 
-async function createServiceRequest(input: unknown): Promise<ActionResult> {
+async function createServiceRequest(
+  input: unknown,
+): Promise<ActionResult<ServiceRequestRow | undefined>> {
   const current = await requireUser();
   if (current.role !== "ADMIN") return actionError("Admins only.");
 
@@ -62,8 +66,7 @@ async function createServiceRequest(input: unknown): Promise<ActionResult> {
   if (!parsed.success) return invalid(parsed.error);
   const data = parsed.data;
 
-  // Technicians are assigned later, from the edit screen.
-  const technicianIds: string[] = [];
+  const technicianIds = data.assignedTechnicianIds ?? [];
 
   const categoryLabel =
     data.category === "OTHER" && data.otherCategory
@@ -86,26 +89,89 @@ async function createServiceRequest(input: unknown): Promise<ActionResult> {
       assignedTechnicianId: technicianIds[0] ?? null,
       assignedTechnicianIds: technicianIds,
       createdById: current.id,
+      createdAt: data.createdAt,
+      updatedAt: data.createdAt,
     })
     .returning({ id: serviceRequest.id, seq: serviceRequest.seq });
 
   if (row) {
+    const label = formatRecordId("SERVICE", row.seq);
+
+    const createdDateObj =
+      data.createdAt instanceof Date
+        ? data.createdAt
+        : new Date(data.createdAt ?? new Date());
+    const createdDateStr = createdDateObj.toISOString().split("T")[0];
+
+    await db.insert(workHistory).values({
+      workType: "SERVICE",
+      referenceId: row.id,
+      technicianIds: technicianIds,
+      workDate: createdDateStr,
+      workDateTime: createdDateObj,
+      status: data.status,
+      description: categoryLabel
+        ? `${categoryLabel} — ${data.description}`
+        : data.description || "Service request created.",
+      attachments: [],
+      createdById: current.id,
+      createdAt: createdDateObj,
+      updatedAt: createdDateObj,
+      isInitial: true,
+    });
+
+    if (technicianIds.length > 0) {
+      await logMultipleTechniciansWorkDates({
+        technicianIds,
+        workType: "SERVICE",
+        referenceId: row.id,
+        createdById: current.id,
+      });
+
+      for (const techId of technicianIds) {
+        await notifyAssignment(
+          { recordType: "SERVICE", recordId: row.id, recordLabel: label },
+          {
+            technicianId: techId,
+            actorId: current.id,
+            description: `${categoryLabel} — ${data.description}`,
+          },
+        );
+      }
+
+      const techs = await db
+        .select({ name: user.name, phone: user.phone })
+        .from(user)
+        .where(inArray(user.id, technicianIds));
+
+      await notifyTicketAssigned({
+        ticketType: "SERVICE",
+        ticketId: label,
+        owner: { name: data.customerName, phone: data.phone },
+        address: data.address,
+        details: `${categoryLabel} — ${data.description}`,
+        technicians: techs,
+      });
+    }
+
     await sendWhatsAppSafely(data.phone, () =>
-      notifyTicketCreated(
-        "SERVICE",
-        data.phone,
-        data.customerName,
-        formatRecordId("SERVICE", row.seq),
-      ),
+      notifyTicketCreated("SERVICE", data.phone, data.customerName, label),
     );
   }
 
   revalidatePath(PATH);
+  revalidatePath("/service-tickets/technician-reports");
   revalidatePath("/", "layout");
-  return actionOk();
+  const created = await getServiceRequest(row.id, {
+    role: current.role,
+    id: current.id,
+  });
+  return actionOk(created);
 }
 
-async function updateServiceRequest(input: unknown): Promise<ActionResult> {
+async function updateServiceRequest(
+  input: unknown,
+): Promise<ActionResult<ServiceRequestRow | undefined>> {
   const current = await requireUser();
 
   const existing =
@@ -149,18 +215,20 @@ async function updateServiceRequest(input: unknown): Promise<ActionResult> {
         amount: data.amount,
         closedDescription: data.closedDescription,
         imageUrl: data.imageUrl,
+        updatedAt: data.updatedAt,
       })
       .where(eq(serviceRequest.id, data.id));
 
-    if (existing.status !== "CLOSED" && data.status === "CLOSED") {
-      await recordStatusChangeEvent({
-        workType: "SERVICE",
-        referenceId: data.id,
-        previousStatus: existing.status,
-        newStatus: data.status,
-        actorId: current.id,
-      });
-    }
+    // Synchronize current status with existing Log Request(s) / work history records for this ticket
+    await db
+      .update(workHistory)
+      .set({ status: data.status })
+      .where(
+        and(
+          eq(workHistory.workType, "SERVICE"),
+          eq(workHistory.referenceId, data.id),
+        ),
+      );
 
     // Always sync so Quick Cash also picks up customer/technician changes;
     // the sync only re-dates the entry when the amount itself changed.
@@ -255,8 +323,14 @@ async function updateServiceRequest(input: unknown): Promise<ActionResult> {
     }
 
     revalidatePath(PATH);
+    revalidatePath("/quick-cash");
+    revalidatePath("/service-tickets/technician-reports");
     revalidatePath("/", "layout");
-    return actionOk();
+    const updated = await getServiceRequest(data.id, {
+      role: current.role,
+      id: current.id,
+    });
+    return actionOk(updated);
   }
 
   // Technician: only their own record, only the whitelisted fields (§4.2).
@@ -278,18 +352,20 @@ async function updateServiceRequest(input: unknown): Promise<ActionResult> {
       amount: data.amount,
       closedDescription: data.closedDescription,
       imageUrl: data.imageUrl,
+      updatedAt: data.updatedAt,
     })
     .where(eq(serviceRequest.id, data.id));
 
-  if (existing.status !== "CLOSED" && data.status === "CLOSED") {
-    await recordStatusChangeEvent({
-      workType: "SERVICE",
-      referenceId: data.id,
-      previousStatus: existing.status,
-      newStatus: data.status,
-      actorId: current.id,
-    });
-  }
+  // Synchronize current status with existing Log Request(s) / work history records for this ticket
+  await db
+    .update(workHistory)
+    .set({ status: data.status })
+    .where(
+      and(
+        eq(workHistory.workType, "SERVICE"),
+        eq(workHistory.referenceId, data.id),
+      ),
+    );
 
   // Auto-log work date for technician
   await logTechnicianWorkDate({
@@ -353,8 +429,13 @@ async function updateServiceRequest(input: unknown): Promise<ActionResult> {
   );
 
   revalidatePath(PATH);
+  revalidatePath("/service-tickets/technician-reports");
   revalidatePath("/", "layout");
-  return actionOk();
+  const updated = await getServiceRequest(data.id, {
+    role: current.role,
+    id: current.id,
+  });
+  return actionOk(updated);
 }
 
 async function deleteServiceRequest(input: unknown): Promise<ActionResult> {
@@ -373,6 +454,7 @@ async function deleteServiceRequest(input: unknown): Promise<ActionResult> {
 
   await db.delete(serviceRequest).where(eq(serviceRequest.id, parsed.data.id));
   revalidatePath(PATH);
+  revalidatePath("/service-tickets/technician-reports");
   revalidatePath("/", "layout");
   return actionOk();
 }

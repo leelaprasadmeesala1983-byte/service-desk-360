@@ -80,6 +80,9 @@ function InstallationDetailsDialog({
                 <DetailRow label="Username">
                   {record.accountUsername ?? "—"}
                 </DetailRow>
+                <DetailRow label="Password">
+                  {record.accountPassword ?? "—"}
+                </DetailRow>
                 <DetailRow label="Mobile Number">
                   {record.accountMobile ?? "—"}
                 </DetailRow>

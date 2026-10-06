@@ -627,10 +627,7 @@ export async function updateSendToVendorRecord(
     valuesToUpdate.bookingDate = new Date(input.bookingDate);
   const rawPackages = input.noOfPackages ?? input.numberOfPackages;
   if (rawPackages !== undefined)
-    valuesToUpdate.numberOfPackages = Math.max(
-      1,
-      Math.floor(rawPackages),
-    );
+    valuesToUpdate.numberOfPackages = Math.max(1, Math.floor(rawPackages));
   if (input.dispatchRemarks !== undefined)
     valuesToUpdate.dispatchRemarks = input.dispatchRemarks.trim();
 
