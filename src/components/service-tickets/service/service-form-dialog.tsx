@@ -47,6 +47,7 @@ import {
   SERVICE_CATEGORY_LABELS,
   type UserRole,
 } from "@/lib/constants";
+import { formatDateTime, formatLocalDateTime } from "@/lib/format";
 
 import {
   createServiceRequestSchema,
@@ -65,6 +66,7 @@ type ServiceFormDialogProps = {
   viewerRole: UserRole;
   technicians: TechnicianOption[];
   record?: ServiceRequestRow;
+  onSuccess?: (savedRecord?: ServiceRequestRow, isEdit?: boolean) => void;
 };
 
 const CATEGORY_OPTIONS = SERVICE_CATEGORIES.map((value) => ({
@@ -93,6 +95,7 @@ function ServiceFormDialog({
   viewerRole,
   technicians,
   record,
+  onSuccess,
 }: ServiceFormDialogProps) {
   const router = useRouter();
 
@@ -186,6 +189,9 @@ function ServiceFormDialog({
            * Never put null into RHF.
            */
           imageUrl: record.imageUrl ?? "",
+          updatedAt: record.updatedAt
+            ? formatLocalDateTime(record.updatedAt)
+            : formatLocalDateTime(new Date()),
         }
       : {
           customerName: "",
@@ -200,6 +206,7 @@ function ServiceFormDialog({
           amount: "",
           closedDescription: "",
           imageUrl: "",
+          createdAt: formatLocalDateTime(new Date()),
         },
   });
 
@@ -280,6 +287,9 @@ function ServiceFormDialog({
             : "",
         closedDescription: record.closedDescription ?? "",
         imageUrl,
+        updatedAt: record.updatedAt
+          ? formatLocalDateTime(record.updatedAt)
+          : formatLocalDateTime(new Date()),
       });
 
       return;
@@ -301,6 +311,7 @@ function ServiceFormDialog({
       amount: "",
       closedDescription: "",
       imageUrl: "",
+      createdAt: formatLocalDateTime(new Date()),
     });
   }, [open, record, form]);
 
@@ -480,6 +491,7 @@ function ServiceFormDialog({
             );
 
             onOpenChange(false);
+            onSuccess?.(result.data, isEdit);
             router.refresh();
           } catch (error) {
             console.error("Service request submit failed:", error);
@@ -653,11 +665,8 @@ function ServiceFormDialog({
                   control={form.control}
                   name="assignedTechnicianIds"
                   label="Assign Technician"
-                  disabled={!isEdit}
                   options={assigneeOptions}
-                  placeholder={
-                    isEdit ? "Select Technician" : "Assign after creating"
-                  }
+                  placeholder="Select Technician"
                   className="sm:col-span-1"
                   error={errors.assignedTechnicianIds?.message}
                 />
@@ -670,6 +679,21 @@ function ServiceFormDialog({
                   options={STATUS_OPTIONS}
                   className="sm:col-span-1"
                 />
+
+                {!isEdit && (
+                  <Field
+                    label="Created Date & Time"
+                    required
+                    className="sm:col-span-1"
+                    error={errors.createdAt?.message}
+                  >
+                    <Input
+                      type="datetime-local"
+                      className="h-10 rounded-md"
+                      {...form.register("createdAt")}
+                    />
+                  </Field>
+                )}
 
                 <Field
                   label="Issue Description"
@@ -685,14 +709,44 @@ function ServiceFormDialog({
               </>
             )}
 
-            {isEdit && !isTechnician && (
-              <DetailRow label="Status">
-                {record && <StatusBadge status={record.status} />}
+            {isEdit && (
+              <>
+                <Field label="Created Date & Time" className="sm:col-span-1">
+                  <Input
+                    type="text"
+                    readOnly
+                    disabled
+                    value={
+                      record?.createdAt ? formatDateTime(record.createdAt) : "—"
+                    }
+                    className="h-10 rounded-md bg-muted/50 cursor-not-allowed"
+                  />
+                </Field>
 
-                <span className="mt-1 block text-xs text-muted-foreground">
-                  Updated by the assigned technician.
-                </span>
-              </DetailRow>
+                <Field
+                  label="Updated Date & Time"
+                  required
+                  className="sm:col-span-1"
+                  error={errors.updatedAt?.message}
+                >
+                  <Input
+                    type="datetime-local"
+                    className="h-10 rounded-md"
+                    {...form.register("updatedAt")}
+                  />
+                </Field>
+              </>
+            )}
+
+            {isEdit && isTechnician && (
+              <ControlledSelect
+                control={form.control}
+                name="status"
+                label="Status"
+                required
+                options={STATUS_OPTIONS}
+                className="sm:col-span-1"
+              />
             )}
 
             {isEdit && (

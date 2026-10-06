@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import {
   ControlledMultiSelect,
+  ControlledSelect,
   Field,
 } from "@/components/service-tickets/form";
 import { Button } from "@/components/ui/button";
@@ -25,9 +26,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
 import type { SelectableRecord } from "@/db/queries/work-history";
 import { createWorkHistory } from "@/lib/actions/work-history";
-import type { RecordType } from "@/lib/constants";
+import { RECORD_STATUS_LABELS, type RecordStatus, type RecordType } from "@/lib/constants";
+import { formatRecordId } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   type CreateWorkHistoryValues,
@@ -77,38 +80,44 @@ function resolveAssignedTechIds(
 
   const resolved = new Set<string>();
 
-  // 1. Check ticket.assignedTechnicianIds
+  // 1. Check ticket.assignedTechnicianIds & ticket.assignedTechnicianId
   const rawIds = Array.isArray(ticket.assignedTechnicianIds)
-    ? ticket.assignedTechnicianIds
+    ? [...ticket.assignedTechnicianIds]
     : [];
+  if (ticket.assignedTechnicianId) {
+    rawIds.push(ticket.assignedTechnicianId);
+  }
 
   for (const raw of rawIds) {
     if (!raw || typeof raw !== "string") continue;
     const clean = raw.trim();
     if (!clean) continue;
 
-    // Check if it matches a known technician ID
     const byId = techById.get(clean) || techById.get(clean.toLowerCase());
     if (byId) {
       resolved.add(byId);
       continue;
     }
 
-    // Check if it matches a technician name
     const byName = techByName.get(clean.toLowerCase());
     if (byName) {
       resolved.add(byName);
     }
   }
 
-  // 2. Check ticket.technicianNames
-  if (Array.isArray(ticket.technicianNames)) {
-    for (const name of ticket.technicianNames) {
-      if (!name || typeof name !== "string") continue;
-      const byName = techByName.get(name.trim().toLowerCase());
-      if (byName) {
-        resolved.add(byName);
-      }
+  // 2. Check ticket.technicianNames & ticket.technicianName
+  const rawNames = Array.isArray(ticket.technicianNames)
+    ? [...ticket.technicianNames]
+    : [];
+  if (ticket.technicianName) {
+    rawNames.push(ticket.technicianName);
+  }
+
+  for (const name of rawNames) {
+    if (!name || typeof name !== "string") continue;
+    const byName = techByName.get(name.trim().toLowerCase());
+    if (byName) {
+      resolved.add(byName);
     }
   }
 
@@ -132,6 +141,11 @@ export function LogRequestDialog({
     [technicians],
   );
 
+  // Directly load the existing management records
+  const activeSelectableTickets = useMemo(() => {
+    return selectableTickets.filter((t) => Boolean(t && t.id));
+  }, [selectableTickets]);
+
   const form = useForm<CreateWorkHistoryValues>({
     resolver: zodResolver(
       createWorkHistorySchema,
@@ -142,17 +156,27 @@ export function LogRequestDialog({
       technicianIds: [],
       workDate: new Date().toISOString().split("T")[0],
       workDateTime: getNowLocalIso(),
-      status: "IN_PROGRESS",
+      status: "OPEN",
       description: "",
       attachments: [],
     },
   });
 
   const selectedTicketId = form.watch("referenceId");
+  const currentStatus = form.watch("status");
 
   const selectedTicket = useMemo(() => {
-    return selectableTickets.find((t) => t.id === selectedTicketId);
-  }, [selectableTickets, selectedTicketId]);
+    return (
+      activeSelectableTickets.find((t) => t.id === selectedTicketId) ||
+      selectableTickets.find((t) => t.id === selectedTicketId)
+    );
+  }, [activeSelectableTickets, selectableTickets, selectedTicketId]);
+
+  const normFormStatus = String(currentStatus || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s_-]+/g, "");
+  const isStatusBlocked = normFormStatus === "OPEN";
 
   // When preselectedTicketId changes or dialog opens
   useEffect(() => {
@@ -168,13 +192,24 @@ export function LogRequestDialog({
         ? resolveAssignedTechIds(matched, technicians)
         : [];
 
+      const norm = String(matched?.status || "")
+        .trim()
+        .toUpperCase()
+        .replace(/[\s_-]+/g, "");
+      const targetStatus: RecordStatus =
+        norm === "CLOSED"
+          ? "CLOSED"
+          : norm === "INPROGRESS"
+            ? "IN_PROGRESS"
+            : "OPEN";
+
       form.reset({
         workType: workType ?? "SERVICE",
-        referenceId: targetId,
+        referenceId: matched ? matched.id : "",
         technicianIds: initialTechIds,
         workDate: todayDate,
         workDateTime: nowIso,
-        status: matched?.status ?? "IN_PROGRESS",
+        status: targetStatus,
         description: "",
         attachments: [],
       });
@@ -188,7 +223,18 @@ export function LogRequestDialog({
     form.setValue("technicianIds", newTechIds, {
       shouldValidate: true,
     });
-    form.setValue("status", ticket.status);
+    // Immediately set the Log Request Status field to the selected ticket's current status
+    const norm = String(ticket.status || "")
+      .trim()
+      .toUpperCase()
+      .replace(/[\s_-]+/g, "");
+    const targetStatus: RecordStatus =
+      norm === "CLOSED"
+        ? "CLOSED"
+        : norm === "INPROGRESS"
+          ? "IN_PROGRESS"
+          : "OPEN";
+    form.setValue("status", targetStatus, { shouldValidate: true });
     setTicketPopoverOpen(false);
   };
 
@@ -207,6 +253,17 @@ export function LogRequestDialog({
         : "Select Ticket";
 
   const onSubmit = (values: CreateWorkHistoryValues) => {
+    const rawStatus = String(values.status || "")
+      .trim()
+      .toUpperCase()
+      .replace(/[\s_-]+/g, "");
+    if (rawStatus === "OPEN") {
+      toast.error(
+        "Log Request is available only for In Progress or Closed records.",
+      );
+      return;
+    }
+
     startTransition(async () => {
       const res = await createWorkHistory(values);
       if (!res.ok) {
@@ -263,7 +320,10 @@ export function LogRequestDialog({
               >
                 {selectedTicket ? (
                   <span className="font-medium text-foreground">
-                    {selectedTicket.recordId}
+                    {selectedTicket.recordId ||
+                      (selectedTicket.seq
+                        ? formatRecordId(workType ?? "SERVICE", selectedTicket.seq)
+                        : selectedTicket.id)}
                   </span>
                 ) : (
                   <span className="text-muted-foreground">
@@ -275,16 +335,21 @@ export function LogRequestDialog({
 
               <PopoverContent
                 align="start"
-                className="w-[var(--anchor-width)] min-w-[220px] max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+                className="w-[var(--anchor-width)] min-w-[200px] max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg"
               >
                 <div className="max-h-60 overflow-y-auto space-y-0.5">
-                  {selectableTickets.length === 0 ? (
+                  {activeSelectableTickets.length === 0 ? (
                     <div className="py-3 text-center text-xs text-muted-foreground">
-                      No tickets available
+                      No active requests
                     </div>
                   ) : (
-                    selectableTickets.map((ticket) => {
+                    activeSelectableTickets.map((ticket) => {
                       const isSelected = ticket.id === selectedTicketId;
+                      const displayId =
+                        ticket.recordId ||
+                        (ticket.seq
+                          ? formatRecordId(workType ?? "SERVICE", ticket.seq)
+                          : ticket.id);
                       return (
                         <button
                           key={ticket.id}
@@ -297,7 +362,7 @@ export function LogRequestDialog({
                               : "hover:bg-muted text-foreground",
                           )}
                         >
-                          <span>{ticket.recordId}</span>
+                          <span className="font-semibold text-foreground">{displayId}</span>
                           {isSelected && (
                             <Check className="text-primary size-4 shrink-0 ml-2" />
                           )}
@@ -315,22 +380,37 @@ export function LogRequestDialog({
             )}
           </div>
 
-          {/* 2. Customer Name (Auto-populated from Ticket) */}
-          <div className="space-y-1.5">
-            <Label htmlFor="customer-name">
-              Customer Name <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="customer-name"
-              readOnly
-              disabled={!selectedTicket}
-              value={selectedTicket?.customerName ?? ""}
-              placeholder="—"
-              className="h-10 bg-muted/30 font-medium cursor-not-allowed text-foreground"
-            />
-          </div>
+          {/* 2. Status Field */}
+          <ControlledSelect
+            control={form.control}
+            name="status"
+            label="Status"
+            required
+            options={[
+              { value: "OPEN", label: "Open" },
+              { value: "IN_PROGRESS", label: "In Progress" },
+              { value: "CLOSED", label: "Closed" },
+            ]}
+          />
 
-          {/* 3. Assigned Technicians */}
+          {isStatusBlocked && (
+            <div className="rounded-md bg-destructive/10 border border-destructive/20 p-2.5 text-xs text-destructive font-medium">
+              Log Request is available only for In Progress or Closed records.
+            </div>
+          )}
+
+          {/* 3. Customer Name */}
+          <Field label="Customer Name">
+            <Input
+              value={selectedTicket?.customerName ?? ""}
+              readOnly
+              disabled
+              placeholder="Customer Name"
+              className="h-10 bg-muted/40 cursor-not-allowed text-muted-foreground"
+            />
+          </Field>
+
+          {/* 4. Assigned Technicians */}
           <ControlledMultiSelect
             control={form.control}
             name="technicianIds"
@@ -348,8 +428,27 @@ export function LogRequestDialog({
           >
             <Input
               type="datetime-local"
-              {...form.register("workDateTime")}
+              {...form.register("workDateTime", {
+                onChange: (e) => {
+                  const val = e.target.value;
+                  if (val && val.includes("T")) {
+                    form.setValue("workDate", val.split("T")[0]);
+                  }
+                },
+              })}
               className="h-10"
+            />
+          </Field>
+
+          {/* 5. Work Description / Notes */}
+          <Field
+            label="Work Description / Notes"
+            error={form.formState.errors.description?.message}
+          >
+            <Textarea
+              {...form.register("description")}
+              placeholder="Enter work details or progress notes..."
+              className="min-h-20"
             />
           </Field>
 
@@ -362,7 +461,10 @@ export function LogRequestDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isPending}>
+            <Button
+              type="submit"
+              disabled={isPending || isStatusBlocked || !selectedTicketId}
+            >
               {isPending && <Loader2 className="size-4 animate-spin mr-2" />}
               Submit
             </Button>

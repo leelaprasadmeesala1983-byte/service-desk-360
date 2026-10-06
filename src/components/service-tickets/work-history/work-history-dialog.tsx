@@ -1,9 +1,18 @@
 "use client";
 
-import { Calendar, Clock, History, Loader2, User, Users } from "lucide-react";
+import {
+  Calendar,
+  Clock,
+  History,
+  Loader2,
+  Pencil,
+  User,
+  Users,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/service-tickets/status-badge";
+import { EditWorkLogDialog } from "@/components/service-tickets/work-history/edit-work-log-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,12 +60,17 @@ export function WorkHistoryDialog({
   onOpenChange,
   workType = "SERVICE",
   record,
+  technicians = [],
+  onLogAdded,
 }: WorkHistoryDialogProps) {
   const [logs, setLogs] = useState<WorkHistoryItem[]>([]);
   const [parentDetails, setParentDetails] =
     useState<ServiceRequestSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [editLogEntry, setEditLogEntry] = useState<WorkHistoryItem | null>(
+    null,
+  );
 
   const loadLogs = useCallback(async () => {
     if (!record?.id) return;
@@ -225,19 +239,7 @@ export function WorkHistoryDialog({
                           id: string;
                           name: string;
                           department?: string | null;
-                        }[] =
-                          log.technicians && log.technicians.length > 0
-                            ? log.technicians
-                            : parentDetails?.assignedTechnicians &&
-                                parentDetails.assignedTechnicians.length > 0
-                              ? parentDetails.assignedTechnicians
-                              : (activeRecord?.technicianNames ?? []).map(
-                                  (name, i) => ({
-                                    id: `tech-${i}`,
-                                    name,
-                                    department: null,
-                                  }),
-                                );
+                        }[] = log.technicians ?? [];
 
                         return (
                           <div
@@ -348,6 +350,16 @@ export function WorkHistoryDialog({
                               </span>
                               <StatusBadge status={log.status} />
                             </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditLogEntry(log)}
+                              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                            >
+                              <Pencil className="size-3 mr-1" />
+                              Edit
+                            </Button>
                           </div>
 
                           {/* Technicians badges */}
@@ -423,6 +435,20 @@ export function WorkHistoryDialog({
           <DialogClose render={<Button variant="outline" />}>Close</DialogClose>
         </DialogFooter>
       </DialogContent>
+
+      {editLogEntry && (
+        <EditWorkLogDialog
+          open={Boolean(editLogEntry)}
+          onOpenChange={(open) => !open && setEditLogEntry(null)}
+          entry={editLogEntry}
+          technicians={technicians}
+          parentStatus={activeRecord?.status}
+          onUpdated={() => {
+            void loadLogs();
+            onLogAdded?.();
+          }}
+        />
+      )}
     </Dialog>
   );
 }

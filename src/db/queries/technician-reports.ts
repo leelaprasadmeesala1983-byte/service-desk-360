@@ -1,16 +1,6 @@
 import "server-only";
 
-import {
-  and,
-  asc,
-  eq,
-  gte,
-  inArray,
-  isNull,
-  lte,
-  type SQL,
-  sql,
-} from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lte, type SQL } from "drizzle-orm";
 
 import { db } from "@/db";
 import { user } from "@/db/schema/auth";
@@ -18,6 +8,7 @@ import { installation } from "@/db/schema/installation";
 import { project } from "@/db/schema/project";
 import { serviceRequest } from "@/db/schema/service-request";
 import { technicianWorkLog } from "@/db/schema/technician-work-log";
+import { workHistory } from "@/db/schema/work-history";
 import type { RecordType, UserRole } from "@/lib/constants";
 import { formatRecordId } from "@/lib/format";
 
@@ -39,17 +30,43 @@ export function getMonthDateRange(
 } {
   const safeYear = Math.max(2000, Math.min(2100, year));
   const safeMonth = Math.max(1, Math.min(12, month));
-
-  const start = new Date(Date.UTC(safeYear, safeMonth - 1, 1));
-  const end = new Date(Date.UTC(safeYear, safeMonth, 0)); // last day of month
-
-  const formatDateString = (d: Date) => d.toISOString().split("T")[0];
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const lastDay = new Date(safeYear, safeMonth, 0).getDate();
 
   return {
-    startDate: formatDateString(start),
-    endDate: formatDateString(end),
-    daysInMonth: end.getUTCDate(),
+    startDate: `${safeYear}-${pad(safeMonth)}-01`,
+    endDate: `${safeYear}-${pad(safeMonth)}-${pad(lastDay)}`,
+    daysInMonth: lastDay,
   };
+}
+
+/**
+ * Normalizes a work date from work history to YYYY-MM-DD string.
+ */
+function normalizeWorkDate(
+  workDate?: string | Date | null,
+  workDateTime?: Date | string | null,
+): string {
+  if (typeof workDate === "string" && workDate.trim().length > 0) {
+    return workDate.trim().split("T")[0];
+  }
+  if (workDate instanceof Date && !Number.isNaN(workDate.getTime())) {
+    const y = workDate.getFullYear();
+    const m = String(workDate.getMonth() + 1).padStart(2, "0");
+    const d = String(workDate.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  if (workDateTime) {
+    const dt =
+      workDateTime instanceof Date ? workDateTime : new Date(workDateTime);
+    if (!Number.isNaN(dt.getTime())) {
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, "0");
+      const d = String(dt.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+  }
+  return "";
 }
 
 /**
@@ -148,165 +165,11 @@ export async function logMultipleTechniciansWorkDates(params: {
 }
 
 /**
- * Ensures historical records with assigned technicians have corresponding
- * work log entries for their creation date and last update date.
+ * Historical work logs are now sourced directly from actual work history entries.
  */
-export async function syncHistoricalWorkLogs(viewer?: Viewer): Promise<void> {
-  try {
-    const isScopedAdmin = viewer && viewer.role === "ADMIN";
-
-    // 1. Service Requests
-    const srWhere = isScopedAdmin
-      ? eq(serviceRequest.createdById, viewer.id)
-      : undefined;
-
-    const serviceRows = await db
-      .select({
-        id: serviceRequest.id,
-        techId: serviceRequest.assignedTechnicianId,
-        techIds: serviceRequest.assignedTechnicianIds,
-        createdAt: serviceRequest.createdAt,
-        updatedAt: serviceRequest.updatedAt,
-        createdById: serviceRequest.createdById,
-      })
-      .from(serviceRequest)
-      .where(srWhere ? srWhere : undefined);
-
-    for (const row of serviceRows) {
-      const ids =
-        Array.isArray(row.techIds) && row.techIds.length > 0
-          ? row.techIds
-          : row.techId
-            ? [row.techId]
-            : [];
-
-      if (ids.length > 0) {
-        await logMultipleTechniciansWorkDates({
-          technicianIds: ids,
-          workType: "SERVICE",
-          referenceId: row.id,
-          workDate: row.createdAt,
-          createdById: row.createdById,
-        });
-
-        if (
-          row.updatedAt &&
-          row.updatedAt.toISOString().split("T")[0] !==
-            row.createdAt.toISOString().split("T")[0]
-        ) {
-          await logMultipleTechniciansWorkDates({
-            technicianIds: ids,
-            workType: "SERVICE",
-            referenceId: row.id,
-            workDate: row.updatedAt,
-            createdById: row.createdById,
-          });
-        }
-      }
-    }
-
-    // 2. Installations
-    const insWhere = isScopedAdmin
-      ? eq(installation.createdById, viewer.id)
-      : undefined;
-
-    const installRows = await db
-      .select({
-        id: installation.id,
-        techId: installation.assignedTechnicianId,
-        techIds: installation.assignedTechnicianIds,
-        createdAt: installation.createdAt,
-        updatedAt: installation.updatedAt,
-        createdById: installation.createdById,
-      })
-      .from(installation)
-      .where(insWhere ? insWhere : undefined);
-
-    for (const row of installRows) {
-      const ids =
-        Array.isArray(row.techIds) && row.techIds.length > 0
-          ? row.techIds
-          : row.techId
-            ? [row.techId]
-            : [];
-
-      if (ids.length > 0) {
-        await logMultipleTechniciansWorkDates({
-          technicianIds: ids,
-          workType: "INSTALLATION",
-          referenceId: row.id,
-          workDate: row.createdAt,
-          createdById: row.createdById,
-        });
-
-        if (
-          row.updatedAt &&
-          row.updatedAt.toISOString().split("T")[0] !==
-            row.createdAt.toISOString().split("T")[0]
-        ) {
-          await logMultipleTechniciansWorkDates({
-            technicianIds: ids,
-            workType: "INSTALLATION",
-            referenceId: row.id,
-            workDate: row.updatedAt,
-            createdById: row.createdById,
-          });
-        }
-      }
-    }
-
-    // 3. Projects
-    const prjWhere = isScopedAdmin
-      ? eq(project.createdById, viewer.id)
-      : undefined;
-
-    const projectRows = await db
-      .select({
-        id: project.id,
-        techId: project.assignedTechnicianId,
-        techIds: project.assignedTechnicianIds,
-        createdAt: project.createdAt,
-        updatedAt: project.updatedAt,
-        createdById: project.createdById,
-      })
-      .from(project)
-      .where(prjWhere ? prjWhere : undefined);
-
-    for (const row of projectRows) {
-      const ids =
-        Array.isArray(row.techIds) && row.techIds.length > 0
-          ? row.techIds
-          : row.techId
-            ? [row.techId]
-            : [];
-
-      if (ids.length > 0) {
-        await logMultipleTechniciansWorkDates({
-          technicianIds: ids,
-          workType: "PROJECT",
-          referenceId: row.id,
-          workDate: row.createdAt,
-          createdById: row.createdById,
-        });
-
-        if (
-          row.updatedAt &&
-          row.updatedAt.toISOString().split("T")[0] !==
-            row.createdAt.toISOString().split("T")[0]
-        ) {
-          await logMultipleTechniciansWorkDates({
-            technicianIds: ids,
-            workType: "PROJECT",
-            referenceId: row.id,
-            workDate: row.updatedAt,
-            createdById: row.createdById,
-          });
-        }
-      }
-    }
-  } catch (err) {
-    console.error("Failed to sync historical work logs:", err);
-  }
+export async function syncHistoricalWorkLogs(_viewer?: Viewer): Promise<void> {
+  // No-op: Actual work logs in work_history table are the single source of truth.
+  return Promise.resolve();
 }
 
 export type TechnicianMonthlySummaryItem = {
@@ -340,7 +203,8 @@ export type TechnicianMonthlySummaryReport = {
 
 /**
  * Report 1 — Monthly Technician Summary.
- * Computes unique calendar dates per technician and aggregates across all work types.
+ * Computes unique calendar dates per technician based on actual work performed
+ * and aggregates across all work types (Total Worked Days = COUNT(DISTINCT actualWorkDate)).
  */
 export async function getMonthlyTechnicianSummary(params: {
   month: number;
@@ -351,9 +215,6 @@ export async function getMonthlyTechnicianSummary(params: {
 }): Promise<TechnicianMonthlySummaryReport> {
   const { month, year, technicianId, workType, viewer } = params;
   const { startDate, endDate } = getMonthDateRange(year, month);
-
-  // Sync historical records for viewer's scope
-  await syncHistoricalWorkLogs(viewer);
 
   // Query only authorized active non-deleted technicians
   const techConditions: SQL[] = [
@@ -404,24 +265,57 @@ export async function getMonthlyTechnicianSummary(params: {
     };
   }
 
-  // Fetch work logs in this date range
-  const workLogs = await db
-    .select({
-      technicianId: technicianWorkLog.technicianId,
-      workType: technicianWorkLog.workType,
-      workDate: technicianWorkLog.workDate,
-      referenceId: technicianWorkLog.referenceId,
-    })
-    .from(technicianWorkLog)
-    .where(
-      and(
-        inArray(technicianWorkLog.technicianId, techIds),
-        gte(technicianWorkLog.workDate, startDate),
-        lte(technicianWorkLog.workDate, endDate),
-      ),
-    );
+  // Fetch valid parent record IDs to exclude deleted records and orphaned work logs
+  const isScopedAdmin = viewer.role === "ADMIN";
+  const srvWhere: SQL[] = [];
+  const insWhere: SQL[] = [];
+  const prjWhere: SQL[] = [];
 
-  // Group work dates by technician
+  if (isScopedAdmin) {
+    srvWhere.push(eq(serviceRequest.createdById, viewer.id));
+    insWhere.push(eq(installation.createdById, viewer.id));
+    prjWhere.push(eq(project.createdById, viewer.id));
+  }
+
+  const [validServices, validInstallations, validProjects, workHistoryRows] =
+    await Promise.all([
+      db
+        .select({ id: serviceRequest.id })
+        .from(serviceRequest)
+        .where(srvWhere.length > 0 ? and(...srvWhere) : undefined),
+      db
+        .select({ id: installation.id })
+        .from(installation)
+        .where(insWhere.length > 0 ? and(...insWhere) : undefined),
+      db
+        .select({ id: project.id })
+        .from(project)
+        .where(prjWhere.length > 0 ? and(...prjWhere) : undefined),
+      db
+        .select({
+          workType: workHistory.workType,
+          referenceId: workHistory.referenceId,
+          technicianIds: workHistory.technicianIds,
+          workDate: workHistory.workDate,
+          workDateTime: workHistory.workDateTime,
+          status: workHistory.status,
+        })
+        .from(workHistory)
+        .where(
+          and(
+            eq(workHistory.isInitial, false),
+            inArray(workHistory.status, ["IN_PROGRESS", "CLOSED"]),
+            gte(workHistory.workDate, startDate),
+            lte(workHistory.workDate, endDate),
+          ),
+        ),
+    ]);
+
+  const validServiceIds = new Set(validServices.map((r) => r.id));
+  const validInstallationIds = new Set(validInstallations.map((r) => r.id));
+  const validProjectIds = new Set(validProjects.map((r) => r.id));
+
+  // Group distinct actual work dates per technician
   const techMap = new Map<
     string,
     {
@@ -441,22 +335,43 @@ export async function getMonthlyTechnicianSummary(params: {
     });
   }
 
-  for (const log of workLogs) {
-    const entry = techMap.get(log.technicianId);
-    if (!entry) continue;
+  for (const row of workHistoryRows) {
+    // Validate parent existence to ensure deleted records / orphaned work logs do not contribute
+    if (row.workType === "SERVICE" && !validServiceIds.has(row.referenceId)) {
+      continue;
+    }
+    if (
+      row.workType === "INSTALLATION" &&
+      !validInstallationIds.has(row.referenceId)
+    ) {
+      continue;
+    }
+    if (row.workType === "PROJECT" && !validProjectIds.has(row.referenceId)) {
+      continue;
+    }
 
-    const dateStr =
-      typeof log.workDate === "string" ? log.workDate : String(log.workDate);
+    const assignedTechs = Array.isArray(row.technicianIds)
+      ? row.technicianIds
+      : [];
+    if (assignedTechs.length === 0) continue;
 
-    if (log.workType === "PROJECT") {
-      entry.projectDates.add(dateStr);
+    const dateStr = normalizeWorkDate(row.workDate, row.workDateTime);
+    if (!dateStr || dateStr < startDate || dateStr > endDate) continue;
+
+    for (const tId of assignedTechs) {
+      const entry = techMap.get(tId);
+      if (!entry) continue;
+
+      // Union of all unique calendar dates on which the technician performed work
       entry.allDates.add(dateStr);
-    } else if (log.workType === "INSTALLATION") {
-      entry.installationDates.add(dateStr);
-      entry.allDates.add(dateStr);
-    } else if (log.workType === "SERVICE") {
-      entry.serviceDates.add(dateStr);
-      entry.allDates.add(dateStr);
+
+      if (row.workType === "PROJECT") {
+        entry.projectDates.add(dateStr);
+      } else if (row.workType === "INSTALLATION") {
+        entry.installationDates.add(dateStr);
+      } else if (row.workType === "SERVICE") {
+        entry.serviceDates.add(dateStr);
+      }
     }
   }
 
@@ -468,14 +383,7 @@ export async function getMonthlyTechnicianSummary(params: {
   const results: TechnicianMonthlySummaryItem[] = [];
 
   for (const t of techniciansList) {
-    const entry = techMap.get(t.id) ?? {
-      name: t.name,
-      department: t.department ?? "-",
-      projectDates: new Set<string>(),
-      installationDates: new Set<string>(),
-      serviceDates: new Set<string>(),
-      allDates: new Set<string>(),
-    };
+    const entry = techMap.get(t.id)!;
     const projectDays = entry.projectDates.size;
     const installationDays = entry.installationDates.size;
     const serviceDays = entry.serviceDates.size;
@@ -565,6 +473,7 @@ export type TechnicianDetailedReport = {
 /**
  * Report 2 — Technician Individual Detailed Report.
  * Returns breakdown of Projects, Installations, and Services worked on during that month.
+ * Counts unique actual work dates per task and across the month.
  */
 export async function getTechnicianDetailedReport(params: {
   technicianId: string;
@@ -606,24 +515,28 @@ export async function getTechnicianDetailedReport(params: {
 
   const { startDate, endDate } = getMonthDateRange(year, month);
 
-  // Fetch all logs for this technician in the month
-  const logs = await db
+  // Fetch actual work history records for the month (excluding creation snapshots)
+  const workHistoryRows = await db
     .select({
-      workType: technicianWorkLog.workType,
-      referenceId: technicianWorkLog.referenceId,
-      workDate: technicianWorkLog.workDate,
+      workType: workHistory.workType,
+      referenceId: workHistory.referenceId,
+      technicianIds: workHistory.technicianIds,
+      workDate: workHistory.workDate,
+      workDateTime: workHistory.workDateTime,
+      status: workHistory.status,
     })
-    .from(technicianWorkLog)
+    .from(workHistory)
     .where(
       and(
-        eq(technicianWorkLog.technicianId, technicianId),
-        gte(technicianWorkLog.workDate, startDate),
-        lte(technicianWorkLog.workDate, endDate),
+        eq(workHistory.isInitial, false),
+        inArray(workHistory.status, ["IN_PROGRESS", "CLOSED"]),
+        gte(workHistory.workDate, startDate),
+        lte(workHistory.workDate, endDate),
       ),
     )
-    .orderBy(asc(technicianWorkLog.workDate));
+    .orderBy(asc(workHistory.workDate), asc(workHistory.workDateTime));
 
-  // Collect reference IDs per work type
+  // Collect reference IDs and distinct dates per work type for this technician
   const projectRefIds = new Set<string>();
   const installRefIds = new Set<string>();
   const serviceRefIds = new Set<string>();
@@ -632,43 +545,43 @@ export async function getTechnicianDetailedReport(params: {
   const installDateMap = new Map<string, Set<string>>();
   const serviceDateMap = new Map<string, Set<string>>();
 
+  for (const row of workHistoryRows) {
+    const assignedTechs = Array.isArray(row.technicianIds)
+      ? row.technicianIds
+      : [];
+    if (!assignedTechs.includes(technicianId)) continue;
+
+    const dateStr = normalizeWorkDate(row.workDate, row.workDateTime);
+    if (!dateStr || dateStr < startDate || dateStr > endDate) continue;
+
+    if (row.workType === "PROJECT") {
+      projectRefIds.add(row.referenceId);
+      if (!projectDateMap.has(row.referenceId)) {
+        projectDateMap.set(row.referenceId, new Set());
+      }
+      projectDateMap.get(row.referenceId)?.add(dateStr);
+    } else if (row.workType === "INSTALLATION") {
+      installRefIds.add(row.referenceId);
+      if (!installDateMap.has(row.referenceId)) {
+        installDateMap.set(row.referenceId, new Set());
+      }
+      installDateMap.get(row.referenceId)?.add(dateStr);
+    } else if (row.workType === "SERVICE") {
+      serviceRefIds.add(row.referenceId);
+      if (!serviceDateMap.has(row.referenceId)) {
+        serviceDateMap.set(row.referenceId, new Set());
+      }
+      serviceDateMap.get(row.referenceId)?.add(dateStr);
+    }
+  }
+
+  const isScopedAdmin = viewer.role === "ADMIN";
   const allMonthDates = new Set<string>();
   const projectMonthDates = new Set<string>();
   const installMonthDates = new Set<string>();
   const serviceMonthDates = new Set<string>();
 
-  for (const log of logs) {
-    const d =
-      typeof log.workDate === "string" ? log.workDate : String(log.workDate);
-    allMonthDates.add(d);
-
-    if (log.workType === "PROJECT") {
-      projectRefIds.add(log.referenceId);
-      projectMonthDates.add(d);
-      if (!projectDateMap.has(log.referenceId)) {
-        projectDateMap.set(log.referenceId, new Set());
-      }
-      projectDateMap.get(log.referenceId)?.add(d);
-    } else if (log.workType === "INSTALLATION") {
-      installRefIds.add(log.referenceId);
-      installMonthDates.add(d);
-      if (!installDateMap.has(log.referenceId)) {
-        installDateMap.set(log.referenceId, new Set());
-      }
-      installDateMap.get(log.referenceId)?.add(d);
-    } else if (log.workType === "SERVICE") {
-      serviceRefIds.add(log.referenceId);
-      serviceMonthDates.add(d);
-      if (!serviceDateMap.has(log.referenceId)) {
-        serviceDateMap.set(log.referenceId, new Set());
-      }
-      serviceDateMap.get(log.referenceId)?.add(d);
-    }
-  }
-
-  const isScopedAdmin = viewer.role === "ADMIN";
-
-  // Fetch Project details
+  // Fetch Project details (only valid, non-deleted projects)
   const projectsBreakdown: TaskWorkBreakdownItem[] = [];
   if (projectRefIds.size > 0) {
     const prjWhere: SQL[] = [inArray(project.id, Array.from(projectRefIds))];
@@ -688,7 +601,12 @@ export async function getTechnicianDetailedReport(params: {
       .where(and(...prjWhere));
 
     for (const prj of prjRows) {
-      const dates = Array.from(projectDateMap.get(prj.id) || []).sort();
+      const dateSet = projectDateMap.get(prj.id) || new Set();
+      const dates = Array.from(dateSet).sort();
+      for (const d of dates) {
+        projectMonthDates.add(d);
+        allMonthDates.add(d);
+      }
       projectsBreakdown.push({
         recordId: formatRecordId("PROJECT", prj.seq),
         referenceId: prj.id,
@@ -703,7 +621,7 @@ export async function getTechnicianDetailedReport(params: {
     }
   }
 
-  // Fetch Installation details
+  // Fetch Installation details (only valid, non-deleted installations)
   const installationsBreakdown: TaskWorkBreakdownItem[] = [];
   if (installRefIds.size > 0) {
     const insWhere: SQL[] = [
@@ -725,7 +643,12 @@ export async function getTechnicianDetailedReport(params: {
       .where(and(...insWhere));
 
     for (const ins of insRows) {
-      const dates = Array.from(installDateMap.get(ins.id) || []).sort();
+      const dateSet = installDateMap.get(ins.id) || new Set();
+      const dates = Array.from(dateSet).sort();
+      for (const d of dates) {
+        installMonthDates.add(d);
+        allMonthDates.add(d);
+      }
       installationsBreakdown.push({
         recordId: formatRecordId("INSTALLATION", ins.seq),
         referenceId: ins.id,
@@ -740,7 +663,7 @@ export async function getTechnicianDetailedReport(params: {
     }
   }
 
-  // Fetch Service Request details
+  // Fetch Service Request details (only valid, non-deleted service requests)
   const servicesBreakdown: TaskWorkBreakdownItem[] = [];
   if (serviceRefIds.size > 0) {
     const srvWhere: SQL[] = [
@@ -762,7 +685,12 @@ export async function getTechnicianDetailedReport(params: {
       .where(and(...srvWhere));
 
     for (const srv of srvRows) {
-      const dates = Array.from(serviceDateMap.get(srv.id) || []).sort();
+      const dateSet = serviceDateMap.get(srv.id) || new Set();
+      const dates = Array.from(dateSet).sort();
+      for (const d of dates) {
+        serviceMonthDates.add(d);
+        allMonthDates.add(d);
+      }
       servicesBreakdown.push({
         recordId: formatRecordId("SERVICE", srv.seq),
         referenceId: srv.id,
@@ -824,6 +752,7 @@ export type RecordTechnicianWorkReport = {
 /**
  * Reports 3, 4, 5 — Record-Level Technician Work Report.
  * Shows which technician(s) worked on a specific Project, Installation, or Service.
+ * Counts unique actual work dates per technician on that record.
  */
 export async function getRecordTechnicianWorkReport(params: {
   workType: RecordType;
@@ -921,59 +850,70 @@ export async function getRecordTechnicianWorkReport(params: {
     };
   }
 
-  const logs = await db
+  const rows = await db
     .select({
-      technicianId: technicianWorkLog.technicianId,
-      workDate: technicianWorkLog.workDate,
-      name: user.name,
-      department: user.department,
+      technicianIds: workHistory.technicianIds,
+      workDate: workHistory.workDate,
+      workDateTime: workHistory.workDateTime,
+      status: workHistory.status,
     })
-    .from(technicianWorkLog)
-    .innerJoin(user, eq(technicianWorkLog.technicianId, user.id))
+    .from(workHistory)
     .where(
       and(
-        eq(technicianWorkLog.workType, workType),
-        eq(technicianWorkLog.referenceId, referenceId),
+        eq(workHistory.isInitial, false),
+        inArray(workHistory.status, ["IN_PROGRESS", "CLOSED"]),
+        eq(workHistory.workType, workType),
+        eq(workHistory.referenceId, referenceId),
       ),
     )
-    .orderBy(asc(technicianWorkLog.workDate));
+    .orderBy(asc(workHistory.workDate), asc(workHistory.workDateTime));
 
-  const techMap = new Map<
-    string,
-    {
-      name: string;
-      department: string | null;
-      dates: Set<string>;
+  const techDateMap = new Map<string, Set<string>>();
+  const allUserIds = new Set<string>();
+
+  for (const row of rows) {
+    const assignedTechs = Array.isArray(row.technicianIds)
+      ? row.technicianIds
+      : [];
+    if (assignedTechs.length === 0) continue;
+
+    const dateStr = normalizeWorkDate(row.workDate, row.workDateTime);
+    if (!dateStr) continue;
+
+    for (const tId of assignedTechs) {
+      allUserIds.add(tId);
+      if (!techDateMap.has(tId)) {
+        techDateMap.set(tId, new Set());
+      }
+      techDateMap.get(tId)?.add(dateStr);
     }
-  >();
-
-  const allDistinctDates = new Set<string>();
-
-  for (const log of logs) {
-    const d =
-      typeof log.workDate === "string" ? log.workDate : String(log.workDate);
-    allDistinctDates.add(d);
-
-    if (!techMap.has(log.technicianId)) {
-      techMap.set(log.technicianId, {
-        name: log.name,
-        department: log.department,
-        dates: new Set(),
-      });
-    }
-    techMap.get(log.technicianId)?.dates.add(d);
   }
+
+  const users =
+    allUserIds.size > 0
+      ? await db
+          .select({
+            id: user.id,
+            name: user.name,
+            department: user.department,
+          })
+          .from(user)
+          .where(inArray(user.id, Array.from(allUserIds)))
+      : [];
+
+  const userMap = new Map(users.map((u) => [u.id, u]));
 
   const technicians: RecordTechnicianWorkItem[] = [];
   let sumOfTechnicianDays = 0;
 
-  for (const [id, data] of techMap.entries()) {
-    const dates = Array.from(data.dates).sort();
+  for (const [id, dateSet] of techDateMap.entries()) {
+    const u = userMap.get(id);
+    const dates = Array.from(dateSet).sort();
     sumOfTechnicianDays += dates.length;
     technicians.push({
       technicianId: id,
-      technicianName: data.name,
-      department: data.department,
+      technicianName: u?.name || "Technician",
+      department: u?.department || null,
       workedDays: dates.length,
       firstWorkDate: dates[0] || "—",
       lastWorkDate: dates[dates.length - 1] || "—",

@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { ProjectRow } from "@/db/queries/projects";
 import { createProject, updateProject } from "@/lib/actions/projects";
 import { RECORD_STATUS_LABELS, type UserRole } from "@/lib/constants";
+import { formatDateTime, formatLocalDateTime } from "@/lib/format";
 import { UNASSIGNED_VALUE } from "@/lib/service-ticket";
 import {
   createProjectSchema,
@@ -101,6 +102,9 @@ function ProjectFormDialog({
           description: record.description,
           status: record.status,
           assignedTechnicianIds: initialAssignedIds,
+          updatedAt: record.updatedAt
+            ? formatLocalDateTime(record.updatedAt)
+            : formatLocalDateTime(new Date()),
         }
       : {
           companyName: "",
@@ -112,6 +116,7 @@ function ProjectFormDialog({
           description: "",
           status: "OPEN",
           assignedTechnicianIds: [],
+          createdAt: formatLocalDateTime(new Date()),
         },
   });
 
@@ -142,6 +147,9 @@ function ProjectFormDialog({
             description: record.description,
             status: record.status,
             assignedTechnicianIds: assignedIds,
+            updatedAt: record.updatedAt
+              ? formatLocalDateTime(record.updatedAt)
+              : formatLocalDateTime(new Date()),
           }
         : {
             companyName: "",
@@ -153,6 +161,7 @@ function ProjectFormDialog({
             description: "",
             status: "OPEN",
             assignedTechnicianIds: [],
+            createdAt: formatLocalDateTime(new Date()),
           },
     );
   }, [open, record, form]);
@@ -236,6 +245,13 @@ function ProjectFormDialog({
                 <DetailRow label="Description" wide>
                   {record.description}
                 </DetailRow>
+                <ControlledSelect
+                  control={form.control}
+                  name="status"
+                  label="Status"
+                  required
+                  options={STATUS_OPTIONS}
+                />
               </>
             ) : (
               <>
@@ -281,10 +297,7 @@ function ProjectFormDialog({
                   control={form.control}
                   name="assignedTechnicianIds"
                   label="Assign Technician"
-                  disabled={!isEdit}
-                  placeholder={
-                    isEdit ? "Select Technician" : "Assign after creating"
-                  }
+                  placeholder="Select Technician"
                   options={assigneeOptions}
                   error={errors.assignedTechnicianIds?.message}
                 />
@@ -318,6 +331,21 @@ function ProjectFormDialog({
                   />
                 </Field>
 
+                {!isEdit && (
+                  <Field
+                    label="Created Date & Time"
+                    required
+                    className="sm:col-span-1"
+                    error={errors.createdAt?.message}
+                  >
+                    <Input
+                      type="datetime-local"
+                      className="h-9 rounded-md"
+                      {...form.register("createdAt")}
+                    />
+                  </Field>
+                )}
+
                 <Field
                   label="Description"
                   required
@@ -327,6 +355,35 @@ function ProjectFormDialog({
                   <Textarea
                     className="min-h-20 rounded-md"
                     {...form.register("description")}
+                  />
+                </Field>
+              </>
+            )}
+
+            {isEdit && (
+              <>
+                <Field label="Created Date & Time" className="sm:col-span-1">
+                  <Input
+                    type="text"
+                    readOnly
+                    disabled
+                    value={
+                      record?.createdAt ? formatDateTime(record.createdAt) : "—"
+                    }
+                    className="h-9 rounded-md bg-muted/50 cursor-not-allowed"
+                  />
+                </Field>
+
+                <Field
+                  label="Updated Date & Time"
+                  required
+                  className="sm:col-span-1"
+                  error={errors.updatedAt?.message}
+                >
+                  <Input
+                    type="datetime-local"
+                    className="h-9 rounded-md"
+                    {...form.register("updatedAt")}
                   />
                 </Field>
               </>

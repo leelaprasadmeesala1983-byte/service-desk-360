@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  boolean,
   date,
   index,
   pgTable,
@@ -30,6 +31,7 @@ const workHistory = pgTable(
     status: recordStatusEnum("status").notNull().default("IN_PROGRESS"),
     description: text("description").notNull(),
     attachments: text("attachments").array(),
+    isInitial: boolean("is_initial").default(false).notNull(),
     createdById: text("created_by_id").references(() => user.id, {
       onDelete: "set null",
     }),

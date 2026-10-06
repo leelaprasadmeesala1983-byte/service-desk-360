@@ -408,7 +408,7 @@ function ProjectView({
       )}
 
       <ProjectFormDialog
-        key={editRecord?.id ?? "edit"}
+        key={`${editRecord?.id ?? "edit"}-${editRecord?.updatedAt ? new Date(editRecord.updatedAt).getTime() : ""}`}
         open={Boolean(editRecord)}
         onOpenChange={(open) => !open && setEditRecord(undefined)}
         viewerRole={viewerRole}
@@ -437,7 +437,9 @@ function ProjectView({
           category: r.companyName,
           address: r.location,
           status: r.status,
+          assignedTechnicianId: r.assignedTechnicianId,
           assignedTechnicianIds: r.assignedTechnicianIds,
+          technicianName: r.technicianName,
           technicianNames: r.technicianNames,
         }))}
         technicians={technicians}

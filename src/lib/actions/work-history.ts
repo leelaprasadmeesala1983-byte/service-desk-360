@@ -43,34 +43,48 @@ export async function createWorkHistory(input: unknown): Promise<ActionResult> {
   const data = parsed.data;
 
   try {
-    // 1. Validate parent record exists
+    // 1. Validate parent record exists and is eligible for work logging (must not be OPEN)
+    let parentStatus: string | null = null;
     if (data.workType === "SERVICE") {
       const [sr] = await db
-        .select({ id: serviceRequest.id })
+        .select({ id: serviceRequest.id, status: serviceRequest.status })
         .from(serviceRequest)
         .where(eq(serviceRequest.id, data.referenceId))
         .limit(1);
       if (!sr) {
         return actionError("Selected service ticket could not be found.");
       }
+      parentStatus = sr.status;
     } else if (data.workType === "INSTALLATION") {
       const [ins] = await db
-        .select({ id: installation.id })
+        .select({ id: installation.id, status: installation.status })
         .from(installation)
         .where(eq(installation.id, data.referenceId))
         .limit(1);
       if (!ins) {
         return actionError("Selected installation ticket could not be found.");
       }
+      parentStatus = ins.status;
     } else if (data.workType === "PROJECT") {
       const [prj] = await db
-        .select({ id: project.id })
+        .select({ id: project.id, status: project.status })
         .from(project)
         .where(eq(project.id, data.referenceId))
         .limit(1);
       if (!prj) {
         return actionError("Selected project ticket could not be found.");
       }
+      parentStatus = prj.status;
+    }
+
+    const submittedStatus = String(data.status || "")
+      .trim()
+      .toUpperCase()
+      .replace(/[\s_-]+/g, "");
+    if (submittedStatus === "OPEN") {
+      return actionError(
+        "Log Request is available only for In Progress or Closed records.",
+      );
     }
 
     // 2. Validate technician IDs against user table
@@ -98,19 +112,27 @@ export async function createWorkHistory(input: unknown): Promise<ActionResult> {
       .from(user)
       .where(eq(user.id, current.id))
       .limit(1);
-    if (validCreator) {
-      validCreatorId = validCreator.id;
+    let workDateStr = "";
+    if (typeof data.workDateTime === "string" && data.workDateTime.trim().length > 0) {
+      const clean = data.workDateTime.trim();
+      if (clean.includes("T")) workDateStr = clean.split("T")[0];
+      else if (clean.includes(" ")) workDateStr = clean.split(" ")[0];
+      else if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) workDateStr = clean;
+    }
+    if (!workDateStr && data.workDate) {
+      const clean = String(data.workDate).trim();
+      if (clean.includes("T")) workDateStr = clean.split("T")[0];
+      else if (clean.includes(" ")) workDateStr = clean.split(" ")[0];
+      else if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) workDateStr = clean;
+    }
+    if (!workDateStr) {
+      const now = new Date();
+      workDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     }
 
     const workDateTime = data.workDateTime
       ? new Date(data.workDateTime)
       : new Date();
-
-    const workDateStr =
-      data.workDate ||
-      (typeof data.workDateTime === "string" && data.workDateTime.includes("T")
-        ? data.workDateTime.split("T")[0]
-        : workDateTime.toISOString().split("T")[0]);
 
     const description = data.description?.trim() || "";
 
@@ -139,6 +161,42 @@ export async function createWorkHistory(input: unknown): Promise<ActionResult> {
         notes: description || null,
         createdById: validCreatorId,
       });
+    }
+
+    // 5. Synchronize parent ticket's assigned technician, updatedAt, and status
+    const parentUpdateData: {
+      updatedAt: Date;
+      status?: RecordStatus;
+      assignedTechnicianId?: string | null;
+      assignedTechnicianIds?: string[];
+    } = {
+      updatedAt: workDateTime,
+    };
+
+    if (data.status) {
+      parentUpdateData.status = data.status;
+    }
+
+    if (validTechIds.length > 0) {
+      parentUpdateData.assignedTechnicianId = validTechIds[0];
+      parentUpdateData.assignedTechnicianIds = validTechIds;
+    }
+
+    if (data.workType === "SERVICE") {
+      await db
+        .update(serviceRequest)
+        .set(parentUpdateData)
+        .where(eq(serviceRequest.id, data.referenceId));
+    } else if (data.workType === "INSTALLATION") {
+      await db
+        .update(installation)
+        .set(parentUpdateData)
+        .where(eq(installation.id, data.referenceId));
+    } else if (data.workType === "PROJECT") {
+      await db
+        .update(project)
+        .set(parentUpdateData)
+        .where(eq(project.id, data.referenceId));
     }
 
     revalidatePath("/service-tickets/service-management");
@@ -199,6 +257,41 @@ export async function updateWorkHistory(input: unknown): Promise<ActionResult> {
       );
     }
 
+    // Check parent record current status in database
+    let parentStatus: string | null = null;
+    if (prev.workType === "SERVICE") {
+      const [sr] = await db
+        .select({ id: serviceRequest.id, status: serviceRequest.status })
+        .from(serviceRequest)
+        .where(eq(serviceRequest.id, prev.referenceId))
+        .limit(1);
+      if (sr) parentStatus = sr.status;
+    } else if (prev.workType === "INSTALLATION") {
+      const [ins] = await db
+        .select({ id: installation.id, status: installation.status })
+        .from(installation)
+        .where(eq(installation.id, prev.referenceId))
+        .limit(1);
+      if (ins) parentStatus = ins.status;
+    } else if (prev.workType === "PROJECT") {
+      const [prj] = await db
+        .select({ id: project.id, status: project.status })
+        .from(project)
+        .where(eq(project.id, prev.referenceId))
+        .limit(1);
+      if (prj) parentStatus = prj.status;
+    }
+
+    const submittedStatus = String(data.status || "")
+      .trim()
+      .toUpperCase()
+      .replace(/[\s_-]+/g, "");
+    if (submittedStatus === "OPEN") {
+      return actionError(
+        "Log Request is available only for In Progress or Closed records.",
+      );
+    }
+
     // Technicians already on this entry stay even if since deactivated or
     // deleted; only newly added ones must be active.
     const alreadyOnEntry = new Set(prev.technicianIds ?? []);
@@ -223,6 +316,27 @@ export async function updateWorkHistory(input: unknown): Promise<ActionResult> {
       }
     }
 
+    let workDateStr = "";
+    if (
+      typeof data.workDateTime === "string" &&
+      data.workDateTime.trim().length > 0
+    ) {
+      const clean = data.workDateTime.trim();
+      if (clean.includes("T")) workDateStr = clean.split("T")[0];
+      else if (clean.includes(" ")) workDateStr = clean.split(" ")[0];
+      else if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) workDateStr = clean;
+    }
+    if (!workDateStr && data.workDate) {
+      const clean = String(data.workDate).trim();
+      if (clean.includes("T")) workDateStr = clean.split("T")[0];
+      else if (clean.includes(" ")) workDateStr = clean.split(" ")[0];
+      else if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) workDateStr = clean;
+    }
+    if (!workDateStr) {
+      const now = new Date();
+      workDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    }
+
     const workDateTime = data.workDateTime
       ? new Date(data.workDateTime)
       : new Date();
@@ -231,7 +345,7 @@ export async function updateWorkHistory(input: unknown): Promise<ActionResult> {
       .update(workHistory)
       .set({
         technicianIds: validTechIds,
-        workDate: data.workDate,
+        workDate: workDateStr,
         workDateTime,
         status: data.status,
         description: data.description,
@@ -246,10 +360,46 @@ export async function updateWorkHistory(input: unknown): Promise<ActionResult> {
         technicianIds: validTechIds,
         workType: prev.workType,
         referenceId: prev.referenceId,
-        workDate: data.workDate,
+        workDate: workDateStr,
         notes: data.description,
         createdById: current.id,
       });
+    }
+
+    // Synchronize parent ticket's assigned technician, updatedAt, and status
+    const parentUpdateData: {
+      updatedAt: Date;
+      status?: RecordStatus;
+      assignedTechnicianId?: string | null;
+      assignedTechnicianIds?: string[];
+    } = {
+      updatedAt: workDateTime,
+    };
+
+    if (data.status) {
+      parentUpdateData.status = data.status;
+    }
+
+    if (validTechIds.length > 0) {
+      parentUpdateData.assignedTechnicianId = validTechIds[0];
+      parentUpdateData.assignedTechnicianIds = validTechIds;
+    }
+
+    if (prev.workType === "SERVICE") {
+      await db
+        .update(serviceRequest)
+        .set(parentUpdateData)
+        .where(eq(serviceRequest.id, prev.referenceId));
+    } else if (prev.workType === "INSTALLATION") {
+      await db
+        .update(installation)
+        .set(parentUpdateData)
+        .where(eq(installation.id, prev.referenceId));
+    } else if (prev.workType === "PROJECT") {
+      await db
+        .update(project)
+        .set(parentUpdateData)
+        .where(eq(project.id, prev.referenceId));
     }
 
     revalidatePath("/service-tickets/service-management");
@@ -359,6 +509,7 @@ export async function createInitialWorkHistory(params: {
       description: params.description,
       attachments: [],
       createdById: validCreatorId,
+      isInitial: true,
     });
   } catch (error) {
     console.error("Failed to create initial work history entry:", error);
@@ -376,6 +527,7 @@ export async function recordStatusChangeEvent(params: {
   newStatus: RecordStatus | string;
   actorId: string | null;
   timestamp?: Date;
+  technicianIds?: string[];
 }): Promise<void> {
   // Only record if transitioning from non-CLOSED to CLOSED
   if (params.previousStatus !== "CLOSED" && params.newStatus === "CLOSED") {
@@ -397,7 +549,7 @@ export async function recordStatusChangeEvent(params: {
       await db.insert(workHistory).values({
         workType: params.workType,
         referenceId: params.referenceId,
-        technicianIds: [],
+        technicianIds: params.technicianIds ?? [],
         workDate: todayStr,
         workDateTime: now,
         status: "CLOSED",

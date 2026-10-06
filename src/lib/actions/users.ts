@@ -96,6 +96,8 @@ async function createUser(input: unknown): Promise<ActionResult> {
   );
 
   revalidatePath(USERS_PATH);
+  revalidatePath("/service-tickets");
+  revalidatePath("/", "layout");
   return actionOk();
 }
 
@@ -135,8 +137,11 @@ async function updateUser(input: unknown): Promise<ActionResult> {
     }
   }
 
-  // The role is fixed at creation; any submitted role is ignored.
-  if (target.role === "ADMIN" && data.status === "INACTIVE") {
+  // Ensure at least one active admin remains if demoting or deactivating an admin
+  if (
+    target.role === "ADMIN" &&
+    (data.role === "TECHNICIAN" || data.status === "INACTIVE")
+  ) {
     const otherAdmins = await countActiveAdmins(data.id);
     if (otherAdmins === 0) {
       return actionError("At least one active admin must remain.");
@@ -155,6 +160,7 @@ async function updateUser(input: unknown): Promise<ActionResult> {
       lastName: data.lastName,
       name: fullName(data.firstName, data.lastName),
       phone: data.phone,
+      role: data.role,
       department: data.department,
       status: data.status,
     })
@@ -167,6 +173,7 @@ async function updateUser(input: unknown): Promise<ActionResult> {
   }
 
   revalidatePath(USERS_PATH);
+  revalidatePath("/service-tickets");
   revalidatePath("/", "layout");
   return actionOk();
 }
@@ -209,6 +216,8 @@ async function setUserStatus(input: unknown): Promise<ActionResult> {
   }
 
   revalidatePath(USERS_PATH);
+  revalidatePath("/service-tickets");
+  revalidatePath("/", "layout");
   return actionOk();
 }
 
@@ -254,6 +263,8 @@ async function deleteUser(input: unknown): Promise<ActionResult> {
   await ctx.internalAdapter.deleteUserSessions(id);
 
   revalidatePath(USERS_PATH);
+  revalidatePath("/service-tickets");
+  revalidatePath("/", "layout");
   return actionOk();
 }
 

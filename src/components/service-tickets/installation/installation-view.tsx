@@ -34,7 +34,7 @@ import {
 import type { UserRole } from "@/lib/constants";
 import { downloadExcelBase64 } from "@/lib/excel-export";
 import { exportInstallationToPdf } from "@/lib/export-installation-pdf";
-import { formatDate, parseRecordIdSearch } from "@/lib/format";
+import { formatDateTime, parseRecordIdSearch } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type InstallationViewProps = {
@@ -55,6 +55,7 @@ function InstallationView({
   const router = useRouter();
   const isAdmin = viewerRole === "ADMIN";
 
+  const [recordsList, setRecordsList] = useState<InstallationRow[]>(records);
   const [status, setStatus] = useState<StatusFilter>("ALL");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -91,15 +92,44 @@ function InstallationView({
   };
 
   useEffect(() => {
+    setRecordsList(records);
+  }, [records]);
+
+  useEffect(() => {
     if (!initialViewId) return;
-    const match = records.find((row) => row.id === initialViewId);
+    const match = recordsList.find((row) => row.id === initialViewId);
     if (match) setViewRecord(match);
-  }, [initialViewId, records]);
+  }, [initialViewId, recordsList]);
+
+  useEffect(() => {
+    if (!viewRecord) return;
+    const match = recordsList.find((row) => row.id === viewRecord.id);
+    if (match && match !== viewRecord) {
+      setViewRecord(match);
+    }
+  }, [recordsList, viewRecord]);
+
+  const handleSaveSuccess = (savedRecord?: InstallationRow, isEdit?: boolean) => {
+    if (savedRecord) {
+      setRecordsList((prev) => {
+        if (isEdit) {
+          return prev.map((item) =>
+            item.id === savedRecord.id ? savedRecord : item,
+          );
+        }
+        return [savedRecord, ...prev];
+      });
+      setViewRecord((current) =>
+        current && current.id === savedRecord.id ? savedRecord : current,
+      );
+    }
+    router.refresh();
+  };
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     const seq = parseRecordIdSearch(search);
-    return records.filter((row) => {
+    return recordsList.filter((row) => {
       if (status !== "ALL" && row.status !== status) return false;
       if (term) {
         const matchesText =
@@ -115,7 +145,7 @@ function InstallationView({
       }
       return true;
     });
-  }, [records, status, search]);
+  }, [recordsList, status, search]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / perPage));
   const safePage = Math.min(page, pageCount);
@@ -281,11 +311,11 @@ function InstallationView({
                         status={row.status}
                       />
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDate(row.createdAt)}
+                    <TableCell className="text-muted-foreground whitespace-nowrap text-xs">
+                      {formatDateTime(row.createdAt)}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDate(row.updatedAt)}
+                    <TableCell className="text-muted-foreground whitespace-nowrap text-xs">
+                      {formatDateTime(row.updatedAt)}
                     </TableCell>
                     <TableCell className="text-right">
                       <RowActions
@@ -384,16 +414,18 @@ function InstallationView({
           onOpenChange={setCreateOpen}
           viewerRole={viewerRole}
           technicians={technicians}
+          onSuccess={handleSaveSuccess}
         />
       )}
 
       <InstallationFormDialog
-        key={editRecord?.id ?? "edit"}
+        key={`${editRecord?.id ?? "edit"}-${editRecord?.updatedAt ? new Date(editRecord.updatedAt).getTime() : ""}`}
         open={Boolean(editRecord)}
         onOpenChange={(open) => !open && setEditRecord(undefined)}
         viewerRole={viewerRole}
         technicians={technicians}
         record={editRecord}
+        onSuccess={handleSaveSuccess}
       />
 
       <InstallationDetailsDialog
@@ -406,7 +438,7 @@ function InstallationView({
         open={logRequestOpen}
         onOpenChange={setLogRequestOpen}
         workType="INSTALLATION"
-        selectableTickets={records.map((r) => ({
+        selectableTickets={recordsList.map((r) => ({
           id: r.id,
           seq: r.seq,
           recordId: r.recordId,
@@ -416,7 +448,9 @@ function InstallationView({
           category: "Installation",
           address: r.address,
           status: r.status,
+          assignedTechnicianId: r.assignedTechnicianId,
           assignedTechnicianIds: r.assignedTechnicianIds,
+          technicianName: r.technicianName,
           technicianNames: r.technicianNames,
         }))}
         technicians={technicians}
