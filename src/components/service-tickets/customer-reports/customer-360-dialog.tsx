@@ -323,10 +323,12 @@ export function Customer360Dialog({
                           {s.recordId}
                         </TableCell>
                         <TableCell className="font-medium">
-                          {s.issueTitle}
+                          {s.issueTitle || s.description || "—"}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {SERVICE_CATEGORY_LABELS[s.category] || s.category}
+                          {s.category === "OTHER" && s.issueTitle
+                            ? s.issueTitle
+                            : SERVICE_CATEGORY_LABELS[s.category] || s.category}
                         </TableCell>
                         <TableCell className="text-center">
                           <StatusBadge status={s.status} />

@@ -20,7 +20,7 @@ const project = pgTable(
 
     companyName: text("company_name").notNull(),
     customerName: text("customer_name").notNull(),
-    email: text("email").notNull(),
+    email: text("email"),
     mobileNo: text("mobile_no").notNull(),
     location: text("location").notNull(),
     estimationNo: text("estimation_no").notNull(),
@@ -33,17 +33,11 @@ const project = pgTable(
     ),
     assignedTechnicianIds: text("assigned_technician_ids").array(),
 
-    pdfUrl: text("pdf_url"),
-    pdfName: text("pdf_name"),
-
     createdById: text("created_by_id").references(() => user.id, {
       onDelete: "set null",
     }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => /* @__PURE__ */ new Date())
-      .notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
     index("project_status_idx").on(table.status),

@@ -47,6 +47,7 @@ import {
   SERVICE_CATEGORY_LABELS,
   type UserRole,
 } from "@/lib/constants";
+import { formatDateTime, formatLocalDateTime } from "@/lib/format";
 
 import {
   createServiceRequestSchema,
@@ -65,6 +66,7 @@ type ServiceFormDialogProps = {
   viewerRole: UserRole;
   technicians: TechnicianOption[];
   record?: ServiceRequestRow;
+  onSuccess?: (savedRecord?: ServiceRequestRow, isEdit?: boolean) => void;
 };
 
 const CATEGORY_OPTIONS = SERVICE_CATEGORIES.map((value) => ({
@@ -93,6 +95,7 @@ function ServiceFormDialog({
   viewerRole,
   technicians,
   record,
+  onSuccess,
 }: ServiceFormDialogProps) {
   const router = useRouter();
 
@@ -163,8 +166,11 @@ function ServiceFormDialog({
           phone: record.phone ?? "",
           email: record.email ?? "",
           category: record.category ?? "GENERAL_SUPPORT",
+          otherCategory:
+            record.category === "OTHER"
+              ? record.otherCategory || record.issueTitle || ""
+              : record.otherCategory || "",
           address: record.address ?? "",
-          issueTitle: record.issueTitle ?? "",
           description: record.description ?? "",
           status: record.status ?? "OPEN",
           assignedTechnicianIds: initialTechnicianIds,
@@ -183,20 +189,24 @@ function ServiceFormDialog({
            * Never put null into RHF.
            */
           imageUrl: record.imageUrl ?? "",
+          updatedAt: record.updatedAt
+            ? formatLocalDateTime(record.updatedAt)
+            : formatLocalDateTime(new Date()),
         }
       : {
           customerName: "",
           phone: "",
           email: "",
           category: "GENERAL_SUPPORT",
+          otherCategory: "",
           address: "",
-          issueTitle: "",
           description: "",
           status: "OPEN",
           assignedTechnicianIds: [],
           amount: "",
           closedDescription: "",
           imageUrl: "",
+          createdAt: formatLocalDateTime(new Date()),
         },
   });
 
@@ -209,6 +219,15 @@ function ServiceFormDialog({
       form.clearErrors("assignedTechnicianIds");
     }
   }, [hasAssignedTechnicians, form]);
+
+  const watchedCategory = form.watch("category");
+
+  useEffect(() => {
+    if (watchedCategory !== "OTHER") {
+      form.setValue("otherCategory", "");
+      form.clearErrors("otherCategory");
+    }
+  }, [watchedCategory, form]);
 
   /*
    * Reset the form whenever a different record is opened.
@@ -254,8 +273,11 @@ function ServiceFormDialog({
         phone: record.phone ?? "",
         email: record.email ?? "",
         category: record.category ?? "GENERAL_SUPPORT",
+        otherCategory:
+          record.category === "OTHER"
+            ? record.otherCategory || record.issueTitle || ""
+            : record.otherCategory || "",
         address: record.address ?? "",
-        issueTitle: record.issueTitle ?? "",
         description: record.description ?? "",
         status: record.status ?? "OPEN",
         assignedTechnicianIds: currentTechIds,
@@ -265,6 +287,9 @@ function ServiceFormDialog({
             : "",
         closedDescription: record.closedDescription ?? "",
         imageUrl,
+        updatedAt: record.updatedAt
+          ? formatLocalDateTime(record.updatedAt)
+          : formatLocalDateTime(new Date()),
       });
 
       return;
@@ -278,14 +303,15 @@ function ServiceFormDialog({
       phone: "",
       email: "",
       category: "GENERAL_SUPPORT",
+      otherCategory: "",
       address: "",
-      issueTitle: "",
       description: "",
       status: "OPEN",
       assignedTechnicianIds: [],
       amount: "",
       closedDescription: "",
       imageUrl: "",
+      createdAt: formatLocalDateTime(new Date()),
     });
   }, [open, record, form]);
 
@@ -427,6 +453,10 @@ function ServiceFormDialog({
           amount: normalizedAmount,
           closedDescription: normalizedClosedDescription,
           imageUrl: normalizedImageUrl,
+          otherCategory:
+            raw.category === "OTHER" && typeof raw.otherCategory === "string"
+              ? raw.otherCategory.trim()
+              : undefined,
         };
 
         startTransition(async () => {
@@ -461,6 +491,7 @@ function ServiceFormDialog({
             );
 
             onOpenChange(false);
+            onSuccess?.(result.data, isEdit);
             router.refresh();
           } catch (error) {
             console.error("Service request submit failed:", error);
@@ -548,16 +579,15 @@ function ServiceFormDialog({
                   {record.email || "—"}
                 </DetailRow>
 
-                <DetailRow label="Category">
-                  {SERVICE_CATEGORY_LABELS[record.category]}
+                <DetailRow label="Issue Type">
+                  {record.category === "OTHER" &&
+                  (record.otherCategory || record.issueTitle)
+                    ? record.otherCategory || record.issueTitle
+                    : (SERVICE_CATEGORY_LABELS[record.category] ?? "—")}
                 </DetailRow>
 
                 <DetailRow label="Customer Address" wide>
                   {record.address}
-                </DetailRow>
-
-                <DetailRow label="Issue Title" wide>
-                  {record.issueTitle}
                 </DetailRow>
 
                 <DetailRow label="Issue Description" wide>
@@ -599,10 +629,25 @@ function ServiceFormDialog({
                 <ControlledSelect
                   control={form.control}
                   name="category"
-                  label="Category"
+                  label="Issue Type"
                   required
                   options={CATEGORY_OPTIONS}
                 />
+
+                {watchedCategory === "OTHER" && (
+                  <Field
+                    label="Other Issue Type"
+                    required
+                    className="sm:col-span-2"
+                    error={errors.otherCategory?.message}
+                  >
+                    <Input
+                      placeholder="Enter custom issue type"
+                      className="h-10 rounded-md"
+                      {...form.register("otherCategory")}
+                    />
+                  </Field>
+                )}
 
                 <Field
                   label="Customer Address"
@@ -616,27 +661,12 @@ function ServiceFormDialog({
                   />
                 </Field>
 
-                <Field
-                  label="Issue Title"
-                  required
-                  className="sm:col-span-2"
-                  error={errors.issueTitle?.message}
-                >
-                  <Input
-                    className="h-10 rounded-md"
-                    {...form.register("issueTitle")}
-                  />
-                </Field>
-
                 <ControlledMultiSelect
                   control={form.control}
                   name="assignedTechnicianIds"
                   label="Assign Technician"
-                  disabled={!isEdit}
                   options={assigneeOptions}
-                  placeholder={
-                    isEdit ? "Select Technician" : "Assign after creating"
-                  }
+                  placeholder="Select Technician"
                   className="sm:col-span-1"
                   error={errors.assignedTechnicianIds?.message}
                 />
@@ -649,6 +679,21 @@ function ServiceFormDialog({
                   options={STATUS_OPTIONS}
                   className="sm:col-span-1"
                 />
+
+                {!isEdit && (
+                  <Field
+                    label="Created Date & Time"
+                    required
+                    className="sm:col-span-1"
+                    error={errors.createdAt?.message}
+                  >
+                    <Input
+                      type="datetime-local"
+                      className="h-10 rounded-md"
+                      {...form.register("createdAt")}
+                    />
+                  </Field>
+                )}
 
                 <Field
                   label="Issue Description"
@@ -664,14 +709,44 @@ function ServiceFormDialog({
               </>
             )}
 
-            {isEdit && !isTechnician && (
-              <DetailRow label="Status">
-                {record && <StatusBadge status={record.status} />}
+            {isEdit && (
+              <>
+                <Field label="Created Date & Time" className="sm:col-span-1">
+                  <Input
+                    type="text"
+                    readOnly
+                    disabled
+                    value={
+                      record?.createdAt ? formatDateTime(record.createdAt) : "—"
+                    }
+                    className="h-10 rounded-md bg-muted/50 cursor-not-allowed"
+                  />
+                </Field>
 
-                <span className="mt-1 block text-xs text-muted-foreground">
-                  Updated by the assigned technician.
-                </span>
-              </DetailRow>
+                <Field
+                  label="Updated Date & Time"
+                  required
+                  className="sm:col-span-1"
+                  error={errors.updatedAt?.message}
+                >
+                  <Input
+                    type="datetime-local"
+                    className="h-10 rounded-md"
+                    {...form.register("updatedAt")}
+                  />
+                </Field>
+              </>
+            )}
+
+            {isEdit && isTechnician && (
+              <ControlledSelect
+                control={form.control}
+                name="status"
+                label="Status"
+                required
+                options={STATUS_OPTIONS}
+                className="sm:col-span-1"
+              />
             )}
 
             {isEdit && (

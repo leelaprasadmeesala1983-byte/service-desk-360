@@ -60,7 +60,7 @@ export type ServiceRequestSummary = {
   address: string;
   status: RecordStatus;
   description: string;
-  issueTitle?: string;
+  issueTitle?: string | null;
   createdAt: Date;
   assignedTechnicianIds: string[];
   assignedTechnicians: TechnicianWorkSummary[];
@@ -85,8 +85,10 @@ export type SelectableRecord = {
   category: ServiceCategory | string;
   address: string;
   status: RecordStatus;
-  assignedTechnicianIds: string[];
+  assignedTechnicianIds?: string[];
+  assignedTechnicianId?: string | null;
   technicianNames?: string[];
+  technicianName?: string | null;
 };
 
 /**
@@ -401,12 +403,33 @@ export async function getCombinedWorkHistory(
       desc(workHistory.createdAt),
     );
 
-  // Collect all technician IDs and creator IDs across parent record and logs
+  // Find any existing initial snapshot log row
+  const initialLogs = rawLogs.filter(
+    (r) =>
+      r.history.isInitial ||
+      r.history.description.startsWith("Initial service request created") ||
+      r.history.description.startsWith("Initial installation created") ||
+      r.history.description.startsWith("Initial project created") ||
+      r.history.description.startsWith("Initial request created"),
+  );
+  const initialLogRow =
+    initialLogs.length > 0 ? initialLogs[initialLogs.length - 1] : undefined;
+
+  // Collect all technician IDs and creator IDs across parent record, initial snapshot, and logs
   const allUserIds = new Set<string>();
   for (const tid of initialTechIds) {
     if (tid) allUserIds.add(tid);
   }
   if (initialCreatedById) allUserIds.add(initialCreatedById);
+
+  if (initialLogRow && Array.isArray(initialLogRow.history.technicianIds)) {
+    for (const tid of initialLogRow.history.technicianIds) {
+      if (tid) allUserIds.add(tid);
+    }
+  }
+  if (initialLogRow?.history.createdById) {
+    allUserIds.add(initialLogRow.history.createdById);
+  }
 
   for (const row of rawLogs) {
     if (Array.isArray(row.history.technicianIds)) {
@@ -456,9 +479,21 @@ export async function getCombinedWorkHistory(
     parentRecord.technicianNames = parentTechNames;
   }
 
-  // 3. Map actual work logs (excluding any legacy duplicate initial records)
+  // 3. Map actual work logs (excluding initial snapshot records)
   const mappedLogs: WorkHistoryItem[] = [];
   for (const { history, createdByName } of rawLogs) {
+    const isInitialRow =
+      history.isInitial ||
+      history.description.startsWith("Initial service request created") ||
+      history.description.startsWith("Initial installation created") ||
+      history.description.startsWith("Initial project created") ||
+      history.description.startsWith("Initial request created");
+
+    // Skip initial snapshot rows from the regular work log list because they represent INITIAL_REQUEST
+    if (isInitialRow) {
+      continue;
+    }
+
     const techIds = Array.isArray(history.technicianIds)
       ? history.technicianIds
       : [];
@@ -488,18 +523,6 @@ export async function getCombinedWorkHistory(
       typeof history.workDate === "string"
         ? history.workDate
         : new Date(history.workDate).toISOString().split("T")[0];
-
-    // Check if this log is a legacy initial log row created during ticket creation
-    const isLegacyInitial =
-      history.description.startsWith("Initial service request created") ||
-      history.description.startsWith("Initial installation created") ||
-      history.description.startsWith("Initial project created") ||
-      history.description.startsWith("Initial request created");
-
-    // Skip duplicate initial rows from the table because we construct the initial record from parent ticket
-    if (isLegacyInitial) {
-      continue;
-    }
 
     // Identify CLOSED status change events
     const isStatusChange =
@@ -570,13 +593,66 @@ export async function getCombinedWorkHistory(
     });
   }
 
-  // 4. Construct the INITIAL_REQUEST record from the parent ticket (Section 1, 2, 3, 5, 6)
+  // 4. Construct the INITIAL_REQUEST record from the historical snapshot
   const allTimelineItems: WorkHistoryItem[] = [...mappedLogs];
 
   if (parentRecord) {
-    const initDateStr = initialCreatedAt.toISOString().split("T")[0];
+    let snapshotTechIds: string[] = [];
+    let snapshotCreatedAt = initialCreatedAt;
+    let snapshotCreatedById = initialCreatedById;
+    let snapshotStatus = initialStatus;
+    let snapshotDescription = initialDescription;
+
+    if (initialLogRow) {
+      snapshotTechIds = Array.isArray(initialLogRow.history.technicianIds)
+        ? initialLogRow.history.technicianIds
+        : [];
+      snapshotCreatedAt =
+        initialLogRow.history.workDateTime || initialLogRow.history.createdAt;
+      snapshotCreatedById =
+        initialLogRow.history.createdById || initialCreatedById;
+      snapshotStatus = initialLogRow.history.status || initialStatus;
+      if (initialLogRow.history.description) {
+        snapshotDescription = initialLogRow.history.description;
+      }
+    } else {
+      // Fallback for legacy records without an explicit initial snapshot row:
+      // If work logs exist, the initial ticket had no technicians at creation (or unassigned).
+      // If no work logs exist, use initialTechIds.
+      const hasWorkLogs = mappedLogs.length > 0;
+      snapshotTechIds = hasWorkLogs ? [] : initialTechIds;
+    }
+
+    const snapshotTechs: TechnicianWorkSummary[] = [];
+    const snapshotTechNames: string[] = [];
+    for (const tid of snapshotTechIds) {
+      const u = userMap.get(tid);
+      if (u) {
+        snapshotTechs.push({
+          id: tid,
+          name: u.name,
+          department: u.department,
+        });
+        snapshotTechNames.push(u.name);
+      } else {
+        snapshotTechs.push({
+          id: tid,
+          name: "Technician",
+          department: null,
+        });
+        snapshotTechNames.push("Technician");
+      }
+    }
+
+    const initDateStr =
+      snapshotCreatedAt instanceof Date
+        ? snapshotCreatedAt.toISOString().split("T")[0]
+        : new Date(snapshotCreatedAt).toISOString().split("T")[0];
+
     const initialItem: WorkHistoryItem = {
-      id: `initial-${parentRecord.id}`,
+      id: initialLogRow
+        ? initialLogRow.history.id
+        : `initial-${parentRecord.id}`,
       recordType: "INITIAL_REQUEST",
       workType,
       referenceId: parentRecord.id,
@@ -584,19 +660,19 @@ export async function getCombinedWorkHistory(
       customerName: parentRecord.customerName,
       mobileNumber: parentRecord.phone,
       category: parentRecord.category,
-      technicianIds: parentRecord.assignedTechnicianIds,
-      technicians: parentRecord.assignedTechnicians,
-      technicianNames: parentRecord.technicianNames,
+      technicianIds: snapshotTechIds,
+      technicians: snapshotTechs,
+      technicianNames: snapshotTechNames,
       workDate: initDateStr,
-      workDateTime: initialCreatedAt,
-      status: initialStatus,
+      workDateTime: snapshotCreatedAt,
+      status: snapshotStatus,
       notes: "Service request created",
-      description: initialDescription,
+      description: snapshotDescription,
       attachments: [],
-      createdById: initialCreatedById,
+      createdById: snapshotCreatedById,
       createdByName:
-        userMap.get(initialCreatedById ?? "")?.name ?? "System Admin",
-      createdAt: initialCreatedAt,
+        userMap.get(snapshotCreatedById ?? "")?.name ?? "System Admin",
+      createdAt: snapshotCreatedAt,
       isInitial: true,
     };
 

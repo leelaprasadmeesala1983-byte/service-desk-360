@@ -22,8 +22,9 @@ type ServiceRequestRow = {
   phone: string;
   email: string | null;
   category: ServiceCategory;
+  otherCategory?: string | null;
   address: string;
-  issueTitle: string;
+  issueTitle?: string | null;
   description: string;
   status: RecordStatus;
   assignedTechnicianId: string | null;
@@ -78,6 +79,7 @@ function mapRow(
     phone: row.service.phone,
     email: row.service.email,
     category: row.service.category,
+    otherCategory: row.service.otherCategory ?? null,
     address: row.service.address,
     issueTitle: row.service.issueTitle,
     description: row.service.description,

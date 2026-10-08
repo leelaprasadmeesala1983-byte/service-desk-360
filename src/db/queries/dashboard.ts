@@ -20,6 +20,7 @@ import {
   type ServiceRequestRow,
   scopeServiceToViewer,
 } from "./service-requests";
+import { getUserStats } from "./users";
 
 type DashboardStats = {
   totalServices: number;
@@ -133,8 +134,7 @@ async function getDashboardData(viewer: Viewer): Promise<DashboardData> {
     totalServices,
     totalInstallations,
     totalProjects,
-    totalUsers,
-    totalTechnicians,
+    userStats,
     serviceDates,
     installDates,
     projectDates,
@@ -148,16 +148,7 @@ async function getDashboardData(viewer: Viewer): Promise<DashboardData> {
     tableCount(serviceRequest, serviceScope),
     tableCount(installation, installScope),
     tableCount(project, projectScope),
-    db
-      .select({ value: count() })
-      .from(user)
-      .where(isNull(user.deletedAt))
-      .then((r) => r[0]?.value ?? 0),
-    db
-      .select({ value: count() })
-      .from(user)
-      .where(and(eq(user.role, "TECHNICIAN"), isNull(user.deletedAt)))
-      .then((r) => r[0]?.value ?? 0),
+    getUserStats(viewer),
     db
       .select({ createdAt: serviceRequest.createdAt })
       .from(serviceRequest)
@@ -390,6 +381,7 @@ async function getDashboardData(viewer: Viewer): Promise<DashboardData> {
         technicianNames: row.technicianName ? [row.technicianName] : [],
         technicianDepartment: row.technicianDepartment,
         accountUsername: ins.accountUsername,
+        accountPassword: ins.accountPassword,
         hasAccountPassword: Boolean(ins.accountPassword),
         accountMobile: ins.accountMobile,
         referenceNo: ins.referenceNo,
@@ -438,8 +430,6 @@ async function getDashboardData(viewer: Viewer): Promise<DashboardData> {
         technicianName: row.technicianName,
         technicianNames: row.technicianName ? [row.technicianName] : [],
         technicianDepartment: row.technicianDepartment,
-        pdfUrl: p.pdfUrl,
-        pdfName: p.pdfName,
         createdByName: row.createdByName,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
@@ -509,8 +499,8 @@ async function getDashboardData(viewer: Viewer): Promise<DashboardData> {
       totalServices,
       totalInstallations,
       totalProjects,
-      totalUsers,
-      totalTechnicians,
+      totalUsers: userStats.total,
+      totalTechnicians: userStats.technicians,
     },
     monthlyActivity,
     recentActivities,

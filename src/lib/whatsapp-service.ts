@@ -209,9 +209,33 @@ async function notifyTicketAssigned(params: AssignedParams): Promise<void> {
 
   for (const tech of params.technicians) {
     const techVars: Record<TicketType, string[]> = {
-      SERVICE: [tech.name, ticketId, owner.name, owner.phone ?? "", address, details, link],
-      INSTALLATION: [tech.name, ticketId, owner.name, owner.phone ?? "", address, details, link],
-      PROJECT: [tech.name, ticketId, company ?? "", owner.name, owner.phone ?? "", address, link],
+      SERVICE: [
+        tech.name,
+        ticketId,
+        owner.name,
+        owner.phone ?? "",
+        address,
+        details,
+        link,
+      ],
+      INSTALLATION: [
+        tech.name,
+        ticketId,
+        owner.name,
+        owner.phone ?? "",
+        address,
+        details,
+        link,
+      ],
+      PROJECT: [
+        tech.name,
+        ticketId,
+        company ?? "",
+        owner.name,
+        owner.phone ?? "",
+        address,
+        link,
+      ],
     };
     const techBody = `Hello ${tech.name}, you have been assigned a new ${TICKET_LABELS[ticketType]}. Ticket: ${ticketId}. Customer: ${owner.name}. Issue: ${clean(details)}. Please open the Service Desk app for full details.`;
 

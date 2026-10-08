@@ -124,81 +124,81 @@ export function CashTransactionList({
                         {category}
                       </span>
                     </TableCell>
-                  <TableCell className="text-sm font-mono">
-                    {tx.sourceRecordLabel ? tx.sourceRecordLabel : "—"}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {tx.customerName ? (
+                    <TableCell className="text-sm font-mono">
+                      {tx.sourceRecordLabel ? tx.sourceRecordLabel : "—"}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {tx.customerName ? (
+                        <span
+                          className={cn(
+                            "inline-block px-2 py-1 rounded text-xs",
+                            tx.isAdminEntry
+                              ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
+                              : "bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-200",
+                          )}
+                        >
+                          {tx.customerName}
+                          {tx.isAdminEntry && " (Admin)"}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right text-sm font-medium">
                       <span
-                        className={cn(
-                          "inline-block px-2 py-1 rounded text-xs",
-                          tx.isAdminEntry
-                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
-                            : "bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-200",
-                        )}
-                      >
-                        {tx.customerName}
-                        {tx.isAdminEntry && " (Admin)"}
-                      </span>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right text-sm font-medium">
-                    <span
-                      className={
-                        tx.type === "CASH_IN"
-                          ? "text-green-600 dark:text-green-400"
-                          : "text-red-600 dark:text-red-400"
-                      }
-                    >
-                      {tx.type === "CASH_IN" ? "+" : "-"}₹
-                      {Math.abs(Number(tx.amount)).toFixed(2)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onView(tx.id)}
-                        title={
-                          tx.isAdminEntry
-                            ? "View transaction details"
-                            : "View synced transaction details"
+                        className={
+                          tx.type === "CASH_IN"
+                            ? "text-green-600 dark:text-green-400"
+                            : "text-red-600 dark:text-red-400"
                         }
                       >
-                        <Eye className="size-4" />
-                      </Button>
-                      {!isReadOnly && tx.isAdminEntry && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onEdit(tx.id)}
-                            title="Edit manual transaction"
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                          {onDelete && (
+                        {tx.type === "CASH_IN" ? "+" : "-"}₹
+                        {Math.abs(Number(tx.amount)).toFixed(2)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onView(tx.id)}
+                          title={
+                            tx.isAdminEntry
+                              ? "View transaction details"
+                              : "View synced transaction details"
+                          }
+                        >
+                          <Eye className="size-4" />
+                        </Button>
+                        {!isReadOnly && tx.isAdminEntry && (
+                          <>
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => onDelete(tx.id)}
-                              title="Delete manual transaction"
-                              className="text-destructive hover:text-destructive"
+                              onClick={() => onEdit(tx.id)}
+                              title="Edit manual transaction"
                             >
-                              <Trash2 className="size-4" />
+                              <Pencil className="size-4" />
                             </Button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })
-          )}
+                            {onDelete && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => onDelete(tx.id)}
+                                title="Delete manual transaction"
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
           </TableBody>
         </Table>
       </div>

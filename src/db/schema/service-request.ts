@@ -25,8 +25,9 @@ const serviceRequest = pgTable(
     category: serviceCategoryEnum("category")
       .notNull()
       .default("GENERAL_SUPPORT"),
+    otherCategory: text("other_category"),
     address: text("address").notNull(),
-    issueTitle: text("issue_title").notNull(),
+    issueTitle: text("issue_title"),
     description: text("description").notNull(),
     status: recordStatusEnum("status").notNull().default("OPEN"),
 
@@ -45,10 +46,7 @@ const serviceRequest = pgTable(
       onDelete: "set null",
     }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => /* @__PURE__ */ new Date())
-      .notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
     index("service_request_status_idx").on(table.status),

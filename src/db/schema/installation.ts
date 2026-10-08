@@ -21,7 +21,7 @@ const installation = pgTable(
 
     customerName: text("customer_name").notNull(),
     contactNumber: text("contact_number").notNull(),
-    email: text("email").notNull(),
+    email: text("email"),
     address: text("address").notNull(),
     description: text("description").notNull(),
     status: recordStatusEnum("status").notNull().default("OPEN"),
@@ -48,10 +48,7 @@ const installation = pgTable(
       onDelete: "set null",
     }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => /* @__PURE__ */ new Date())
-      .notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
     index("installation_status_idx").on(table.status),

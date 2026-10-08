@@ -111,7 +111,8 @@ const normalizeCashTransactionInput = (input: unknown) => {
   const raw = input as Record<string, unknown>;
   const type = (raw.type || raw.transactionType) as string | undefined;
   const rawCategory = (raw.transactionCategory || raw.category) as
-    string | undefined;
+    | string
+    | undefined;
   const otherCategory =
     typeof raw.otherCategory === "string"
       ? raw.otherCategory.trim()

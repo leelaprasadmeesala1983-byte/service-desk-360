@@ -288,7 +288,11 @@ function ControlledMultiSelect<T extends FieldValues>({
           <div className="h-px bg-border my-0.5" />
 
           <div className="max-h-56 overflow-y-auto space-y-0.5 px-0.5">
-            {filteredOptions.length === 0 ? (
+            {options.length === 0 ? (
+              <div className="py-4 text-center text-xs text-muted-foreground">
+                No technicians available
+              </div>
+            ) : filteredOptions.length === 0 ? (
               <div className="py-4 text-center text-xs text-muted-foreground">
                 No technicians found
               </div>

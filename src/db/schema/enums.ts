@@ -23,6 +23,7 @@ const serviceCategoryEnum = pgEnum("service_category", [
   "POWER_ISSUE",
   "CABLE_WIRING",
   "GENERAL_SUPPORT",
+  "OTHER",
 ]);
 
 /** ASSIGNMENT: admin assigned a record. UPDATE: technician saved changes on one. */

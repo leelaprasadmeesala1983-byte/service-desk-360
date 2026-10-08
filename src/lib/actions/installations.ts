@@ -1,17 +1,22 @@
 "use server";
 
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { ZodError } from "zod";
 
 import { db } from "@/db";
-import { getInstallation, listInstallations } from "@/db/queries/installations";
+import {
+  type InstallationRow,
+  getInstallation,
+  listInstallations,
+} from "@/db/queries/installations";
 import {
   logMultipleTechniciansWorkDates,
   logTechnicianWorkDate,
 } from "@/db/queries/technician-reports";
 import { user } from "@/db/schema/auth";
 import { installation } from "@/db/schema/installation";
+import { workHistory } from "@/db/schema/work-history";
 import { syncServiceRequestAmount } from "@/lib/actions/cash-transactions";
 import { recordStatusChangeEvent } from "@/lib/actions/work-history";
 import { RECORD_STATUS_LABELS, type RecordStatus } from "@/lib/constants";
@@ -47,7 +52,9 @@ function invalid(error: ZodError): ActionResult {
   );
 }
 
-async function createInstallation(input: unknown): Promise<ActionResult> {
+async function createInstallation(
+  input: unknown,
+): Promise<ActionResult<InstallationRow | undefined>> {
   const current = await requireUser();
   if (current.role !== "ADMIN") return actionError("Admins only.");
 
@@ -55,15 +62,14 @@ async function createInstallation(input: unknown): Promise<ActionResult> {
   if (!parsed.success) return invalid(parsed.error);
   const data = parsed.data;
 
-  // Technicians are assigned later, from the edit screen.
-  const technicianIds: string[] = [];
+  const technicianIds = data.assignedTechnicianIds ?? [];
 
   const [row] = await db
     .insert(installation)
     .values({
       customerName: data.customerName,
       contactNumber: data.contactNumber,
-      email: data.email,
+      email: data.email ?? null,
       address: data.address,
       description: data.description,
       status: data.status,
@@ -74,26 +80,92 @@ async function createInstallation(input: unknown): Promise<ActionResult> {
       accountMobile: data.accountMobile ?? null,
       referenceNo: data.referenceNo ?? null,
       createdById: current.id,
+      createdAt: data.createdAt,
+      updatedAt: data.createdAt,
     })
     .returning({ id: installation.id, seq: installation.seq });
 
   if (row) {
+    const label = formatRecordId("INSTALLATION", row.seq);
+
+    const createdDateObj =
+      data.createdAt instanceof Date
+        ? data.createdAt
+        : new Date(data.createdAt ?? new Date());
+    const createdDateStr = createdDateObj.toISOString().split("T")[0];
+
+    await db.insert(workHistory).values({
+      workType: "INSTALLATION",
+      referenceId: row.id,
+      technicianIds: technicianIds,
+      workDate: createdDateStr,
+      workDateTime: createdDateObj,
+      status: data.status,
+      description: data.description || "Installation request created.",
+      attachments: [],
+      createdById: current.id,
+      createdAt: createdDateObj,
+      updatedAt: createdDateObj,
+      isInitial: true,
+    });
+
+    if (technicianIds.length > 0) {
+      await logMultipleTechniciansWorkDates({
+        technicianIds,
+        workType: "INSTALLATION",
+        referenceId: row.id,
+        createdById: current.id,
+      });
+
+      for (const techId of technicianIds) {
+        await notifyAssignment(
+          { recordType: "INSTALLATION", recordId: row.id, recordLabel: label },
+          {
+            technicianId: techId,
+            actorId: current.id,
+            description: data.description,
+          },
+        );
+      }
+
+      const techs = await db
+        .select({ name: user.name, phone: user.phone })
+        .from(user)
+        .where(inArray(user.id, technicianIds));
+
+      await notifyTicketAssigned({
+        ticketType: "INSTALLATION",
+        ticketId: label,
+        owner: { name: data.customerName, phone: data.contactNumber },
+        address: data.address,
+        details: data.description,
+        technicians: techs,
+      });
+    }
+
     await sendWhatsAppSafely(data.contactNumber, () =>
       notifyTicketCreated(
         "INSTALLATION",
         data.contactNumber,
         data.customerName,
-        formatRecordId("INSTALLATION", row.seq),
+        label,
       ),
     );
   }
 
   revalidatePath(PATH);
+  revalidatePath("/service-tickets/technician-reports");
   revalidatePath("/", "layout");
-  return actionOk();
+  const created = await getInstallation(row.id, {
+    role: current.role,
+    id: current.id,
+  });
+  return actionOk(created);
 }
 
-async function updateInstallation(input: unknown): Promise<ActionResult> {
+async function updateInstallation(
+  input: unknown,
+): Promise<ActionResult<InstallationRow | undefined>> {
   const current = await requireUser();
 
   const existing =
@@ -130,7 +202,7 @@ async function updateInstallation(input: unknown): Promise<ActionResult> {
     const updateValues: Record<string, unknown> = {
       customerName: data.customerName,
       contactNumber: data.contactNumber,
-      email: data.email,
+      email: data.email ?? null,
       address: data.address,
       description: data.description,
       status: data.status,
@@ -142,6 +214,7 @@ async function updateInstallation(input: unknown): Promise<ActionResult> {
       paymentMode,
       paymentStatus,
       amount,
+      updatedAt: data.updatedAt,
     };
 
     // Write-only password logic:
@@ -182,15 +255,16 @@ async function updateInstallation(input: unknown): Promise<ActionResult> {
       );
     }
 
-    if (existing.status !== "CLOSED" && data.status === "CLOSED") {
-      await recordStatusChangeEvent({
-        workType: "INSTALLATION",
-        referenceId: data.id,
-        previousStatus: existing.status,
-        newStatus: data.status,
-        actorId: current.id,
-      });
-    }
+    // Synchronize current status with existing Log Request(s) / work history records for this installation
+    await db
+      .update(workHistory)
+      .set({ status: data.status })
+      .where(
+        and(
+          eq(workHistory.workType, "INSTALLATION"),
+          eq(workHistory.referenceId, data.id),
+        ),
+      );
 
     const prevIds = new Set(
       existing.assignedTechnicianIds?.length
@@ -299,8 +373,13 @@ async function updateInstallation(input: unknown): Promise<ActionResult> {
 
     revalidatePath(PATH);
     revalidatePath("/quick-cash");
+    revalidatePath("/service-tickets/technician-reports");
     revalidatePath("/", "layout");
-    return actionOk();
+    const updated = await getInstallation(data.id, {
+      role: current.role,
+      id: current.id,
+    });
+    return actionOk(updated);
   }
 
   // Technician: own record, whitelisted fields only (§4.3).
@@ -332,6 +411,7 @@ async function updateInstallation(input: unknown): Promise<ActionResult> {
     paymentMode,
     paymentStatus,
     amount,
+    updatedAt: data.updatedAt,
   };
 
   if (data.accountPassword && data.accountPassword.trim().length > 0) {
@@ -368,15 +448,16 @@ async function updateInstallation(input: unknown): Promise<ActionResult> {
     );
   }
 
-  if (existing.status !== "CLOSED" && data.status === "CLOSED") {
-    await recordStatusChangeEvent({
-      workType: "INSTALLATION",
-      referenceId: data.id,
-      previousStatus: existing.status,
-      newStatus: data.status,
-      actorId: current.id,
-    });
-  }
+  // Synchronize current status with existing Log Request(s) / work history records for this installation
+  await db
+    .update(workHistory)
+    .set({ status: data.status })
+    .where(
+      and(
+        eq(workHistory.workType, "INSTALLATION"),
+        eq(workHistory.referenceId, data.id),
+      ),
+    );
 
   // Auto-log work date for technician
   await logTechnicianWorkDate({
@@ -422,14 +503,18 @@ async function updateInstallation(input: unknown): Promise<ActionResult> {
   );
 
   revalidatePath(PATH);
+  revalidatePath("/service-tickets/technician-reports");
   revalidatePath("/", "layout");
-  return actionOk();
+  const updated = await getInstallation(data.id, {
+    role: current.role,
+    id: current.id,
+  });
+  return actionOk(updated);
 }
 
 async function deleteInstallation(input: unknown): Promise<ActionResult> {
   const current = await requireUser();
-  if (current.role !== "ADMIN")
-    return actionError("Admins only.");
+  if (current.role !== "ADMIN") return actionError("Admins only.");
 
   const parsed = deleteRecordSchema.safeParse(input);
   if (!parsed.success) return actionError("Invalid request.");
@@ -443,6 +528,8 @@ async function deleteInstallation(input: unknown): Promise<ActionResult> {
 
   await db.delete(installation).where(eq(installation.id, parsed.data.id));
   revalidatePath(PATH);
+  revalidatePath("/service-tickets/technician-reports");
+  revalidatePath("/quick-cash");
   revalidatePath("/", "layout");
   return actionOk();
 }

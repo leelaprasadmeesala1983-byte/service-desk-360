@@ -38,8 +38,7 @@ export async function createVendor(
   input: unknown,
 ): Promise<ActionResult<Vendor>> {
   const current = await requireUser();
-  if (current.role !== "ADMIN")
-    return actionError("Admins only.");
+  if (current.role !== "ADMIN") return actionError("Admins only.");
 
   const parsed = vendorFormSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
@@ -63,8 +62,7 @@ export async function updateVendor(
   input: unknown,
 ): Promise<ActionResult<Vendor>> {
   const current = await requireUser();
-  if (current.role !== "ADMIN")
-    return actionError("Admins only.");
+  if (current.role !== "ADMIN") return actionError("Admins only.");
 
   if (!id) return actionError("Vendor ID is required.");
 
@@ -90,8 +88,7 @@ export async function updateVendor(
 
 export async function deleteVendor(input: unknown): Promise<ActionResult> {
   const current = await requireUser();
-  if (current.role !== "ADMIN")
-    return actionError("Admins only.");
+  if (current.role !== "ADMIN") return actionError("Admins only.");
 
   const parsed = deleteVendorSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);

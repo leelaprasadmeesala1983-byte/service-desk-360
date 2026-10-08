@@ -133,6 +133,21 @@ function getLocalDateBoundaries(dateStr: string): { start: Date; end: Date } {
   return { start, end };
 }
 
+/**
+ * Formats a Date object or timestamp as a local YYYY-MM-DDTHH:mm string for datetime-local inputs.
+ */
+function formatLocalDateTime(value?: Date | string | null): string {
+  if (!value) return "";
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 export type { RecordKind };
 export {
   formatRecordId,
@@ -143,5 +158,6 @@ export {
   formatRelativeTime,
   getInitials,
   formatLocalDate,
+  formatLocalDateTime,
   getLocalDateBoundaries,
 };

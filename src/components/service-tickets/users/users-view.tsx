@@ -174,6 +174,21 @@ function UsersView({
     }
   };
 
+  const currentStats = useMemo(() => {
+    let total = usersList.length;
+    let active = 0;
+    let inactive = 0;
+    let admins = 0;
+    let technicians = 0;
+    for (const u of usersList) {
+      if (u.status === "ACTIVE") active++;
+      else inactive++;
+      if (u.role === "ADMIN") admins++;
+      else if (u.role === "TECHNICIAN") technicians++;
+    }
+    return { total, active, inactive, admins, technicians };
+  }, [usersList]);
+
   return (
     <div className="space-y-6 p-4 sm:p-6">
       <PageHeader
@@ -189,7 +204,7 @@ function UsersView({
       <div className="border-border bg-card/40 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border px-3 py-2 text-xs">
         <div className="flex items-center gap-1">
           <span className="text-muted-foreground font-medium">Total Users</span>
-          <span className="text-foreground font-bold">{stats.total}</span>
+          <span className="text-foreground font-bold">{currentStats.total}</span>
         </div>
         <span className="text-muted-foreground">|</span>
         <div className="flex items-center gap-1">
@@ -197,7 +212,7 @@ function UsersView({
             Active
           </span>
           <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-            {stats.active}
+            {currentStats.active}
           </span>
         </div>
         <span className="text-muted-foreground">|</span>
@@ -206,7 +221,7 @@ function UsersView({
             Inactive
           </span>
           <span className="text-rose-600 dark:text-rose-400 font-bold">
-            {stats.inactive}
+            {currentStats.inactive}
           </span>
         </div>
         <span className="text-muted-foreground">|</span>
@@ -215,7 +230,7 @@ function UsersView({
             Admins / Technicians
           </span>
           <span className="text-foreground font-bold">
-            {stats.admins} / {stats.technicians}
+            {currentStats.admins} / {currentStats.technicians}
           </span>
         </div>
       </div>

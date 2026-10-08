@@ -1,9 +1,6 @@
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import {
-  scopeAdminOwnership,
-  type Viewer,
-} from "@/db/queries/record-scope";
+import { scopeAdminOwnership, type Viewer } from "@/db/queries/record-scope";
 import { asset } from "@/db/schema/asset";
 import { assetStatusHistory } from "@/db/schema/asset-status-history";
 import { user } from "@/db/schema/auth";

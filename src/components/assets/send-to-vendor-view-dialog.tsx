@@ -247,29 +247,29 @@ export function SendToVendorViewDialog({
         </div>
 
         {/* STICKY FOOTER */}
-            <div className="flex items-center justify-end gap-2.5 w-full">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  printVendorDispatch(item as SendToVendorRow);
-                }}
-                className="h-8.5 text-xs font-semibold gap-1.5 cursor-pointer text-primary border-primary/30 hover:bg-primary/10"
-              >
-                <Printer className="size-3.5" />
-                Print / Save PDF
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onClose}
-                className="h-8.5 text-xs font-semibold cursor-pointer"
-              >
-                Close
-              </Button>
-            </div>
+        <div className="flex items-center justify-end gap-2.5 w-full">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              printVendorDispatch(item as SendToVendorRow);
+            }}
+            className="h-8.5 text-xs font-semibold gap-1.5 cursor-pointer text-primary border-primary/30 hover:bg-primary/10"
+          >
+            <Printer className="size-3.5" />
+            Print / Save PDF
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onClose}
+            className="h-8.5 text-xs font-semibold cursor-pointer"
+          >
+            Close
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
