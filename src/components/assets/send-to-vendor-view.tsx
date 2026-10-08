@@ -1,10 +1,11 @@
 "use client";
 
-import { Search, X } from "lucide-react";
+import { Printer, Search, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/app-shell/page-header";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   deleteSendToVendor,
@@ -12,7 +13,7 @@ import {
   updateSendToVendor,
   updateVendorDispatchRepairStatus,
 } from "@/lib/actions/send-to-vendor";
-import { printVendorDispatch } from "@/lib/utils/print-vendor-dispatch";
+import { printVendorDispatches } from "@/lib/utils/print-vendor-dispatch";
 import type { SendToVendorFormValues } from "@/lib/validations/send-to-vendor";
 import type {
   SendToVendorListResponse,
@@ -71,14 +72,41 @@ export function SendToVendorView({
     null,
   );
 
-  // Print Action
-  const handlePrint = useCallback((record: SendToVendorRow) => {
-    printVendorDispatch(record, () => {
+  // Print selection (select mode is toggled by the Print button)
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Map<string, SendToVendorRow>>(
+    new Map(),
+  );
+
+  const toggleSelect = useCallback((record: SendToVendorRow) => {
+    setSelected((prev) => {
+      const next = new Map(prev);
+      if (next.has(record.id)) next.delete(record.id);
+      else next.set(record.id, record);
+      return next;
+    });
+  }, []);
+
+  const cancelSelect = () => {
+    setSelectMode(false);
+    setSelected(new Map());
+  };
+
+  const handlePrintClick = () => {
+    if (!selectMode) {
+      setSelectMode(true);
+      return;
+    }
+    if (selected.size === 0) {
+      toast.warning("Select at least one record to print.");
+      return;
+    }
+    printVendorDispatches(Array.from(selected.values()), () => {
       toast.error(
         "Please allow pop-ups for ServiceDesk 360 to print the dispatch document.",
       );
     });
-  }, []);
+  };
 
   // Debounce search input by 300ms
   useEffect(() => {
@@ -203,6 +231,7 @@ export function SendToVendorView({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <PageHeader title="Send to Vendor" count={totalCount} />
 
+        <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
         {/* Search Input */}
         <div className="relative w-full sm:w-80 shrink-0">
           <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2" />
@@ -224,6 +253,27 @@ export function SendToVendorView({
             </button>
           )}
         </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handlePrintClick}
+          className="h-9 gap-2 text-xs cursor-pointer shrink-0"
+        >
+          <Printer className="size-3.5" />
+          {selectMode ? `Print (${selected.size})` : "Print"}
+        </Button>
+        {selectMode && (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={cancelSelect}
+            className="h-9 text-xs cursor-pointer shrink-0"
+          >
+            Cancel
+          </Button>
+        )}
+        </div>
       </div>
 
       {/* Dispatched Records Table */}
@@ -242,7 +292,9 @@ export function SendToVendorView({
         onView={(item) => setViewRecord(item)}
         onEdit={(item) => setEditRecord(item)}
         onDelete={(item) => setDeleteRecord(item)}
-        onPrint={handlePrint}
+        selectable={selectMode}
+        selectedIds={new Set(selected.keys())}
+        onToggleSelect={toggleSelect}
         onUpdateStatus={(item) => setStatusRecord(item)}
         isSearch={Boolean(debouncedSearch)}
         onResetSearch={() => setSearch("")}

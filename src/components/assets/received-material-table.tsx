@@ -41,7 +41,10 @@ type ReceivedMaterialTableProps = {
 };
 
 // Determine selectable (un-dispatched) rows
-const isItemAvailable = (item: ReceivedItemRow) => {
+export const isItemAvailable = (item: {
+  itemStatus?: string | null;
+  dispatchId?: string | null;
+}) => {
   const s = (item.itemStatus || "").toLowerCase();
   const isDispatched =
     Boolean(item.dispatchId) ||
@@ -129,9 +132,12 @@ export function ReceivedMaterialTable({
       });
     });
 
+    // Dispatched items live under "Send to Vendor", not here
+    const availableRows = rows.filter(isItemAvailable);
+
     if (searchQuery && searchQuery.trim().length > 0) {
       const q = searchQuery.trim().toLowerCase();
-      return rows.filter((item) => {
+      return availableRows.filter((item) => {
         const values = [
           item.trackId,
           item.customerName,
@@ -154,7 +160,7 @@ export function ReceivedMaterialTable({
       });
     }
 
-    return rows;
+    return availableRows;
   }, [assets, searchQuery]);
 
   const handleToggleItem = (item: ReceivedItemRow) => {

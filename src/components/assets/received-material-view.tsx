@@ -19,7 +19,10 @@ import type { AssetListResponse, ReceivedItemRow } from "@/types/assets";
 
 import { AssetDeleteDialog } from "./asset-delete-dialog";
 import { AssetFormDialog } from "./asset-form-dialog";
-import { ReceivedMaterialTable } from "./received-material-table";
+import {
+  isItemAvailable,
+  ReceivedMaterialTable,
+} from "./received-material-table";
 import { ReceivedMaterialViewDialog } from "./received-material-view-dialog";
 import { SendToVendorFormDialog } from "./send-to-vendor-form-dialog";
 
@@ -231,11 +234,18 @@ export function ReceivedMaterialView({
     : null;
 
   const totalItemsCount = (assetsData.data || []).reduce((acc, a) => {
-    const prods =
-      Array.isArray(a.products) && a.products.length > 0
-        ? a.products.length
-        : 1;
-    return acc + prods;
+    if (!Array.isArray(a.products) || a.products.length === 0) {
+      return acc + (isItemAvailable({ itemStatus: a.status }) ? 1 : 0);
+    }
+    return (
+      acc +
+      a.products.filter((p) =>
+        isItemAvailable({
+          itemStatus: p.status || a.status,
+          dispatchId: p.dispatchId,
+        }),
+      ).length
+    );
   }, 0);
 
   return (

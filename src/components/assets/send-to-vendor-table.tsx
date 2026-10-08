@@ -1,7 +1,8 @@
 "use client";
 
-import { Eye, FilePenLine, Pencil, Printer, Trash2 } from "lucide-react";
+import { Eye, FilePenLine, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -30,7 +31,9 @@ type SendToVendorTableProps = {
   onView: (item: SendToVendorRow) => void;
   onEdit: (item: SendToVendorRow) => void;
   onDelete: (item: SendToVendorRow) => void;
-  onPrint?: (item: SendToVendorRow) => void;
+  selectable?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (item: SendToVendorRow) => void;
   onUpdateStatus?: (item: SendToVendorRow) => void;
   onReceiveFromVendor?: (item: SendToVendorRow) => void;
   isSearch?: boolean;
@@ -49,7 +52,9 @@ export function SendToVendorTable({
   onView,
   onEdit,
   onDelete,
-  onPrint,
+  selectable = false,
+  selectedIds,
+  onToggleSelect,
   onUpdateStatus,
   onReceiveFromVendor,
   isSearch = false,
@@ -70,6 +75,7 @@ export function SendToVendorTable({
           <Table className="min-w-[950px]">
             <TableHeader>
               <TableRow className="bg-muted/30">
+                {selectable && <TableHead className="w-10 text-center" />}
                 <TableHead className="w-14 text-center">S.No</TableHead>
                 <TableHead className="w-28">Track ID</TableHead>
                 <TableHead className="w-36">Customer</TableHead>
@@ -84,7 +90,7 @@ export function SendToVendorTable({
             <TableBody>
               {records.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="p-0">
+                  <TableCell colSpan={selectable ? 10 : 9} className="p-0">
                     <AssetEmptyState
                       isSearch={isSearch}
                       onResetSearch={onResetSearch}
@@ -159,6 +165,16 @@ export function SendToVendorTable({
                       key={item.id}
                       className="hover:bg-muted/50 transition-colors"
                     >
+                      {selectable && (
+                        <TableCell className="text-center">
+                          <Checkbox
+                            checked={selectedIds?.has(item.id) ?? false}
+                            onCheckedChange={() => onToggleSelect?.(item)}
+                            aria-label="Select record for print"
+                          />
+                        </TableCell>
+                      )}
+
                       {/* 1. S.No */}
                       <TableCell className="text-center font-mono text-muted-foreground text-xs">
                         {sNo}
@@ -244,19 +260,6 @@ export function SendToVendorTable({
                               className="size-7 text-primary hover:text-primary hover:bg-primary/10 cursor-pointer"
                             >
                               <FilePenLine className="size-3.5" />
-                            </Button>
-                          )}
-
-                          {onPrint && (
-                            <Button
-                              variant="ghost"
-                              size="icon-xs"
-                              onClick={() => onPrint(item)}
-                              aria-label="Print / Save PDF Dispatch"
-                              title="Print / Save PDF Dispatch"
-                              className="size-7 text-primary hover:text-primary hover:bg-primary/10 cursor-pointer"
-                            >
-                              <Printer className="size-3.5" />
                             </Button>
                           )}
 

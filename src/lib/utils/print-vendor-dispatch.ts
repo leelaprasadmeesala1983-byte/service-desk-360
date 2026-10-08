@@ -732,3 +732,114 @@ export function printVendorDispatch(
     console.error("Error writing to vendor dispatch print window:", err);
   }
 }
+
+/**
+ * Generates one HTML document listing every selected dispatch in a single table
+ * (one row per dispatched material).
+ */
+export function generateVendorDispatchListHtml(
+  rows: SendToVendorRow[],
+): string {
+  const docs = rows.map(normalizeVendorDispatchDocumentData);
+  let sNo = 0;
+  const bodyRows = docs
+    .flatMap((d) =>
+      d.materials.map((m) => {
+        sNo += 1;
+        return `
+      <tr>
+        <td class="text-center">${sNo}</td>
+        <td class="font-mono font-bold">${escapeHtml(d.dispatchId)}</td>
+        <td class="font-mono">${escapeHtml(m.trackId)}</td>
+        <td>${escapeHtml(d.customer.name)}</td>
+        <td><strong>${escapeHtml(m.productName)}</strong>${
+          m.details !== "—"
+            ? `<div class="muted">${escapeHtml(m.details)}</div>`
+            : ""
+        }</td>
+        <td class="font-mono">${escapeHtml(m.serialNumber)}</td>
+        <td class="text-center">${m.quantity}</td>
+        <td>${escapeHtml(d.vendor.name)}</td>
+        <td>${escapeHtml(d.dispatchDate)}</td>
+        <td>${escapeHtml(d.status)}</td>
+      </tr>`;
+      }),
+    )
+    .join("");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Vendor Dispatch List</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 24px; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      h1 { margin: 0; font-size: 20px; text-transform: uppercase; text-align: center; }
+      .sub { text-align: center; font-size: 12px; color: #475569; margin: 4px 0 14px; padding-bottom: 12px; border-bottom: 2px solid #0f172a; }
+      .toolbar { margin-bottom: 14px; }
+      .toolbar button { font-size: 12px; font-weight: 600; padding: 8px 14px; border: none; border-radius: 6px; cursor: pointer; background: #2563eb; color: #fff; margin-right: 6px; }
+      .toolbar button.secondary { background: #e2e8f0; color: #1e293b; }
+      table { width: 100%; border-collapse: collapse; font-size: 11px; }
+      th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; vertical-align: top; }
+      th { background: #f1f5f9; text-transform: uppercase; font-size: 10px; }
+      tr { page-break-inside: avoid; }
+      .text-center { text-align: center; }
+      .font-mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
+      .font-bold { font-weight: 700; }
+      .muted { color: #475569; font-size: 10px; }
+      @page { size: A4 landscape; margin: 10mm; }
+      @media print { .toolbar { display: none !important; } body { padding: 0; } }
+    </style>
+  </head>
+  <body>
+    <div class="toolbar">
+      <button type="button" onclick="window.print()">Print / Save as PDF</button>
+      <button type="button" class="secondary" onclick="window.close()">Close</button>
+    </div>
+    <h1>MARUTHI IT SERVICES</h1>
+    <div class="sub">Vendor Dispatch List &mdash; ${docs.length} dispatch(es), ${sNo} item(s) &middot; ${escapeHtml(formatDateTime(new Date().toISOString()))}</div>
+    <table>
+      <thead>
+        <tr>
+          <th class="text-center">S.No</th><th>Dispatch ID</th><th>Track ID</th><th>Customer</th><th>Product</th><th>Serial Number</th><th class="text-center">Qty</th><th>Vendor</th><th>Dispatch Date</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody>${bodyRows}</tbody>
+    </table>
+    <script>
+      window.addEventListener('load', function () {
+        setTimeout(function () { try { window.focus(); window.print(); } catch (e) {} }, 300);
+      });
+    </script>
+  </body>
+</html>`;
+}
+
+/**
+ * Prints several dispatch records together in a single table.
+ */
+export function printVendorDispatches(
+  rows: SendToVendorRow[],
+  onPopupBlocked?: () => void,
+): void {
+  const printWindow = window.open(
+    "",
+    "_blank",
+    "width=1100,height=850,resizable=yes,scrollbars=yes",
+  );
+
+  if (!printWindow) {
+    onPopupBlocked?.();
+    return;
+  }
+
+  try {
+    printWindow.document.open();
+    printWindow.document.write(generateVendorDispatchListHtml(rows));
+    printWindow.document.close();
+    printWindow.focus();
+  } catch (err) {
+    console.error("Error writing to vendor dispatch list print window:", err);
+  }
+}
