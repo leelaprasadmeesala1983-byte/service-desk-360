@@ -45,7 +45,12 @@ export default async function QuickCashPage({
   const todayStr = formatLocalDate(now);
   const firstDayOfCurrentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 
-  const currentTab = params.tab || "today";
+  const currentTab: "today" | "history" | "monthly" =
+    params.tab === "history"
+      ? "history"
+      : params.tab === "monthly"
+        ? "monthly"
+        : "today";
   const page = Math.max(1, parseInt(params.page || "1", 10));
   const perPage = params.limit ? parseInt(params.limit, 10) : 10;
 

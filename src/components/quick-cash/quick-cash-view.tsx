@@ -82,9 +82,16 @@ export function QuickCashView({
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
-  const [activeTab, setActiveTab] = useState<"today" | "history" | "monthly">(
-    initialTab,
-  );
+  const rawTab = searchParams.get("tab");
+  const activeTab: "today" | "history" | "monthly" =
+    rawTab === "history"
+      ? "history"
+      : rawTab === "monthly"
+        ? "monthly"
+        : rawTab === "today"
+          ? "today"
+          : initialTab || "today";
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -99,7 +106,6 @@ export function QuickCashView({
   const totalPages = Math.max(1, Math.ceil(total / perPage));
 
   const handleTabChange = (tab: "today" | "history" | "monthly") => {
-    setActiveTab(tab);
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", tab);
     params.delete("page");
@@ -107,18 +113,27 @@ export function QuickCashView({
       params.delete("from");
       params.delete("to");
       params.delete("date");
+      params.delete("year");
+      params.delete("month");
+    } else if (tab === "history") {
+      params.delete("from");
+      params.delete("to");
+      params.delete("date");
+      params.delete("year");
+      params.delete("month");
     }
     router.push(`${pathname}?${params.toString()}`);
   };
 
   const handleViewDateFromHistory = (date: string) => {
-    setActiveTab("today");
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", "today");
     params.set("date", date);
     params.delete("from");
     params.delete("to");
     params.delete("page");
+    params.delete("year");
+    params.delete("month");
     router.push(`${pathname}?${params.toString()}`);
   };
 
