@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 
 import { db } from "@/db";
 import { scopeRecordToViewer, type Viewer } from "@/db/queries/record-scope";
@@ -66,6 +66,14 @@ export type ServiceRequestSummary = {
   assignedTechnicians: TechnicianWorkSummary[];
   technicians: TechnicianWorkSummary[];
   technicianNames: string[];
+  accountUsername?: string | null;
+  accountPassword?: string | null;
+  hasAccountPassword?: boolean;
+  accountMobile?: string | null;
+  referenceNo?: string | null;
+  paymentMode?: string | null;
+  paymentStatus?: string | null;
+  amount?: string | null;
 };
 
 export type CombinedWorkHistoryResult = {
@@ -150,7 +158,16 @@ export async function getCombinedWorkHistory(
       ? eq(serviceRequest.id, referenceId)
       : seqNumber !== null
         ? eq(serviceRequest.seq, seqNumber)
-        : eq(serviceRequest.id, referenceId);
+        : null;
+
+    if (!idClause) {
+      return {
+        serviceRequest: null,
+        parentRecord: null,
+        history: [],
+        totalLogs: 0,
+      };
+    }
 
     const scope = scopeRecordToViewer(
       {
@@ -233,7 +250,16 @@ export async function getCombinedWorkHistory(
       ? eq(installation.id, referenceId)
       : seqNumber !== null
         ? eq(installation.seq, seqNumber)
-        : eq(installation.id, referenceId);
+        : null;
+
+    if (!idClause) {
+      return {
+        serviceRequest: null,
+        parentRecord: null,
+        history: [],
+        totalLogs: 0,
+      };
+    }
 
     const scope = scopeRecordToViewer(
       {
@@ -256,6 +282,13 @@ export async function getCombinedWorkHistory(
         description: installation.description,
         assignedTechnicianId: installation.assignedTechnicianId,
         assignedTechnicianIds: installation.assignedTechnicianIds,
+        accountUsername: installation.accountUsername,
+        accountPassword: installation.accountPassword,
+        accountMobile: installation.accountMobile,
+        referenceNo: installation.referenceNo,
+        paymentMode: installation.paymentMode,
+        paymentStatus: installation.paymentStatus,
+        amount: installation.amount,
         createdById: installation.createdById,
         createdAt: installation.createdAt,
         updatedAt: installation.updatedAt,
@@ -300,6 +333,16 @@ export async function getCombinedWorkHistory(
         assignedTechnicians: [],
         technicians: [],
         technicianNames: [],
+        accountUsername: ins.accountUsername,
+        accountPassword: ins.accountPassword,
+        hasAccountPassword: Boolean(
+          ins.accountPassword && ins.accountPassword.trim().length > 0,
+        ),
+        accountMobile: ins.accountMobile,
+        referenceNo: ins.referenceNo,
+        paymentMode: ins.paymentMode,
+        paymentStatus: ins.paymentStatus,
+        amount: ins.amount,
       };
     }
   } else if (workType === "PROJECT") {
@@ -311,7 +354,16 @@ export async function getCombinedWorkHistory(
       ? eq(project.id, referenceId)
       : seqNumber !== null
         ? eq(project.seq, seqNumber)
-        : eq(project.id, referenceId);
+        : null;
+
+    if (!idClause) {
+      return {
+        serviceRequest: null,
+        parentRecord: null,
+        history: [],
+        totalLogs: 0,
+      };
+    }
 
     const scope = scopeRecordToViewer(
       {
@@ -790,6 +842,7 @@ export async function getWorkHistoryById(
 
 /**
  * Returns active service requests for the Log Request form dropdown with pre-populated metadata.
+ * Excludes closed records.
  */
 export async function listSelectableServiceRequests(
   viewer?: Viewer,
@@ -804,6 +857,12 @@ export async function listSelectableServiceRequests(
         viewer,
       )
     : undefined;
+
+  const notClosed = ne(serviceRequest.status, "CLOSED");
+  const whereCondition = scopeCondition
+    ? and(scopeCondition, notClosed)
+    : notClosed;
+
   const rows = await db
     .select({
       id: serviceRequest.id,
@@ -818,7 +877,7 @@ export async function listSelectableServiceRequests(
       assignedTechnicianIds: serviceRequest.assignedTechnicianIds,
     })
     .from(serviceRequest)
-    .where(scopeCondition ? scopeCondition : undefined)
+    .where(whereCondition)
     .orderBy(desc(serviceRequest.createdAt));
 
   // Collect technician names
@@ -875,3 +934,194 @@ export async function listSelectableServiceRequests(
     };
   });
 }
+
+/**
+ * Returns active installations for the Log Request form dropdown with pre-populated metadata.
+ * Excludes closed records.
+ */
+export async function listSelectableInstallations(
+  viewer?: Viewer,
+): Promise<SelectableRecord[]> {
+  const scopeCondition = viewer
+    ? scopeRecordToViewer(
+        {
+          createdById: installation.createdById,
+          assignedTechnicianId: installation.assignedTechnicianId,
+          assignedTechnicianIds: installation.assignedTechnicianIds,
+        },
+        viewer,
+      )
+    : undefined;
+
+  const notClosed = ne(installation.status, "CLOSED");
+  const whereCondition = scopeCondition
+    ? and(scopeCondition, notClosed)
+    : notClosed;
+
+  const rows = await db
+    .select({
+      id: installation.id,
+      seq: installation.seq,
+      customerName: installation.customerName,
+      phone: installation.contactNumber,
+      email: installation.email,
+      address: installation.address,
+      status: installation.status,
+      assignedTechnicianId: installation.assignedTechnicianId,
+      assignedTechnicianIds: installation.assignedTechnicianIds,
+    })
+    .from(installation)
+    .where(whereCondition)
+    .orderBy(desc(installation.createdAt));
+
+  // Collect technician names
+  const allTechIds = new Set<string>();
+  for (const r of rows) {
+    const ids =
+      Array.isArray(r.assignedTechnicianIds) &&
+      r.assignedTechnicianIds.length > 0
+        ? r.assignedTechnicianIds
+        : r.assignedTechnicianId
+          ? [r.assignedTechnicianId]
+          : [];
+    for (const tid of ids) {
+      if (tid) allTechIds.add(tid);
+    }
+  }
+
+  const techMap = new Map<string, string>();
+  if (allTechIds.size > 0) {
+    const users = await db
+      .select({ id: user.id, name: user.name })
+      .from(user)
+      .where(inArray(user.id, Array.from(allTechIds)));
+    for (const u of users) {
+      techMap.set(u.id, u.name);
+    }
+  }
+
+  return rows.map((r) => {
+    const assignedTechnicianIds =
+      Array.isArray(r.assignedTechnicianIds) &&
+      r.assignedTechnicianIds.length > 0
+        ? r.assignedTechnicianIds
+        : r.assignedTechnicianId
+          ? [r.assignedTechnicianId]
+          : [];
+
+    const technicianNames = assignedTechnicianIds
+      .map((id) => techMap.get(id))
+      .filter((n): n is string => Boolean(n));
+
+    return {
+      id: r.id,
+      seq: r.seq,
+      recordId: formatRecordId("INSTALLATION", r.seq),
+      customerName: r.customerName,
+      phone: r.phone,
+      email: r.email,
+      category: "Installation",
+      address: r.address,
+      status: r.status,
+      assignedTechnicianIds,
+      technicianNames,
+    };
+  });
+}
+
+/**
+ * Returns active projects for the Log Request form dropdown with pre-populated metadata.
+ * Excludes closed records.
+ */
+export async function listSelectableProjects(
+  viewer?: Viewer,
+): Promise<SelectableRecord[]> {
+  const scopeCondition = viewer
+    ? scopeRecordToViewer(
+        {
+          createdById: project.createdById,
+          assignedTechnicianId: project.assignedTechnicianId,
+          assignedTechnicianIds: project.assignedTechnicianIds,
+        },
+        viewer,
+      )
+    : undefined;
+
+  const notClosed = ne(project.status, "CLOSED");
+  const whereCondition = scopeCondition
+    ? and(scopeCondition, notClosed)
+    : notClosed;
+
+  const rows = await db
+    .select({
+      id: project.id,
+      seq: project.seq,
+      companyName: project.companyName,
+      customerName: project.customerName,
+      mobileNo: project.mobileNo,
+      email: project.email,
+      location: project.location,
+      status: project.status,
+      assignedTechnicianId: project.assignedTechnicianId,
+      assignedTechnicianIds: project.assignedTechnicianIds,
+    })
+    .from(project)
+    .where(whereCondition)
+    .orderBy(desc(project.createdAt));
+
+  // Collect technician names
+  const allTechIds = new Set<string>();
+  for (const r of rows) {
+    const ids =
+      Array.isArray(r.assignedTechnicianIds) &&
+      r.assignedTechnicianIds.length > 0
+        ? r.assignedTechnicianIds
+        : r.assignedTechnicianId
+          ? [r.assignedTechnicianId]
+          : [];
+    for (const tid of ids) {
+      if (tid) allTechIds.add(tid);
+    }
+  }
+
+  const techMap = new Map<string, string>();
+  if (allTechIds.size > 0) {
+    const users = await db
+      .select({ id: user.id, name: user.name })
+      .from(user)
+      .where(inArray(user.id, Array.from(allTechIds)));
+    for (const u of users) {
+      techMap.set(u.id, u.name);
+    }
+  }
+
+  return rows.map((r) => {
+    const assignedTechnicianIds =
+      Array.isArray(r.assignedTechnicianIds) &&
+      r.assignedTechnicianIds.length > 0
+        ? r.assignedTechnicianIds
+        : r.assignedTechnicianId
+          ? [r.assignedTechnicianId]
+          : [];
+
+    const technicianNames = assignedTechnicianIds
+      .map((id) => techMap.get(id))
+      .filter((n): n is string => Boolean(n));
+
+    return {
+      id: r.id,
+      seq: r.seq,
+      recordId: formatRecordId("PROJECT", r.seq),
+      customerName: r.customerName,
+      phone: r.mobileNo,
+      email: r.email,
+      category: r.companyName,
+      address: r.location,
+      status: r.status,
+      assignedTechnicianIds,
+      technicianNames,
+    };
+  });
+}
+
+

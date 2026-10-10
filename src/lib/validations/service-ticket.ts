@@ -59,8 +59,8 @@ const optionalMobileField = z.preprocess(
     .optional()
     .transform((value) => (value?.trim() ? value.trim() : null))
     .refine(
-      (value) => value === null || /^\d{10}$/.test(value),
-      "Invalid mobile number",
+      (value) => value === null || /^[0-9]{10}$/.test(value),
+      "Please enter a valid 10-digit mobile number",
     ),
 );
 

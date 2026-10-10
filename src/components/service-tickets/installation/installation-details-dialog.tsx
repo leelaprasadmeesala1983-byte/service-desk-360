@@ -1,5 +1,8 @@
 "use client";
 
+import { Eye, EyeOff } from "lucide-react";
+import { useState } from "react";
+
 import { DetailGrid, DetailRow } from "@/components/service-tickets/detail-row";
 import { RecordWorkSummary } from "@/components/service-tickets/reports/record-work-summary";
 import { StatusBadge } from "@/components/service-tickets/status-badge";
@@ -23,6 +26,11 @@ function InstallationDetailsDialog({
   onOpenChange,
   record,
 }: InstallationDetailsDialogProps) {
+  const [showPassword, setShowPassword] = useState(false);
+  const hasPassword = Boolean(
+    record?.hasAccountPassword ||
+      (record?.accountPassword && record.accountPassword.trim().length > 0),
+  );
   const technicianLabel =
     record?.technicianNames && record.technicianNames.length > 0
       ? record.technicianNames.join(", ")
@@ -81,7 +89,30 @@ function InstallationDetailsDialog({
                   {record.accountUsername ?? "—"}
                 </DetailRow>
                 <DetailRow label="Password">
-                  {record.accountPassword ?? "—"}
+                  {hasPassword ? (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-mono tracking-wider">
+                        {showPassword && record.accountPassword
+                          ? record.accountPassword
+                          : "••••••••"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="text-muted-foreground hover:text-foreground p-0.5 rounded transition-colors inline-flex items-center"
+                        title={showPassword ? "Hide password" : "Show password"}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="size-3.5" />
+                        ) : (
+                          <Eye className="size-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    "Not configured"
+                  )}
                 </DetailRow>
                 <DetailRow label="Mobile Number">
                   {record.accountMobile ?? "—"}

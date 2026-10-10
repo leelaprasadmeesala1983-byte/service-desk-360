@@ -95,7 +95,9 @@ function mapRow(
     technicianDepartment: row.technicianDepartment,
     accountUsername: record.accountUsername,
     accountPassword: record.accountPassword,
-    hasAccountPassword: Boolean(record.accountPassword),
+    hasAccountPassword: Boolean(
+      record.accountPassword && record.accountPassword.trim().length > 0,
+    ),
     accountMobile: record.accountMobile,
     referenceNo: record.referenceNo,
     paymentMode: (record.paymentMode as "ONLINE" | "CASH" | null) ?? null,

@@ -2,12 +2,18 @@
 
 import {
   Calendar,
+  Check,
   Clock,
+  CreditCard,
+  Eye,
+  EyeOff,
   History,
+  KeyRound,
   Loader2,
   Pencil,
   User,
   Users,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -24,11 +30,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import type {
   SelectableRecord,
   ServiceRequestSummary,
   WorkHistoryItem,
 } from "@/db/queries/work-history";
+import { updateInstallationDetails } from "@/lib/actions/installations";
 import { fetchWorkHistoryByRecord } from "@/lib/actions/work-history";
 import type { RecordStatus, RecordType } from "@/lib/constants";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -43,16 +52,26 @@ type WorkHistoryDialogProps = {
     recordId: string;
     customerName: string;
     phone: string;
+    email?: string | null;
     category?: string;
     address?: string;
     status: RecordStatus;
     description?: string;
     assignedTechnicianIds?: string[];
     technicianNames?: string[];
+    accountUsername?: string | null;
+    accountPassword?: string | null;
+    hasAccountPassword?: boolean;
+    accountMobile?: string | null;
+    referenceNo?: string | null;
+    paymentMode?: "ONLINE" | "CASH" | string | null;
+    paymentStatus?: "PAID" | "PENDING" | string | null;
+    amount?: string | null;
   };
   technicians?: { id: string; name: string }[];
   selectableTickets?: SelectableRecord[];
   onLogAdded?: () => void;
+  onDetailsSaved?: (savedRecord?: any) => void;
 };
 
 export function WorkHistoryDialog({
@@ -62,15 +81,29 @@ export function WorkHistoryDialog({
   record,
   technicians = [],
   onLogAdded,
+  onDetailsSaved,
 }: WorkHistoryDialogProps) {
   const [logs, setLogs] = useState<WorkHistoryItem[]>([]);
   const [parentDetails, setParentDetails] =
     useState<ServiceRequestSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showViewPassword, setShowViewPassword] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
   const [editLogEntry, setEditLogEntry] = useState<WorkHistoryItem | null>(
     null,
   );
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [savingDetails, setSavingDetails] = useState(false);
+  const [detailsForm, setDetailsForm] = useState({
+    accountUsername: "",
+    accountPassword: "",
+    accountMobile: "",
+    referenceNo: "",
+    paymentMode: "",
+    paymentStatus: "PAID",
+    amount: "",
+  });
 
   const loadLogs = useCallback(async () => {
     if (!record?.id) return;
@@ -98,6 +131,10 @@ export function WorkHistoryDialog({
 
   useEffect(() => {
     if (open && record?.id) {
+      setShowViewPassword(false);
+      setShowEditPassword(false);
+      setIsEditingDetails(false);
+      setSavingDetails(false);
       void loadLogs();
     }
   }, [open, record?.id, loadLogs]);
@@ -121,10 +158,127 @@ export function WorkHistoryDialog({
   }, [logs]);
 
   const activeRecord = parentDetails || record;
+  const hasPassword = Boolean(
+    activeRecord?.hasAccountPassword ||
+      (typeof activeRecord?.accountPassword === "string" &&
+        activeRecord.accountPassword.trim().length > 0),
+  );
+
+  const handleStartEditDetails = () => {
+    if (!activeRecord) return;
+    setDetailsForm({
+      accountUsername: activeRecord.accountUsername ?? "",
+      accountPassword: activeRecord.accountPassword ?? "",
+      accountMobile: activeRecord.accountMobile ?? "",
+      referenceNo: activeRecord.referenceNo ?? "",
+      paymentMode: activeRecord.paymentMode ?? "",
+      paymentStatus: activeRecord.paymentStatus ?? "PAID",
+      amount: activeRecord.amount ?? "",
+    });
+    setShowEditPassword(false);
+    setIsEditingDetails(true);
+  };
+
+  const handleCancelEditDetails = () => {
+    setIsEditingDetails(false);
+  };
+
+  const handleSaveDetails = async () => {
+    if (!activeRecord?.id) return;
+
+    if (
+      detailsForm.accountMobile &&
+      detailsForm.accountMobile.trim().length > 0
+    ) {
+      const mobile = detailsForm.accountMobile.trim();
+      if (!/^[0-9]{10}$/.test(mobile)) {
+        toast.error("Please enter a valid 10-digit mobile number");
+        return;
+      }
+    }
+
+    if (detailsForm.paymentMode === "CASH") {
+      if (
+        !detailsForm.amount ||
+        Number.isNaN(Number(detailsForm.amount)) ||
+        Number(detailsForm.amount) <= 0
+      ) {
+        toast.error("Please enter a valid cash amount");
+        return;
+      }
+    }
+
+    setSavingDetails(true);
+    try {
+      const payload = {
+        id: activeRecord.id,
+        accountUsername: detailsForm.accountUsername.trim() || null,
+        accountPassword: detailsForm.accountPassword.trim() || undefined,
+        accountMobile: detailsForm.accountMobile.trim() || null,
+        referenceNo: detailsForm.referenceNo.trim() || null,
+        paymentMode: detailsForm.paymentMode || null,
+        paymentStatus:
+          detailsForm.paymentMode === "ONLINE"
+            ? detailsForm.paymentStatus || "PAID"
+            : detailsForm.paymentMode === "CASH"
+              ? "PAID"
+              : null,
+        amount:
+          detailsForm.paymentMode === "CASH"
+            ? detailsForm.amount
+            : null,
+      };
+
+      let res: { ok: boolean; data?: any; error?: string };
+      try {
+        const apiRes = await fetch(
+          `/api/work-history/${activeRecord.id}/installation-details`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          },
+        );
+        const data = await apiRes.json();
+        if (apiRes.ok && data.success) {
+          res = { ok: true, data: data.data };
+        } else {
+          res = { ok: false, error: data.error || "Failed to update installation details" };
+        }
+      } catch {
+        res = await updateInstallationDetails(payload);
+      }
+
+      if (res.ok) {
+        toast.success("Installation details updated successfully");
+        setIsEditingDetails(false);
+        try {
+          await loadLogs();
+          if (res.data) {
+            onDetailsSaved?.(res.data);
+          }
+          onLogAdded?.();
+        } catch (refreshError) {
+          console.error("Error refreshing logs after save:", refreshError);
+        }
+      } else {
+        toast.error(res.error || "Failed to update installation details");
+      }
+    } catch (err) {
+      console.error("Save details error:", err);
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "An unexpected error occurred while saving details";
+      toast.error(msg);
+    } finally {
+      setSavingDetails(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] max-w-3xl max-h-[92vh] overflow-y-auto p-3.5 sm:p-6 flex flex-col gap-4">
+      <DialogContent className="w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] max-w-3xl max-h-[90vh] sm:max-h-[92vh] overflow-y-auto overflow-x-hidden p-3 sm:p-6 flex flex-col gap-3.5 sm:gap-4">
         <DialogHeader className="border-b border-border/80 pb-3">
           <div>
             <DialogTitle className="flex flex-wrap items-center gap-2 text-base sm:text-xl">
@@ -143,7 +297,7 @@ export function WorkHistoryDialog({
 
           {/* Responsive Summary Section: 3 cols (Customer, Phone, Total Logs) */}
           {activeRecord && (
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2.5 rounded-lg border border-border/80 bg-muted/30 p-2.5 text-xs">
+            <div className="mt-3 grid grid-cols-1 min-[480px]:grid-cols-3 gap-2 sm:gap-2.5 rounded-lg border border-border/80 bg-muted/30 p-2 sm:p-2.5 text-xs">
               <div className="min-w-0">
                 <span className="text-muted-foreground text-[11px] block">
                   Customer
@@ -167,6 +321,360 @@ export function WorkHistoryDialog({
                 <span className="font-bold text-primary block">
                   {logs.length} {logs.length === 1 ? "entry" : "entries"}
                 </span>
+              </div>
+            </div>
+          )}
+
+          {/* Account Details & Customer Payment Details for Installations */}
+          {workType === "INSTALLATION" && activeRecord && (
+            <div className="mt-3 space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 font-semibold text-xs text-foreground">
+                  <KeyRound className="size-3.5 text-primary shrink-0" />
+                  <span>Installation Details</span>
+                </div>
+                {isEditingDetails ? (
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={savingDetails}
+                      onClick={handleCancelEditDetails}
+                      className="h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="size-3 mr-1" />
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={savingDetails}
+                      onClick={() => void handleSaveDetails()}
+                      className="h-7 px-3 text-xs gap-1"
+                    >
+                      {savingDetails ? (
+                        <>
+                          <Loader2 className="size-3 animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="size-3" />
+                          <span>Save Changes</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleStartEditDetails}
+                    className="h-7 px-2.5 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                  >
+                    <Pencil className="size-3" />
+                    <span>Edit Details</span>
+                  </Button>
+                )}
+              </div>
+
+              <div className="space-y-3 text-xs">
+                {/* Account & Credentials Card - Full Width */}
+                <div className="rounded-lg border border-border/80 bg-card/60 p-3 sm:p-4 space-y-3">
+                  <div className="flex items-center gap-1.5 font-semibold text-foreground text-xs pb-1.5 border-b border-border/50">
+                    <KeyRound className="size-3.5 text-primary shrink-0" />
+                    <span>Account &amp; Credentials</span>
+                  </div>
+                  {isEditingDetails ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-muted-foreground text-[11px] block font-medium">
+                          Username
+                        </label>
+                        <Input
+                          value={detailsForm.accountUsername}
+                          onChange={(e) =>
+                            setDetailsForm((prev) => ({
+                              ...prev,
+                              accountUsername: e.target.value,
+                            }))
+                          }
+                          placeholder="Enter username"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-muted-foreground text-[11px] block font-medium">
+                            Password
+                          </label>
+                          {hasPassword && (
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                              Existing password is set
+                            </span>
+                          )}
+                        </div>
+                        <div className="relative">
+                          <Input
+                            type={showEditPassword ? "text" : "password"}
+                            value={detailsForm.accountPassword}
+                            onChange={(e) =>
+                              setDetailsForm((prev) => ({
+                                ...prev,
+                                accountPassword: e.target.value,
+                              }))
+                            }
+                            placeholder={hasPassword ? "Leave blank to keep existing" : "Enter password"}
+                            className="h-8 text-xs pr-8 font-mono"
+                            autoComplete="new-password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowEditPassword((prev) => !prev)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+                            title={
+                              showEditPassword ? "Hide password" : "Show password"
+                            }
+                            aria-label={
+                              showEditPassword ? "Hide password" : "Show password"
+                            }
+                          >
+                            {showEditPassword ? (
+                              <EyeOff className="size-3.5" />
+                            ) : (
+                              <Eye className="size-3.5" />
+                            )}
+                          </button>
+                        </div>
+                        {hasPassword ? (
+                          <span className="text-[10px] text-muted-foreground block">
+                            Leave blank to keep the existing password.
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground block">
+                            Enter an initial password for this account.
+                          </span>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-muted-foreground text-[11px] block font-medium">
+                          Mobile Number
+                        </label>
+                        <PhoneInput
+                          value={detailsForm.accountMobile}
+                          onChange={(e) =>
+                            setDetailsForm((prev) => ({
+                              ...prev,
+                              accountMobile: e.target.value,
+                            }))
+                          }
+                          placeholder="Enter 10-digit mobile number"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-muted-foreground text-[11px] block font-medium">
+                          S.No / Reference ID
+                        </label>
+                        <Input
+                          value={detailsForm.referenceNo}
+                          onChange={(e) =>
+                            setDetailsForm((prev) => ({
+                              ...prev,
+                              referenceNo: e.target.value,
+                            }))
+                          }
+                          placeholder="Enter reference ID"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="min-w-0">
+                        <span className="text-muted-foreground text-[11px] block">
+                          Username
+                        </span>
+                        <span className="font-medium text-foreground break-all block mt-0.5">
+                          {activeRecord.accountUsername || "—"}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-muted-foreground text-[11px] block">
+                          Password
+                        </span>
+                        {hasPassword ? (
+                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                            <span className="font-mono text-foreground tracking-wider">
+                              {showViewPassword && activeRecord.accountPassword
+                                ? activeRecord.accountPassword
+                                : "••••••••"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setShowViewPassword((prev) => !prev)}
+                              className="text-muted-foreground hover:text-foreground p-0.5 rounded transition-colors inline-flex items-center"
+                              title={
+                                showViewPassword ? "Hide password" : "Show password"
+                              }
+                              aria-label={
+                                showViewPassword ? "Hide password" : "Show password"
+                              }
+                            >
+                              {showViewPassword ? (
+                                <EyeOff className="size-3.5" />
+                              ) : (
+                                <Eye className="size-3.5" />
+                              )}
+                            </button>
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                              (Password configured)
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground block mt-0.5">
+                            Not configured
+                          </span>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-muted-foreground text-[11px] block">
+                          Mobile Number
+                        </span>
+                        <span className="font-medium text-foreground break-words block mt-0.5">
+                          {activeRecord.accountMobile || "—"}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-muted-foreground text-[11px] block">
+                          S.No / Reference ID
+                        </span>
+                        <span className="font-medium text-foreground break-words block mt-0.5">
+                          {activeRecord.referenceNo || "—"}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Customer Payment Details Card - Full Width directly below */}
+                <div className="rounded-lg border border-border/80 bg-card/60 p-3 sm:p-4 space-y-3">
+                  <div className="flex items-center gap-1.5 font-semibold text-foreground text-xs pb-1.5 border-b border-border/50">
+                    <CreditCard className="size-3.5 text-primary shrink-0" />
+                    <span>Customer Payment Details</span>
+                  </div>
+                  {isEditingDetails ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-muted-foreground text-[11px] block font-medium">
+                          Payment Mode
+                        </label>
+                        <select
+                          value={detailsForm.paymentMode}
+                          onChange={(e) =>
+                            setDetailsForm((prev) => ({
+                              ...prev,
+                              paymentMode: e.target.value,
+                            }))
+                          }
+                          className="h-8 w-full rounded-md border border-input bg-background px-2.5 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        >
+                          <option value="">None / Not Selected</option>
+                          <option value="ONLINE">Online</option>
+                          <option value="CASH">Cash</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-muted-foreground text-[11px] block font-medium">
+                          Payment Status
+                        </label>
+                        <select
+                          value={detailsForm.paymentStatus}
+                          disabled={
+                            detailsForm.paymentMode === "CASH" ||
+                            !detailsForm.paymentMode
+                          }
+                          onChange={(e) =>
+                            setDetailsForm((prev) => ({
+                              ...prev,
+                              paymentStatus: e.target.value,
+                            }))
+                          }
+                          className="h-8 w-full rounded-md border border-input bg-background px-2.5 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+                        >
+                          <option value="PAID">Paid</option>
+                          <option value="PENDING">Pending</option>
+                        </select>
+                      </div>
+                      {detailsForm.paymentMode === "CASH" && (
+                        <div className="space-y-1 col-span-1 sm:col-span-2">
+                          <label className="text-muted-foreground text-[11px] block font-medium">
+                            Cash Amount (₹)
+                          </label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={detailsForm.amount}
+                            onChange={(e) =>
+                              setDetailsForm((prev) => ({
+                                ...prev,
+                                amount: e.target.value,
+                              }))
+                            }
+                            placeholder="Enter cash amount"
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="min-w-0">
+                        <span className="text-muted-foreground text-[11px] block">
+                          Payment Mode
+                        </span>
+                        <span className="font-medium text-foreground block mt-0.5">
+                          {activeRecord.paymentMode === "ONLINE"
+                            ? "Online"
+                            : activeRecord.paymentMode === "CASH"
+                              ? "Cash"
+                              : activeRecord.paymentMode || "—"}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-muted-foreground text-[11px] block">
+                          Payment Status
+                        </span>
+                        <span className="font-medium text-foreground block mt-0.5">
+                          {activeRecord.paymentMode === "ONLINE"
+                            ? activeRecord.paymentStatus === "PAID"
+                              ? "Paid"
+                              : activeRecord.paymentStatus === "PENDING"
+                                ? "Pending"
+                                : activeRecord.paymentStatus || "—"
+                            : activeRecord.paymentMode === "CASH"
+                              ? "Paid"
+                              : "—"}
+                        </span>
+                      </div>
+                      {activeRecord.paymentMode === "CASH" && (
+                        <div className="min-w-0 col-span-1 sm:col-span-2">
+                          <span className="text-muted-foreground text-[11px] block">
+                            Cash Amount
+                          </span>
+                          <span className="font-semibold text-foreground block mt-0.5">
+                            {activeRecord.amount
+                              ? `₹${Number(activeRecord.amount).toLocaleString("en-IN")}`
+                              : "—"}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -229,7 +737,7 @@ export function WorkHistoryDialog({
                   </div>
 
                   {/* Day Entries List */}
-                  <div className="space-y-3 pl-2 sm:pl-4 border-l-2 border-primary/20 ml-2">
+                  <div className="space-y-3 pl-2.5 sm:pl-4 border-l-2 border-primary/20 ml-2">
                     {dayLogs.map((log) => {
                       const isInitial =
                         log.recordType === "INITIAL_REQUEST" || log.isInitial;
@@ -244,20 +752,20 @@ export function WorkHistoryDialog({
                         return (
                           <div
                             key={log.id}
-                            className="relative rounded-xl border border-primary/40 bg-primary/[0.03] p-3.5 shadow-xs transition-shadow hover:shadow-sm"
+                            className="relative rounded-xl border border-primary/40 bg-primary/[0.03] p-3 sm:p-3.5 shadow-xs transition-shadow hover:shadow-sm"
                           >
                             {/* Timeline node dot */}
-                            <div className="absolute -left-[19px] sm:-left-[27px] top-4 size-3 rounded-full border-2 border-background bg-primary ring-2 ring-primary/20" />
+                            <div className="absolute -left-[17px] sm:-left-[23px] top-4 size-2.5 sm:size-3 rounded-full border-2 border-background bg-primary ring-2 ring-primary/20" />
 
                             {/* Card Header */}
-                            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-2.5 border-b border-border/40">
+                            <div className="flex flex-wrap items-center justify-between gap-1.5 pb-2 mb-2 border-b border-border/40">
                               <Badge
                                 variant="default"
                                 className="text-[10px] uppercase font-bold tracking-wide bg-primary text-primary-foreground"
                               >
                                 Initial Request
                               </Badge>
-                              <span className="flex items-center gap-1 text-xs font-semibold text-foreground">
+                              <span className="flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-foreground whitespace-nowrap">
                                 <Clock className="size-3.5 text-muted-foreground" />
                                 {formatDateTime(log.workDateTime)}
                               </span>
@@ -272,7 +780,7 @@ export function WorkHistoryDialog({
                               {initialTechs.length === 0 ? (
                                 <Badge
                                   variant="outline"
-                                  className="text-[11px] font-normal text-muted-foreground"
+                                  className="text-[10px] sm:text-[11px] font-normal text-muted-foreground"
                                 >
                                   Unassigned
                                 </Badge>
@@ -281,7 +789,7 @@ export function WorkHistoryDialog({
                                   <Badge
                                     key={t.id}
                                     variant="secondary"
-                                    className="text-[11px] font-normal gap-1"
+                                    className="text-[10px] sm:text-[11px] font-normal gap-1 py-0 px-1.5"
                                   >
                                     <User className="size-2.5" />
                                     <span>{t.name}</span>
@@ -300,20 +808,20 @@ export function WorkHistoryDialog({
                         return (
                           <div
                             key={log.id}
-                            className="relative rounded-xl border border-border/80 bg-muted/40 p-3.5 shadow-xs transition-shadow hover:shadow-sm"
+                            className="relative rounded-xl border border-border/80 bg-muted/40 p-3 sm:p-3.5 shadow-xs transition-shadow hover:shadow-sm"
                           >
                             {/* Timeline node dot */}
-                            <div className="absolute -left-[19px] sm:-left-[27px] top-4 size-3 rounded-full border-2 border-background bg-slate-600 dark:bg-slate-400 ring-2 ring-slate-400/20" />
+                            <div className="absolute -left-[17px] sm:-left-[23px] top-4 size-2.5 sm:size-3 rounded-full border-2 border-background bg-slate-600 dark:bg-slate-400 ring-2 ring-slate-400/20" />
 
                             {/* Card Header */}
-                            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-2 border-b border-border/40">
+                            <div className="flex flex-wrap items-center justify-between gap-1.5 pb-2 mb-2 border-b border-border/40">
                               <Badge
                                 variant="secondary"
                                 className="text-[10px] uppercase font-bold tracking-wide bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700"
                               >
                                 Closed
                               </Badge>
-                              <span className="flex items-center gap-1 text-xs font-semibold text-foreground">
+                              <span className="flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-foreground whitespace-nowrap">
                                 <Clock className="size-3.5 text-muted-foreground" />
                                 {formatDateTime(log.workDateTime)}
                               </span>
@@ -330,21 +838,21 @@ export function WorkHistoryDialog({
                       return (
                         <div
                           key={log.id}
-                          className="relative rounded-xl border border-border bg-card p-3.5 shadow-xs transition-shadow hover:shadow-sm"
+                          className="relative rounded-xl border border-border bg-card p-3 sm:p-3.5 shadow-xs transition-shadow hover:shadow-sm"
                         >
                           {/* Timeline node dot */}
-                          <div className="absolute -left-[19px] sm:-left-[27px] top-4 size-3 rounded-full border-2 border-background bg-emerald-600" />
+                          <div className="absolute -left-[17px] sm:-left-[23px] top-4 size-2.5 sm:size-3 rounded-full border-2 border-background bg-emerald-600" />
 
                           {/* Card Header */}
-                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2 mb-2.5">
-                            <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-border/50 pb-2 mb-2">
+                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                               <Badge
                                 variant="secondary"
                                 className="text-[10px] uppercase font-bold tracking-wide bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
                               >
                                 Work Log
                               </Badge>
-                              <span className="flex items-center gap-1 text-xs font-semibold text-foreground">
+                              <span className="flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-foreground whitespace-nowrap">
                                 <Clock className="size-3.5 text-muted-foreground" />
                                 {formatDateTime(log.workDateTime)}
                               </span>
@@ -355,7 +863,7 @@ export function WorkHistoryDialog({
                               variant="ghost"
                               size="sm"
                               onClick={() => setEditLogEntry(log)}
-                              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                              className="h-6 px-1.5 sm:h-7 sm:px-2 text-[11px] sm:text-xs text-muted-foreground hover:text-foreground"
                             >
                               <Pencil className="size-3 mr-1" />
                               Edit
@@ -363,7 +871,7 @@ export function WorkHistoryDialog({
                           </div>
 
                           {/* Technicians badges */}
-                          <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                          <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 mb-2">
                             <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
                               <Users className="size-3 text-muted-foreground" />
                               Technicians:
@@ -371,7 +879,7 @@ export function WorkHistoryDialog({
                             {log.technicians.length === 0 ? (
                               <Badge
                                 variant="outline"
-                                className="text-[11px] font-normal text-muted-foreground"
+                                className="text-[10px] sm:text-[11px] font-normal text-muted-foreground"
                               >
                                 Unassigned
                               </Badge>
@@ -380,7 +888,7 @@ export function WorkHistoryDialog({
                                 <Badge
                                   key={t.id}
                                   variant="secondary"
-                                  className="text-[11px] font-normal gap-1"
+                                  className="text-[10px] sm:text-[11px] font-normal gap-1 py-0 px-1.5"
                                 >
                                   <User className="size-2.5" />
                                   <span>{t.name}</span>
@@ -397,14 +905,14 @@ export function WorkHistoryDialog({
                           )}
 
                           {/* Logged by footer */}
-                          <div className="mt-2.5 flex flex-wrap items-center justify-between gap-1 text-[10px] text-muted-foreground/80 border-t border-border/40 pt-1.5">
+                          <div className="mt-2.5 flex flex-col min-[380px]:flex-row min-[380px]:items-center justify-between gap-1 text-[10px] text-muted-foreground/80 border-t border-border/40 pt-1.5">
                             <span>
                               Logged by:{" "}
                               <strong className="font-medium text-muted-foreground">
                                 {log.createdByName ?? "System"}
                               </strong>
                             </span>
-                            <span>
+                            <span className="whitespace-nowrap">
                               Recorded: {formatDateTime(log.createdAt)}
                             </span>
                           </div>
@@ -427,12 +935,12 @@ export function WorkHistoryDialog({
           )}
         </div>
 
-        <DialogFooter className="border-t border-border/80 pt-2 sm:justify-between flex flex-col sm:flex-row gap-2">
-          <span className="text-xs text-muted-foreground self-center">
+        <DialogFooter className="border-t border-border/80 pt-2.5 flex flex-row items-center justify-between gap-2">
+          <span className="text-xs text-muted-foreground">
             Total {logs.length} timeline{" "}
             {logs.length === 1 ? "record" : "records"}
           </span>
-          <DialogClose render={<Button variant="outline" />}>Close</DialogClose>
+          <DialogClose render={<Button variant="outline" size="sm" className="h-8 px-3 text-xs" />}>Close</DialogClose>
         </DialogFooter>
       </DialogContent>
 

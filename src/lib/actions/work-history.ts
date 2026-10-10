@@ -112,6 +112,7 @@ export async function createWorkHistory(input: unknown): Promise<ActionResult> {
       .from(user)
       .where(eq(user.id, current.id))
       .limit(1);
+    if (validCreator) validCreatorId = validCreator.id;
     let workDateStr = "";
     if (typeof data.workDateTime === "string" && data.workDateTime.trim().length > 0) {
       const clean = data.workDateTime.trim();

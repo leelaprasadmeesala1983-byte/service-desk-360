@@ -141,9 +141,16 @@ export function LogRequestDialog({
     [technicians],
   );
 
-  // Directly load the existing management records
+  // Filter out CLOSED records so closed tickets, installations, and projects never appear in the dropdown
   const activeSelectableTickets = useMemo(() => {
-    return selectableTickets.filter((t) => Boolean(t && t.id));
+    return (selectableTickets ?? []).filter((t) => {
+      if (!t || !t.id) return false;
+      const norm = String(t.status || "")
+        .trim()
+        .toUpperCase()
+        .replace(/[\s_-]+/g, "");
+      return norm !== "CLOSED";
+    });
   }, [selectableTickets]);
 
   const form = useForm<CreateWorkHistoryValues>({
@@ -168,7 +175,7 @@ export function LogRequestDialog({
   const selectedTicket = useMemo(() => {
     return (
       activeSelectableTickets.find((t) => t.id === selectedTicketId) ||
-      selectableTickets.find((t) => t.id === selectedTicketId)
+      (selectableTickets ?? []).find((t) => t.id === selectedTicketId)
     );
   }, [activeSelectableTickets, selectableTickets, selectedTicketId]);
 
@@ -185,7 +192,7 @@ export function LogRequestDialog({
       const todayDate = new Date().toISOString().split("T")[0];
       const targetId = preselectedTicketId ?? "";
       const matched = targetId
-        ? selectableTickets.find((t) => t.id === targetId)
+        ? (selectableTickets ?? []).find((t) => t.id === targetId)
         : undefined;
 
       const initialTechIds = matched

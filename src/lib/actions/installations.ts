@@ -28,7 +28,7 @@ import {
   notifyAssignment,
   notifyTechnicianOfEdit,
 } from "@/lib/notifications";
-import { requireUser } from "@/lib/session";
+import { getCurrentUser, requireUser } from "@/lib/session";
 import {
   createInstallationSchema,
   deleteRecordSchema,
@@ -590,9 +590,161 @@ async function exportInstallationsExcel(params: {
   }
 }
 
+async function updateInstallationDetails(
+  input: unknown,
+): Promise<ActionResult<InstallationRow | undefined>> {
+  try {
+    const current = await getCurrentUser();
+    if (!current) return actionError("Unauthorized. Please log in.");
+
+    const id =
+      typeof input === "object" && input !== null && "id" in input
+        ? String((input as { id: unknown }).id)
+        : undefined;
+    if (!id) return actionError("Installation ID is required.");
+
+    const [existing] = await db
+      .select()
+      .from(installation)
+      .where(eq(installation.id, id))
+      .limit(1);
+    if (!existing) return actionError("That installation no longer exists.");
+
+    if (current.role === "TECHNICIAN") {
+      const isAssigned =
+        existing.assignedTechnicianIds?.includes(current.id) ||
+        existing.assignedTechnicianId === current.id ||
+        existing.createdById === current.id;
+      if (!isAssigned) {
+        return actionError("This installation is not assigned to you.");
+      }
+    }
+
+    const raw = input as Record<string, unknown>;
+    const accountUsername =
+      typeof raw.accountUsername === "string" &&
+      raw.accountUsername.trim().length > 0
+        ? raw.accountUsername.trim()
+        : null;
+    const accountPassword =
+      typeof raw.accountPassword === "string" &&
+      raw.accountPassword.trim().length > 0
+        ? raw.accountPassword.trim()
+        : undefined;
+    const accountMobile =
+      typeof raw.accountMobile === "string" &&
+      raw.accountMobile.trim().length > 0
+        ? raw.accountMobile.trim()
+        : null;
+    const referenceNo =
+      typeof raw.referenceNo === "string" && raw.referenceNo.trim().length > 0
+        ? raw.referenceNo.trim()
+        : null;
+
+    if (accountMobile) {
+      if (!/^[0-9]{10}$/.test(accountMobile)) {
+        return actionError("Please enter a valid 10-digit mobile number");
+      }
+    }
+
+    const paymentMode =
+      raw.paymentMode === "ONLINE" || raw.paymentMode === "CASH"
+        ? (raw.paymentMode as "ONLINE" | "CASH")
+        : null;
+
+    const paymentStatus =
+      paymentMode === "ONLINE"
+        ? raw.paymentStatus === "PENDING"
+          ? "PENDING"
+          : "PAID"
+        : paymentMode === "CASH"
+          ? "PAID"
+          : null;
+
+    let amount: string | null = null;
+    if (paymentMode === "CASH") {
+      const rawAmt = String(raw.amount ?? "").trim();
+      if (!rawAmt || Number.isNaN(Number(rawAmt)) || Number(rawAmt) <= 0) {
+        return actionError("Please enter a valid cash amount");
+      }
+      amount = rawAmt;
+    }
+
+    const updateValues: Record<string, unknown> = {
+      accountUsername,
+      accountMobile,
+      referenceNo,
+      paymentMode,
+      paymentStatus,
+      amount,
+      updatedAt: new Date(),
+    };
+
+    if (accountPassword) {
+      updateValues.accountPassword = accountPassword;
+    }
+
+    await db
+      .update(installation)
+      .set(updateValues)
+      .where(eq(installation.id, id));
+
+    const label = formatRecordId("INSTALLATION", existing.seq);
+    const technicianIds =
+      existing.assignedTechnicianIds?.length
+        ? existing.assignedTechnicianIds
+        : existing.assignedTechnicianId
+          ? [existing.assignedTechnicianId]
+          : [];
+
+    if (paymentMode === "CASH" && amount && Number(amount) > 0) {
+      await syncServiceRequestAmount(
+        id,
+        "INSTALLATION",
+        amount,
+        `Installation Payment - ${label} - ${existing.customerName}`,
+        existing.customerName,
+        technicianIds[0] ?? null,
+        current.id,
+        label,
+      );
+    } else {
+      await syncServiceRequestAmount(
+        id,
+        "INSTALLATION",
+        null,
+        "",
+        null,
+        null,
+        current.id,
+        label,
+      );
+    }
+
+    revalidatePath(PATH);
+    revalidatePath("/quick-cash");
+    revalidatePath("/service-tickets/technician-reports");
+    revalidatePath("/", "layout");
+
+    const updated = await getInstallation(id, {
+      role: current.role,
+      id: current.id,
+    });
+    return actionOk(updated);
+  } catch (error) {
+    console.error("updateInstallationDetails error:", error);
+    const msg =
+      error instanceof Error
+        ? error.message
+        : "Failed to update installation details";
+    return actionError(msg);
+  }
+}
+
 export {
   createInstallation,
   updateInstallation,
+  updateInstallationDetails,
   deleteInstallation,
   exportInstallationsExcel,
 };

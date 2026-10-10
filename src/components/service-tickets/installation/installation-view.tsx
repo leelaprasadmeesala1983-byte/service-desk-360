@@ -109,6 +109,14 @@ function InstallationView({
     }
   }, [recordsList, viewRecord]);
 
+  useEffect(() => {
+    if (!historyRecord) return;
+    const match = recordsList.find((row) => row.id === historyRecord.id);
+    if (match && match !== historyRecord) {
+      setHistoryRecord(match);
+    }
+  }, [recordsList, historyRecord]);
+
   const handleSaveSuccess = (savedRecord?: InstallationRow, isEdit?: boolean) => {
     if (savedRecord) {
       setRecordsList((prev) => {
@@ -120,6 +128,9 @@ function InstallationView({
         return [savedRecord, ...prev];
       });
       setViewRecord((current) =>
+        current && current.id === savedRecord.id ? savedRecord : current,
+      );
+      setHistoryRecord((current) =>
         current && current.id === savedRecord.id ? savedRecord : current,
       );
     }
@@ -438,21 +449,23 @@ function InstallationView({
         open={logRequestOpen}
         onOpenChange={setLogRequestOpen}
         workType="INSTALLATION"
-        selectableTickets={recordsList.map((r) => ({
-          id: r.id,
-          seq: r.seq,
-          recordId: r.recordId,
-          customerName: r.customerName,
-          phone: r.contactNumber,
-          email: r.email,
-          category: "Installation",
-          address: r.address,
-          status: r.status,
-          assignedTechnicianId: r.assignedTechnicianId,
-          assignedTechnicianIds: r.assignedTechnicianIds,
-          technicianName: r.technicianName,
-          technicianNames: r.technicianNames,
-        }))}
+        selectableTickets={(recordsList ?? [])
+          .filter((r) => r && r.status !== "CLOSED")
+          .map((r) => ({
+            id: r.id,
+            seq: r.seq,
+            recordId: r.recordId,
+            customerName: r.customerName,
+            phone: r.contactNumber,
+            email: r.email,
+            category: "Installation",
+            address: r.address,
+            status: r.status,
+            assignedTechnicianId: r.assignedTechnicianId,
+            assignedTechnicianIds: r.assignedTechnicianIds,
+            technicianName: r.technicianName,
+            technicianNames: r.technicianNames,
+          }))}
         technicians={technicians}
         onSuccess={() => router.refresh()}
       />
@@ -469,16 +482,27 @@ function InstallationView({
                 recordId: historyRecord.recordId,
                 customerName: historyRecord.customerName,
                 phone: historyRecord.contactNumber,
+                email: historyRecord.email,
                 category: "Installation",
                 address: historyRecord.address,
+                description: historyRecord.description,
                 status: historyRecord.status,
                 assignedTechnicianIds: historyRecord.assignedTechnicianIds,
                 technicianNames: historyRecord.technicianNames,
+                accountUsername: historyRecord.accountUsername,
+                accountPassword: historyRecord.accountPassword,
+                hasAccountPassword: historyRecord.hasAccountPassword,
+                accountMobile: historyRecord.accountMobile,
+                referenceNo: historyRecord.referenceNo,
+                paymentMode: historyRecord.paymentMode,
+                paymentStatus: historyRecord.paymentStatus,
+                amount: historyRecord.amount,
               }
             : undefined
         }
         technicians={technicians}
         onLogAdded={() => router.refresh()}
+        onDetailsSaved={(saved) => handleSaveSuccess(saved, true)}
       />
     </div>
   );

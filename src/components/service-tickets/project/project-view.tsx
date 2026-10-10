@@ -427,21 +427,23 @@ function ProjectView({
         open={logRequestOpen}
         onOpenChange={setLogRequestOpen}
         workType="PROJECT"
-        selectableTickets={recordsList.map((r) => ({
-          id: r.id,
-          seq: r.seq,
-          recordId: r.recordId,
-          customerName: r.customerName,
-          phone: r.mobileNo,
-          email: r.email,
-          category: r.companyName,
-          address: r.location,
-          status: r.status,
-          assignedTechnicianId: r.assignedTechnicianId,
-          assignedTechnicianIds: r.assignedTechnicianIds,
-          technicianName: r.technicianName,
-          technicianNames: r.technicianNames,
-        }))}
+        selectableTickets={(recordsList ?? [])
+          .filter((r) => r && r.status !== "CLOSED")
+          .map((r) => ({
+            id: r.id,
+            seq: r.seq,
+            recordId: r.recordId,
+            customerName: r.customerName,
+            phone: r.mobileNo,
+            email: r.email,
+            category: r.companyName,
+            address: r.location,
+            status: r.status,
+            assignedTechnicianId: r.assignedTechnicianId,
+            assignedTechnicianIds: r.assignedTechnicianIds,
+            technicianName: r.technicianName,
+            technicianNames: r.technicianNames,
+          }))}
         technicians={technicians}
         onSuccess={() => router.refresh()}
       />

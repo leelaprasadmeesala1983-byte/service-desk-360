@@ -45,17 +45,19 @@ export const isItemAvailable = (item: {
   itemStatus?: string | null;
   dispatchId?: string | null;
 }) => {
-  const s = (item.itemStatus || "").toLowerCase();
-  const isDispatched =
-    Boolean(item.dispatchId) ||
-    s === "dispatched_to_vendor" ||
-    s === "sent to vendor" ||
-    s === "under repair" ||
-    s === "under_repair" ||
-    s === "vendor_received" ||
-    s === "repair_completed";
+  if (item.dispatchId && String(item.dispatchId).trim().length > 0) {
+    return false;
+  }
+  const raw = String(item.itemStatus || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
 
-  return !isDispatched;
+  if (!raw || raw === "received" || raw === "available") {
+    return true;
+  }
+
+  return false;
 };
 
 export function ReceivedMaterialTable({

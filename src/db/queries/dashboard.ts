@@ -381,8 +381,9 @@ async function getDashboardData(viewer: Viewer): Promise<DashboardData> {
         technicianNames: row.technicianName ? [row.technicianName] : [],
         technicianDepartment: row.technicianDepartment,
         accountUsername: ins.accountUsername,
-        accountPassword: ins.accountPassword,
-        hasAccountPassword: Boolean(ins.accountPassword),
+        hasAccountPassword: Boolean(
+          ins.accountPassword && ins.accountPassword.trim().length > 0,
+        ),
         accountMobile: ins.accountMobile,
         referenceNo: ins.referenceNo,
         paymentMode: (ins.paymentMode as "ONLINE" | "CASH" | null) ?? null,

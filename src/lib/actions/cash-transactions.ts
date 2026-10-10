@@ -10,6 +10,7 @@ import {
   findSyncedTransaction,
   getDailyRegister,
   listAllFilteredCashTransactions,
+  recalculateDailyCashRegister,
 } from "@/db/queries/cash-transactions";
 import { setOpeningBalance as setOpeningBalanceQuery } from "@/db/queries/quick-cash-settings";
 import { cashTransaction } from "@/db/schema/cash-transaction";
@@ -315,6 +316,8 @@ async function addCashTransaction(input: unknown): Promise<ActionResult> {
 
     if (!result) return actionError("Failed to create transaction.");
 
+    await recalculateDailyCashRegister(dateStr, current.id);
+
     revalidatePath(PATH);
     revalidatePath("/");
     return actionOk();
@@ -447,6 +450,11 @@ async function updateCashTransaction(input: unknown): Promise<ActionResult> {
       }
     }
 
+    await recalculateDailyCashRegister(data.date, current.id);
+    if (existingDateStr !== data.date) {
+      await recalculateDailyCashRegister(existingDateStr, current.id);
+    }
+
     revalidatePath(PATH);
     revalidatePath("/");
     return actionOk();
@@ -485,6 +493,8 @@ async function deleteCashTransaction(id: string): Promise<ActionResult> {
     }
 
     await db.delete(cashTransaction).where(eq(cashTransaction.id, id));
+    await recalculateDailyCashRegister(dateStr, current.id);
+
     revalidatePath(PATH);
     revalidatePath("/");
     return actionOk();
@@ -559,6 +569,7 @@ async function setOpeningBalance(input: {
       });
 
     await setOpeningBalanceQuery(amountStr, current.id);
+    await recalculateDailyCashRegister(targetDate, current.id);
 
     revalidatePath(PATH);
     revalidatePath("/");
@@ -584,6 +595,10 @@ async function syncServiceRequestAmount(
 ): Promise<void> {
   try {
     if (!amount || Number(amount) === 0) {
+      const existing = await findSyncedTransaction(
+        sourceRecordId,
+        sourceRecordType,
+      );
       await db
         .delete(cashTransaction)
         .where(
@@ -592,6 +607,9 @@ async function syncServiceRequestAmount(
             eq(cashTransaction.sourceRecordType, sourceRecordType),
           ),
         );
+      if (existing && createdById) {
+        await recalculateDailyCashRegister(formatLocalDate(new Date()), createdById);
+      }
       return;
     }
 
@@ -630,6 +648,10 @@ async function syncServiceRequestAmount(
         createdById,
         isAdminEntry: false,
       });
+    }
+
+    if (createdById) {
+      await recalculateDailyCashRegister(formatLocalDate(new Date()), createdById);
     }
   } catch (error) {
     console.error("syncServiceRequestAmount error:", error);
