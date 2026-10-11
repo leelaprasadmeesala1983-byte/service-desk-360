@@ -89,8 +89,6 @@ async function createUser(input: unknown): Promise<ActionResult> {
     notifyUserCreation(
       data.phone,
       fullName(data.firstName, data.lastName),
-      email,
-      data.password,
       process.env.APP_URL ?? "",
     ),
   );

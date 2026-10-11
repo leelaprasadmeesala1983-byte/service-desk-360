@@ -1,26 +1,30 @@
 /**
- * WhatsApp notifications via Twilio.
+ * WhatsApp notifications via the Meta WhatsApp Business Cloud API.
  *
  * Required in .env:
- *   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
- *   TWILIO_WHATSAPP_FROM            e.g. whatsapp:+14155238886 (sandbox)
+ *   WHATSAPP_ACCESS_TOKEN             permanent System User token
+ *   WHATSAPP_PHONE_NUMBER_ID          from WhatsApp Manager > Phone numbers
  *
- * Optional approved Content Template SIDs (HX...). When one is unset, the
- * message is sent as free-form text, which works in the Twilio sandbox and
- * inside WhatsApp's 24-hour reply window.
+ * Optional:
+ *   WHATSAPP_ENABLED                  set to "false" to turn notifications off
+ *   WHATSAPP_API_VERSION              Graph API version, default v21.0
+ *   WHATSAPP_TEMPLATE_LANGUAGE        template language code, default en
+ *   WHATSAPP_SUPPORT_PHONE            support number shown in messages
  *
- *   TWILIO_TEMPLATE_USER_CREDENTIALS         {{1}} name, {{2}} login link, {{3}} username (email), {{4}} temporary password, {{5}} support phone
+ * Approved template NAMES (WhatsApp Manager > Message templates). When one is
+ * unset, the message is sent as free-form text, which WhatsApp only delivers
+ * inside the 24-hour reply window. Variable order must match the template.
  *
- *   TWILIO_TEMPLATE_SERVICE_CREATED          {{1}} customer, {{2}} ticket id
- *   TWILIO_TEMPLATE_INSTALLATION_CREATED     {{1}} customer, {{2}} ticket id
- *   TWILIO_TEMPLATE_PROJECT_CREATED          {{1}} customer, {{2}} ticket id
+ *   WHATSAPP_TEMPLATE_USER_CREDENTIALS         {{1}} name, {{2}} login link, {{3}} support phone
  *
- *   TWILIO_TEMPLATE_SERVICE_TECHNICIAN       {{1}} technician, {{2}} ticket id, {{3}} customer, {{4}} phone, {{5}} address, {{6}} issue, {{7}} link
- *   TWILIO_TEMPLATE_SERVICE_CUSTOMER         {{1}} customer, {{2}} technician(s), {{3}} ticket id
- *   TWILIO_TEMPLATE_INSTALLATION_TECHNICIAN  {{1}} technician, {{2}} ticket id, {{3}} customer, {{4}} contact, {{5}} address, {{6}} details, {{7}} link
- *   TWILIO_TEMPLATE_INSTALLATION_CUSTOMER    {{1}} customer, {{2}} ticket id, {{3}} technician(s), {{4}} address
- *   TWILIO_TEMPLATE_PROJECT_TECHNICIAN       {{1}} technician, {{2}} ticket id, {{3}} company, {{4}} customer, {{5}} mobile, {{6}} location, {{7}} link
- *   TWILIO_TEMPLATE_PROJECT_CUSTOMER         {{1}} customer, {{2}} ticket id, {{3}} company, {{4}} technician(s)
+ *   WHATSAPP_TEMPLATE_TICKET_CREATED           {{1}} customer, {{2}} ticket name (Service Ticket / Installation Ticket / Project Ticket), {{3}} ticket id, {{4}} support phone
+ *
+ *   WHATSAPP_TEMPLATE_SERVICE_TECHNICIAN       {{1}} technician, {{2}} ticket id, {{3}} customer, {{4}} phone, {{5}} address, {{6}} issue, {{7}} link
+ *   WHATSAPP_TEMPLATE_SERVICE_CUSTOMER         {{1}} customer, {{2}} ticket id, {{3}} technician(s), {{4}} support phone
+ *   WHATSAPP_TEMPLATE_INSTALLATION_TECHNICIAN  {{1}} technician, {{2}} ticket id, {{3}} customer, {{4}} contact, {{5}} address, {{6}} details, {{7}} link
+ *   WHATSAPP_TEMPLATE_INSTALLATION_CUSTOMER    {{1}} customer, {{2}} ticket id, {{3}} technician(s), {{4}} address
+ *   WHATSAPP_TEMPLATE_PROJECT_TECHNICIAN       {{1}} technician, {{2}} ticket id, {{3}} company, {{4}} customer, {{5}} mobile, {{6}} location, {{7}} link
+ *   WHATSAPP_TEMPLATE_PROJECT_CUSTOMER         {{1}} customer, {{2}} ticket id, {{3}} company, {{4}} technician(s)
  */
 
 type TicketType = "SERVICE" | "INSTALLATION" | "PROJECT";
@@ -31,19 +35,26 @@ const TICKET_PATHS: Record<TicketType, string> = {
   PROJECT: "/service-tickets/project-management",
 };
 
+/** Shown in the "ticket created" message, per management tab. */
+const TICKET_NAMES: Record<TicketType, string> = {
+  SERVICE: "Service Ticket",
+  INSTALLATION: "Installation Ticket",
+  PROJECT: "Project Ticket",
+};
+
 const TICKET_LABELS: Record<TicketType, string> = {
   SERVICE: "service request",
   INSTALLATION: "installation",
   PROJECT: "project",
 };
 
-function templateSid(name: string): string | undefined {
-  return process.env[`TWILIO_TEMPLATE_${name}`] || undefined;
+function templateName(name: string): string | undefined {
+  return process.env[`WHATSAPP_TEMPLATE_${name}`] || undefined;
 }
 
-/** Support number shown in messages: the WhatsApp sender number. */
+/** Support number shown in messages. */
 function supportPhone(): string {
-  return (process.env.TWILIO_WHATSAPP_FROM ?? "").replace(/^whatsapp:/, "");
+  return process.env.WHATSAPP_SUPPORT_PHONE ?? "";
 }
 
 /** WhatsApp rejects empty template variables and newlines. */
@@ -54,29 +65,29 @@ function clean(value: string | null | undefined): string {
 type SendResult = { success: boolean; messageId?: string; error?: string };
 
 /**
- * Send a WhatsApp message through the Twilio Messages API.
- * Uses the content template when `contentSid` is given, else the plain body.
+ * Send a WhatsApp message through the Meta Cloud API.
+ * Uses the approved template when `template` is given, else plain text.
  */
 async function sendWhatsAppMessage(
   phoneNumber: string,
   body: string,
-  contentSid?: string,
+  template?: string,
   variables?: string[],
 ): Promise<SendResult> {
   try {
-    const accountSid = process.env.TWILIO_ACCOUNT_SID;
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
-    const from = process.env.TWILIO_WHATSAPP_FROM;
+    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    const apiVersion = process.env.WHATSAPP_API_VERSION || "v21.0";
 
-    if (process.env.TWILIO_WHATSAPP_ENABLED === "false") {
+    if (process.env.WHATSAPP_ENABLED === "false") {
       return { success: false, error: "WhatsApp notifications are disabled" };
     }
 
-    if (!accountSid || !authToken || !from) {
+    if (!accessToken || !phoneNumberId) {
       return {
         success: false,
         error:
-          "Twilio not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_WHATSAPP_FROM in .env",
+          "WhatsApp not configured. Set WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID in .env",
       };
     }
 
@@ -84,45 +95,59 @@ async function sendWhatsAppMessage(
     let digits = phoneNumber.replace(/\D/g, "");
     if (digits.length === 10) digits = `91${digits}`;
 
-    const params = new URLSearchParams({
-      To: `whatsapp:+${digits}`,
-      From: from.startsWith("whatsapp:") ? from : `whatsapp:${from}`,
-    });
-
-    if (contentSid && variables) {
-      params.set("ContentSid", contentSid);
-      params.set(
-        "ContentVariables",
-        JSON.stringify(
-          Object.fromEntries(variables.map((v, i) => [String(i + 1), v])),
-        ),
-      );
-    } else {
-      params.set("Body", body);
-    }
+    const payload =
+      template && variables
+        ? {
+            messaging_product: "whatsapp",
+            to: digits,
+            type: "template",
+            template: {
+              name: template,
+              language: {
+                code: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en",
+              },
+              components: [
+                {
+                  type: "body",
+                  parameters: variables.map((text) => ({ type: "text", text })),
+                },
+              ],
+            },
+          }
+        : {
+            messaging_product: "whatsapp",
+            to: digits,
+            type: "text",
+            text: { body },
+          };
 
     const response = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+      `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`,
       {
         method: "POST",
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
         },
-        body: params,
+        body: JSON.stringify(payload),
       },
     );
 
-    const data = (await response.json()) as { sid?: string; message?: string };
+    const data = (await response.json()) as {
+      messages?: { id: string }[];
+      error?: { message?: string; code?: number };
+    };
 
     if (!response.ok) {
       return {
         success: false,
-        error: data.message || "Failed to send WhatsApp message",
+        error: data.error
+          ? `${data.error.message ?? "Failed to send WhatsApp message"} (code ${data.error.code})`
+          : "Failed to send WhatsApp message",
       };
     }
 
-    return { success: true, messageId: data.sid };
+    return { success: true, messageId: data.messages?.[0]?.id };
   } catch (error) {
     console.error("WhatsApp service error:", error);
     return {
@@ -143,9 +168,14 @@ async function notifyTicketCreated(
 ): Promise<SendResult> {
   return sendWhatsAppMessage(
     phoneNumber,
-    `Hello ${customerName}, your ${TICKET_LABELS[ticketType]} ${ticketId} has been created. Soon the technician will reach out to you.`,
-    templateSid(`${ticketType}_CREATED`),
-    [clean(customerName), clean(ticketId)],
+    `Hello ${customerName}, your ${TICKET_NAMES[ticketType]} of ${ticketId} has been created. Soon the technician will reach out to you.`,
+    templateName("TICKET_CREATED"),
+    [
+      clean(customerName),
+      TICKET_NAMES[ticketType],
+      clean(ticketId),
+      clean(supportPhone()),
+    ],
   );
 }
 
@@ -192,7 +222,7 @@ async function notifyTicketAssigned(params: AssignedParams): Promise<void> {
     : "-";
 
   const ownerVars: Record<TicketType, string[]> = {
-    SERVICE: [owner.name, technicianNames, ticketId],
+    SERVICE: [owner.name, ticketId, technicianNames, supportPhone()],
     INSTALLATION: [owner.name, ticketId, technicianNames, address],
     PROJECT: [owner.name, ticketId, company ?? "", technicianNames],
   };
@@ -202,7 +232,7 @@ async function notifyTicketAssigned(params: AssignedParams): Promise<void> {
     sendWhatsAppMessage(
       owner.phone as string,
       ownerBody,
-      templateSid(`${ticketType}_CUSTOMER`),
+      templateName(`${ticketType}_CUSTOMER`),
       ownerVars[ticketType].map(clean),
     ),
   );
@@ -243,7 +273,7 @@ async function notifyTicketAssigned(params: AssignedParams): Promise<void> {
       sendWhatsAppMessage(
         tech.phone as string,
         techBody,
-        templateSid(`${ticketType}_TECHNICIAN`),
+        templateName(`${ticketType}_TECHNICIAN`),
         techVars[ticketType].map(clean),
       ),
     );
@@ -251,22 +281,21 @@ async function notifyTicketAssigned(params: AssignedParams): Promise<void> {
 }
 
 /**
- * Send user creation notification with credentials
+ * Send user creation notification. The password is never sent over WhatsApp:
+ * the user opens the login link and sets one with "Forgot password".
  */
 async function notifyUserCreation(
   phoneNumber: string,
   userName: string,
-  email: string,
-  password: string,
   appUrl: string,
 ): Promise<SendResult> {
-  const message = `Welcome ${userName}! Your Service Desk account has been created. Email: ${email} Password: ${password} Login: ${appUrl} Please change your password on first login.`;
+  const message = `Hello ${userName}, welcome to Service Desk 360. Your access has been set up. Please complete your registration using this link: ${appUrl}. If you need any help, contact us at ${supportPhone()}. Thank you.`;
 
   return sendWhatsAppMessage(
     phoneNumber,
     message,
-    templateSid("USER_CREDENTIALS"),
-    [userName, appUrl, email, password, supportPhone()].map(clean),
+    templateName("USER_CREDENTIALS"),
+    [userName, appUrl, supportPhone()].map(clean),
   );
 }
 
