@@ -57,6 +57,16 @@ function supportPhone(): string {
   return process.env.WHATSAPP_SUPPORT_PHONE ?? "";
 }
 
+/**
+ * App base URL with a scheme and no trailing slash. WhatsApp only makes a URL
+ * tappable when it starts with http:// or https://.
+ */
+function appBaseUrl(raw: string | undefined): string {
+  const url = (raw ?? "").trim().replace(/\/+$/, "");
+  if (!url) return "";
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
+
 /** WhatsApp rejects empty template variables and newlines. */
 function clean(value: string | null | undefined): string {
   return (value ?? "").replace(/\s+/g, " ").trim() || "-";
@@ -217,9 +227,8 @@ type AssignedParams = {
 async function notifyTicketAssigned(params: AssignedParams): Promise<void> {
   const { ticketType, ticketId, owner, address, details, company } = params;
   const technicianNames = params.technicians.map((t) => t.name).join(", ");
-  const link = process.env.APP_URL
-    ? `${process.env.APP_URL.replace(/\/$/, "")}${TICKET_PATHS[ticketType]}`
-    : "-";
+  const baseUrl = appBaseUrl(process.env.APP_URL);
+  const link = baseUrl ? `${baseUrl}${TICKET_PATHS[ticketType]}` : "-";
 
   const ownerVars: Record<TicketType, string[]> = {
     SERVICE: [owner.name, ticketId, technicianNames, supportPhone()],
@@ -289,13 +298,14 @@ async function notifyUserCreation(
   userName: string,
   appUrl: string,
 ): Promise<SendResult> {
-  const message = `Hello ${userName}, welcome to Service Desk 360. Your access has been set up. Please complete your registration using this link: ${appUrl}. If you need any help, contact us at ${supportPhone()}. Thank you.`;
+  const loginUrl = appBaseUrl(appUrl);
+  const message = `Hello ${userName}, welcome to Service Desk 360. Your access has been set up. Please complete your registration using this link: ${loginUrl}. If you need any help, contact us at ${supportPhone()}. Thank you.`;
 
   return sendWhatsAppMessage(
     phoneNumber,
     message,
     templateName("USER_CREDENTIALS"),
-    [userName, appUrl, supportPhone()].map(clean),
+    [userName, loginUrl, supportPhone()].map(clean),
   );
 }
 
