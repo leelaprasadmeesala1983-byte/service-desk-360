@@ -1,5 +1,7 @@
 "use server";
 
+import { unstable_rethrow } from "next/navigation";
+
 import {
   type Customer360Data,
   type CustomerReportFilterParams,
@@ -20,18 +22,19 @@ import { type ActionResult, actionError, actionOk } from "./result";
 export async function fetchCustomerReports(
   params: CustomerReportFilterParams = {},
 ): Promise<ActionResult<CustomerReportResult>> {
-  try {
-    const current = await requireUser();
-    if (current.role !== "ADMIN") {
-      return actionError("Admins only.");
-    }
+  const current = await requireUser();
+  if (current.role !== "ADMIN") {
+    return actionError("Admins only.");
+  }
 
+  try {
     const data = await getCustomerReports(params, {
       role: current.role,
       id: current.id,
     });
     return actionOk(data);
   } catch (error) {
+    unstable_rethrow(error);
     console.error("fetchCustomerReports error:", error);
     return actionError("Failed to fetch customer reports.");
   }
@@ -43,12 +46,12 @@ export async function fetchCustomerReports(
 export async function fetchCustomer360(
   customerKey: string,
 ): Promise<ActionResult<Customer360Data>> {
-  try {
-    const current = await requireUser();
-    if (current.role !== "ADMIN") {
-      return actionError("Admins only.");
-    }
+  const current = await requireUser();
+  if (current.role !== "ADMIN") {
+    return actionError("Admins only.");
+  }
 
+  try {
     const data = await getCustomer360Details(customerKey, {
       role: current.role,
       id: current.id,
@@ -59,6 +62,7 @@ export async function fetchCustomer360(
 
     return actionOk(data);
   } catch (error) {
+    unstable_rethrow(error);
     console.error("fetchCustomer360 error:", error);
     return actionError("Failed to fetch customer 360 data.");
   }
@@ -70,12 +74,12 @@ export async function fetchCustomer360(
 export async function exportCustomerReportsExcel(
   params: CustomerReportFilterParams = {},
 ): Promise<ActionResult<{ data: string; filename: string }>> {
-  try {
-    const current = await requireUser();
-    if (current.role !== "ADMIN") {
-      return actionError("Admins only.");
-    }
+  const current = await requireUser();
+  if (current.role !== "ADMIN") {
+    return actionError("Admins only.");
+  }
 
+  try {
     const customers = await getAllFilteredCustomersForExport(params, {
       role: current.role,
       id: current.id,
@@ -118,6 +122,7 @@ export async function exportCustomerReportsExcel(
 
     return actionOk({ data, filename });
   } catch (error) {
+    unstable_rethrow(error);
     console.error("exportCustomerReportsExcel error:", error);
     return actionError("Failed to export customer reports to Excel.");
   }

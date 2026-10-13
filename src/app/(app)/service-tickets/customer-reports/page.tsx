@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 
 import { CustomerReportsView } from "@/components/service-tickets/customer-reports/customer-reports-view";
 import { getCustomerReports } from "@/db/queries/customer-reports";
