@@ -42,6 +42,7 @@ import {
 import {
   notifyTicketAssigned,
   notifyTicketCreated,
+  notifyTicketStatusChanged,
   sendWhatsAppSafely,
 } from "@/lib/whatsapp-service";
 
@@ -243,6 +244,15 @@ async function updateServiceRequest(
       label,
     );
 
+    await notifyTicketStatusChanged({
+      ticketType: "SERVICE",
+      previousStatus: existing.status,
+      newStatus: data.status,
+      phone: data.phone,
+      customerName: data.customerName,
+      ticketId: label,
+    });
+
     const prevIds = new Set(existing.assignedTechnicianIds || []);
     const newTechs = technicianIds.filter((id) => !prevIds.has(id));
     if (newTechs.length > 0) {
@@ -399,6 +409,15 @@ async function updateServiceRequest(
     console.error("Failed to sync amount to Quick Cash:", error);
     // Don't fail the service request update, but log the error
   }
+
+  await notifyTicketStatusChanged({
+    ticketType: "SERVICE",
+    previousStatus: existing.status,
+    newStatus: data.status,
+    phone: existing.phone,
+    customerName: existing.customerName,
+    ticketId: label,
+  });
 
   const changes = diffRecord(existing, data, [
     {

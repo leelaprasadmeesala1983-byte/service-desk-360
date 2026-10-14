@@ -38,6 +38,7 @@ import {
 import {
   notifyTicketAssigned,
   notifyTicketCreated,
+  notifyTicketStatusChanged,
   sendWhatsAppSafely,
 } from "@/lib/whatsapp-service";
 
@@ -266,6 +267,15 @@ async function updateInstallation(
         ),
       );
 
+    await notifyTicketStatusChanged({
+      ticketType: "INSTALLATION",
+      previousStatus: existing.status,
+      newStatus: data.status,
+      phone: data.contactNumber,
+      customerName: data.customerName,
+      ticketId: label,
+    });
+
     const prevIds = new Set(
       existing.assignedTechnicianIds?.length
         ? existing.assignedTechnicianIds
@@ -465,6 +475,15 @@ async function updateInstallation(
     workType: "INSTALLATION",
     referenceId: data.id,
     createdById: current.id,
+  });
+
+  await notifyTicketStatusChanged({
+    ticketType: "INSTALLATION",
+    previousStatus: existing.status,
+    newStatus: data.status,
+    phone: existing.contactNumber,
+    customerName: existing.customerName,
+    ticketId: label,
   });
 
   const next: Record<string, unknown> = {

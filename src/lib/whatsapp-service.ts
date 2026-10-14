@@ -17,35 +17,34 @@
  *
  *   WHATSAPP_TEMPLATE_USER_CREDENTIALS         {{1}} name, {{2}} login link, {{3}} support phone
  *
- *   WHATSAPP_TEMPLATE_TICKET_CREATED           {{1}} customer, {{2}} ticket name (Service Ticket / Installation Ticket / Project Ticket), {{3}} ticket id, {{4}} support phone
+ *   WHATSAPP_TEMPLATE_TICKET_CREATED           {{1}} customer, {{2}} ticket name (Service Ticket / Installation Ticket), {{3}} ticket id, {{4}} support phone
+ *   WHATSAPP_TEMPLATE_STATUS_IN_PROGRESS       {{1}} customer, {{2}} ticket name, {{3}} ticket id, {{4}} support phone
+ *   WHATSAPP_TEMPLATE_STATUS_CLOSED            {{1}} customer, {{2}} ticket name, {{3}} ticket id, {{4}} support phone
  *
  *   WHATSAPP_TEMPLATE_SERVICE_TECHNICIAN       {{1}} technician, {{2}} ticket id, {{3}} customer, {{4}} phone, {{5}} address, {{6}} issue, {{7}} link
  *   WHATSAPP_TEMPLATE_SERVICE_CUSTOMER         {{1}} customer, {{2}} ticket id, {{3}} technician(s), {{4}} support phone
  *   WHATSAPP_TEMPLATE_INSTALLATION_TECHNICIAN  {{1}} technician, {{2}} ticket id, {{3}} customer, {{4}} contact, {{5}} address, {{6}} details, {{7}} link
  *   WHATSAPP_TEMPLATE_INSTALLATION_CUSTOMER    {{1}} customer, {{2}} ticket id, {{3}} technician(s), {{4}} address
- *   WHATSAPP_TEMPLATE_PROJECT_TECHNICIAN       {{1}} technician, {{2}} ticket id, {{3}} company, {{4}} customer, {{5}} mobile, {{6}} location, {{7}} link
- *   WHATSAPP_TEMPLATE_PROJECT_CUSTOMER         {{1}} customer, {{2}} ticket id, {{3}} company, {{4}} technician(s)
+ *
+ * Project management sends no WhatsApp messages.
  */
 
-type TicketType = "SERVICE" | "INSTALLATION" | "PROJECT";
+type TicketType = "SERVICE" | "INSTALLATION";
 
 const TICKET_PATHS: Record<TicketType, string> = {
   SERVICE: "/service-tickets/service-management",
   INSTALLATION: "/service-tickets/installation-management",
-  PROJECT: "/service-tickets/project-management",
 };
 
 /** Shown in the "ticket created" message, per management tab. */
 const TICKET_NAMES: Record<TicketType, string> = {
   SERVICE: "Service Ticket",
   INSTALLATION: "Installation Ticket",
-  PROJECT: "Project Ticket",
 };
 
 const TICKET_LABELS: Record<TicketType, string> = {
   SERVICE: "service request",
   INSTALLATION: "installation",
-  PROJECT: "project",
 };
 
 function templateName(name: string): string | undefined {
@@ -207,16 +206,52 @@ async function sendWhatsAppSafely(
   }
 }
 
+/**
+ * Tell the customer their ticket moved to In Progress or Closed. Other
+ * statuses, and unchanged statuses, send nothing.
+ */
+async function notifyTicketStatusChanged(params: {
+  ticketType: TicketType;
+  previousStatus: string | null | undefined;
+  newStatus: string;
+  phone: string | null | undefined;
+  customerName: string;
+  ticketId: string;
+}): Promise<void> {
+  const { ticketType, previousStatus, newStatus, phone, customerName } = params;
+  if (previousStatus === newStatus) return;
+
+  const template =
+    newStatus === "IN_PROGRESS"
+      ? "STATUS_IN_PROGRESS"
+      : newStatus === "CLOSED"
+        ? "STATUS_CLOSED"
+        : null;
+  if (!template) return;
+
+  const message =
+    newStatus === "CLOSED"
+      ? `Hello ${customerName}, your ${TICKET_NAMES[ticketType]} of ${params.ticketId} has been closed. Thank you for choosing us.`
+      : `Hello ${customerName}, your ${TICKET_NAMES[ticketType]} of ${params.ticketId} is now in progress. Our technician is working on it.`;
+
+  await sendWhatsAppSafely(phone, () =>
+    sendWhatsAppMessage(phone as string, message, templateName(template), [
+      clean(customerName),
+      TICKET_NAMES[ticketType],
+      clean(params.ticketId),
+      clean(supportPhone()),
+    ]),
+  );
+}
+
 type AssignedParams = {
   ticketType: TicketType;
   ticketId: string;
   owner: { name: string; phone: string | null | undefined };
-  /** Service/installation address, or the project location. */
+  /** Service/installation address. */
   address: string;
-  /** Service issue title, installation details or project description. */
+  /** Service issue title or installation details. */
   details: string;
-  /** Project only. */
-  company?: string;
   technicians: { name: string; phone: string | null }[];
 };
 
@@ -225,7 +260,7 @@ type AssignedParams = {
  * per-tab templates.
  */
 async function notifyTicketAssigned(params: AssignedParams): Promise<void> {
-  const { ticketType, ticketId, owner, address, details, company } = params;
+  const { ticketType, ticketId, owner, address, details } = params;
   const technicianNames = params.technicians.map((t) => t.name).join(", ");
   const baseUrl = appBaseUrl(process.env.APP_URL);
   const link = baseUrl ? `${baseUrl}${TICKET_PATHS[ticketType]}` : "-";
@@ -233,7 +268,6 @@ async function notifyTicketAssigned(params: AssignedParams): Promise<void> {
   const ownerVars: Record<TicketType, string[]> = {
     SERVICE: [owner.name, ticketId, technicianNames, supportPhone()],
     INSTALLATION: [owner.name, ticketId, technicianNames, address],
-    PROJECT: [owner.name, ticketId, company ?? "", technicianNames],
   };
   const ownerBody = `Hello ${owner.name}, technician ${technicianNames} has been assigned to your ticket ${ticketId} and will reach out to you soon.`;
 
@@ -264,15 +298,6 @@ async function notifyTicketAssigned(params: AssignedParams): Promise<void> {
         owner.phone ?? "",
         address,
         details,
-        link,
-      ],
-      PROJECT: [
-        tech.name,
-        ticketId,
-        company ?? "",
-        owner.name,
-        owner.phone ?? "",
-        address,
         link,
       ],
     };
@@ -324,6 +349,7 @@ export {
   sendWhatsAppSafely,
   notifyTicketAssigned,
   notifyTicketCreated,
+  notifyTicketStatusChanged,
   notifyUserCreation,
   sendNotification,
 };

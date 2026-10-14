@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { ZodError } from "zod";
 
@@ -14,7 +14,6 @@ import {
   logMultipleTechniciansWorkDates,
   logTechnicianWorkDate,
 } from "@/db/queries/technician-reports";
-import { user } from "@/db/schema/auth";
 import { project } from "@/db/schema/project";
 import { workHistory } from "@/db/schema/work-history";
 import { recordStatusChangeEvent } from "@/lib/actions/work-history";
@@ -34,11 +33,6 @@ import {
   editProjectSchema,
   technicianProjectSchema,
 } from "@/lib/validations/service-ticket";
-import {
-  notifyTicketAssigned,
-  notifyTicketCreated,
-  sendWhatsAppSafely,
-} from "@/lib/whatsapp-service";
 
 import { type ActionResult, actionError, actionOk } from "./result";
 
@@ -124,26 +118,7 @@ async function createProject(
           },
         );
       }
-
-      const techs = await db
-        .select({ name: user.name, phone: user.phone })
-        .from(user)
-        .where(inArray(user.id, technicianIds));
-
-      await notifyTicketAssigned({
-        ticketType: "PROJECT",
-        ticketId: label,
-        owner: { name: data.customerName, phone: data.mobileNo },
-        address: data.location,
-        details: data.description,
-        company: data.companyName,
-        technicians: techs,
-      });
     }
-
-    await sendWhatsAppSafely(data.mobileNo, () =>
-      notifyTicketCreated("PROJECT", data.mobileNo, data.customerName, label),
-    );
   }
 
   revalidatePath(PATH);
@@ -236,23 +211,6 @@ async function updateProject(
           description: `${data.companyName}: ${data.description}`,
         },
       );
-    }
-
-    if (newIds.length > 0) {
-      const techs = await db
-        .select({ name: user.name, phone: user.phone })
-        .from(user)
-        .where(inArray(user.id, newIds));
-
-      await notifyTicketAssigned({
-        ticketType: "PROJECT",
-        ticketId: label,
-        owner: { name: data.customerName, phone: data.mobileNo },
-        address: data.location,
-        details: data.description,
-        company: data.companyName,
-        technicians: techs,
-      });
     }
 
     const remainingTechIds = technicianIds.filter((id) => prevIds.has(id));

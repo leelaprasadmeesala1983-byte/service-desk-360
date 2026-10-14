@@ -16,12 +16,14 @@ import { project } from "@/db/schema/project";
 import { serviceRequest } from "@/db/schema/service-request";
 import { workHistory } from "@/db/schema/work-history";
 import type { RecordStatus, RecordType } from "@/lib/constants";
+import { formatRecordId } from "@/lib/format";
 import { requireUser } from "@/lib/session";
 import {
   createWorkHistorySchema,
   deleteWorkHistorySchema,
   editWorkHistorySchema,
 } from "@/lib/validations/work-history";
+import { notifyTicketStatusChanged } from "@/lib/whatsapp-service";
 
 import { type ActionResult, actionError, actionOk } from "./result";
 
@@ -30,6 +32,59 @@ function invalid(error: ZodError): ActionResult {
     "Please correct the highlighted fields.",
     error.flatten().fieldErrors,
   );
+}
+
+/**
+ * Tells the customer when a Log Request moves a service or installation ticket
+ * to In Progress or Closed. Projects send no WhatsApp messages.
+ */
+async function notifyCustomerOfLogStatus(
+  workType: RecordType,
+  referenceId: string,
+  previousStatus: string | null,
+  newStatus: string | undefined,
+): Promise<void> {
+  if (!newStatus) return;
+
+  if (workType === "SERVICE") {
+    const [sr] = await db
+      .select({
+        seq: serviceRequest.seq,
+        customerName: serviceRequest.customerName,
+        phone: serviceRequest.phone,
+      })
+      .from(serviceRequest)
+      .where(eq(serviceRequest.id, referenceId))
+      .limit(1);
+    if (!sr) return;
+    await notifyTicketStatusChanged({
+      ticketType: "SERVICE",
+      previousStatus,
+      newStatus,
+      phone: sr.phone,
+      customerName: sr.customerName,
+      ticketId: formatRecordId("SERVICE", sr.seq),
+    });
+  } else if (workType === "INSTALLATION") {
+    const [ins] = await db
+      .select({
+        seq: installation.seq,
+        customerName: installation.customerName,
+        contactNumber: installation.contactNumber,
+      })
+      .from(installation)
+      .where(eq(installation.id, referenceId))
+      .limit(1);
+    if (!ins) return;
+    await notifyTicketStatusChanged({
+      ticketType: "INSTALLATION",
+      previousStatus,
+      newStatus,
+      phone: ins.contactNumber,
+      customerName: ins.customerName,
+      ticketId: formatRecordId("INSTALLATION", ins.seq),
+    });
+  }
 }
 
 /**
@@ -199,6 +254,13 @@ export async function createWorkHistory(input: unknown): Promise<ActionResult> {
         .set(parentUpdateData)
         .where(eq(project.id, data.referenceId));
     }
+
+    await notifyCustomerOfLogStatus(
+      data.workType,
+      data.referenceId,
+      parentStatus,
+      data.status,
+    );
 
     revalidatePath("/service-tickets/service-management");
     revalidatePath("/service-tickets/installation-management");
@@ -402,6 +464,13 @@ export async function updateWorkHistory(input: unknown): Promise<ActionResult> {
         .set(parentUpdateData)
         .where(eq(project.id, prev.referenceId));
     }
+
+    await notifyCustomerOfLogStatus(
+      prev.workType,
+      prev.referenceId,
+      parentStatus,
+      data.status,
+    );
 
     revalidatePath("/service-tickets/service-management");
     revalidatePath("/service-tickets/installation-management");
