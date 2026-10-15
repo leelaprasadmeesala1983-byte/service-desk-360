@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import type { UserRow } from "@/db/queries/users";
 import { USER_ROLE_LABELS, USER_STATUS_LABELS } from "@/lib/constants";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatRecordId } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type UserDetailsDialogProps = {
@@ -33,7 +33,10 @@ function UserDetailsDialog({
         {user && (
           <DetailGrid>
             <DetailRow label="User ID">
-              #{user.id.slice(0, 8).toUpperCase()}
+              {user.displayId ||
+                (user.seq
+                  ? formatRecordId("USER", user.seq)
+                  : `#${user.id.slice(0, 8).toUpperCase()}`)}
             </DetailRow>
             <DetailRow label="Status">
               <span

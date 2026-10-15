@@ -432,6 +432,8 @@ async function getDashboardData(viewer: Viewer): Promise<DashboardData> {
         technicianNames: row.technicianName ? [row.technicianName] : [],
         technicianDepartment: row.technicianDepartment,
         createdByName: row.createdByName,
+        pdfUrl: p.pdfUrl ?? null,
+        pdfName: p.pdfName ?? null,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
       };

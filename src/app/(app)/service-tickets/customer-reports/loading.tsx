@@ -31,12 +31,12 @@ export default function CustomerReportsLoading() {
 
       {/* Toolbar */}
       <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <Skeleton className="h-9 w-64 rounded-lg" />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <Skeleton className="h-9 w-32 rounded-lg" />
             <Skeleton className="h-9 w-32 rounded-lg" />
           </div>
+          <Skeleton className="h-9 w-64 rounded-lg" />
         </div>
       </div>
 

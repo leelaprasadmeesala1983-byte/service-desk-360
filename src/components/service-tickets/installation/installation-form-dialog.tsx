@@ -7,6 +7,7 @@ import { useEffect, useState, useTransition } from "react";
 import { type Resolver, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { CustomerSelectField } from "@/components/service-tickets/customer-select-field";
 import { DetailRow } from "@/components/service-tickets/detail-row";
 import {
   ControlledMultiSelect,
@@ -77,6 +78,9 @@ function InstallationFormDialog({
   const [isPending, startTransition] = useTransition();
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
+    null,
+  );
 
   const schema = !isEdit
     ? createInstallationSchema
@@ -167,6 +171,7 @@ function InstallationFormDialog({
 
     setServerError(null);
     setShowPassword(false);
+    setSelectedCustomerId(null);
 
     if (record) {
       const currentTechIds =
@@ -392,9 +397,52 @@ function InstallationFormDialog({
                   required
                   error={errors.customerName?.message}
                 >
-                  <Input
-                    className="h-9 rounded-md"
-                    {...form.register("customerName")}
+                  <CustomerSelectField
+                    value={form.watch("customerName") ?? ""}
+                    selectedCustomerId={selectedCustomerId}
+                    size="sm"
+                    onChange={(val) =>
+                      form.setValue("customerName", val, {
+                        shouldValidate: true,
+                      })
+                    }
+                    onCustomerSelect={(cust) => {
+                      setSelectedCustomerId(cust.id);
+                      form.setValue("customerName", cust.customerName, {
+                        shouldValidate: true,
+                      });
+                      form.setValue("contactNumber", cust.mobileNumber || "", {
+                        shouldValidate: true,
+                      });
+                      form.setValue("email", cust.email || "", {
+                        shouldValidate: true,
+                      });
+                      form.setValue(
+                        "address",
+                        cust.address && cust.address !== "—"
+                          ? cust.address
+                          : "",
+                        {
+                          shouldValidate: true,
+                        },
+                      );
+                    }}
+                    onClear={() => {
+                      setSelectedCustomerId(null);
+                      form.setValue("customerName", "", {
+                        shouldValidate: true,
+                      });
+                      form.setValue("contactNumber", "", {
+                        shouldValidate: true,
+                      });
+                      form.setValue("email", "", {
+                        shouldValidate: true,
+                      });
+                      form.setValue("address", "", {
+                        shouldValidate: true,
+                      });
+                    }}
+                    hasError={Boolean(errors.customerName)}
                   />
                 </Field>
                 <Field
@@ -403,14 +451,22 @@ function InstallationFormDialog({
                   error={errors.contactNumber?.message}
                 >
                   <PhoneInput
-                    className="h-9 rounded-md"
+                    readOnly
+                    tabIndex={-1}
+                    autoComplete="off"
+                    className="h-9 rounded-md bg-muted/40 cursor-not-allowed select-text"
+                    placeholder="Auto-populated from customer"
                     {...form.register("contactNumber")}
                   />
                 </Field>
                 <Field label="Email Address" error={errors.email?.message}>
                   <Input
                     type="email"
-                    className="h-9 rounded-md"
+                    readOnly
+                    tabIndex={-1}
+                    autoComplete="off"
+                    className="h-9 rounded-md bg-muted/40 cursor-not-allowed select-text"
+                    placeholder="Auto-populated from customer"
                     {...form.register("email")}
                   />
                 </Field>
@@ -422,7 +478,11 @@ function InstallationFormDialog({
                   error={errors.address?.message}
                 >
                   <Input
-                    className="h-9 rounded-md"
+                    readOnly
+                    tabIndex={-1}
+                    autoComplete="off"
+                    className="h-9 rounded-md bg-muted/40 cursor-not-allowed select-text"
+                    placeholder="Auto-populated from customer"
                     {...form.register("address")}
                   />
                 </Field>

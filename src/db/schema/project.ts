@@ -33,6 +33,9 @@ const project = pgTable(
     ),
     assignedTechnicianIds: text("assigned_technician_ids").array(),
 
+    pdfUrl: text("pdf_url"),
+    pdfName: text("pdf_name"),
+
     createdById: text("created_by_id").references(() => user.id, {
       onDelete: "set null",
     }),

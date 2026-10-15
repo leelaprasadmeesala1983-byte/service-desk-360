@@ -2,6 +2,7 @@ export * from "./asset";
 export * from "./asset-status-history";
 export * from "./auth";
 export * from "./cash-transaction";
+export * from "./customer";
 export * from "./customer-dispatch";
 export * from "./daily-cash-register";
 export * from "./department";

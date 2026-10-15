@@ -14,6 +14,7 @@ import {
   Search,
   Users,
   Wrench,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -86,12 +87,15 @@ export function TechnicianReportsView({
   );
   const [workTypeFilter, setWorkTypeFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     setReport(initialReport);
     setMonth(String(initialReport.month));
     setYear(String(initialReport.year));
+    setPage(1);
   }, [initialReport]);
 
   // Individual Technician detail dialog state
@@ -134,24 +138,28 @@ export function TechnicianReportsView({
   const handleMonthChange = (newMonth: string | null) => {
     if (!newMonth) return;
     setMonth(newMonth);
+    setPage(1);
     loadReport(newMonth, year, technicianFilter, workTypeFilter);
   };
 
   const handleYearChange = (newYear: string | null) => {
     if (!newYear) return;
     setYear(newYear);
+    setPage(1);
     loadReport(month, newYear, technicianFilter, workTypeFilter);
   };
 
   const handleTechChange = (newTech: string | null) => {
     if (!newTech) return;
     setTechnicianFilter(newTech);
+    setPage(1);
     loadReport(month, year, newTech, workTypeFilter);
   };
 
   const handleWorkTypeChange = (newType: string | null) => {
     if (!newType) return;
     setWorkTypeFilter(newType);
+    setPage(1);
     loadReport(month, year, technicianFilter, newType);
   };
 
@@ -166,6 +174,7 @@ export function TechnicianReportsView({
     setTechnicianFilter(defaultTech);
     setWorkTypeFilter(defaultType);
     setSearchQuery("");
+    setPage(1);
 
     loadReport(defaultMonth, defaultYear, defaultTech, defaultType);
   };
@@ -180,6 +189,23 @@ export function TechnicianReportsView({
         t.email.toLowerCase().includes(q),
     );
   }, [report.technicians, searchQuery]);
+
+  const pageCount = Math.max(
+    1,
+    Math.ceil(filteredTechnicians.length / perPage),
+  );
+  const safePage = Math.min(Math.max(1, page), pageCount);
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
+
+  const visibleTechnicians = useMemo(() => {
+    return filteredTechnicians.slice(
+      (safePage - 1) * perPage,
+      safePage * perPage,
+    );
+  }, [filteredTechnicians, safePage, perPage]);
 
   const handleOpenDetails = (tech: TechnicianMonthlySummaryItem) => {
     setSelectedTechId(tech.technicianId);
@@ -237,110 +263,134 @@ export function TechnicianReportsView({
       />
 
       {/* Filter Bar */}
-      <div className="rounded-xl border border-border bg-card p-4 shadow-sm space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Month Selector */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
-              Month:
-            </span>
-            <Select value={month} onValueChange={handleMonthChange}>
-              <SelectTrigger className="w-[130px] h-9 text-xs">
-                <SelectValue placeholder="Select Month" />
-              </SelectTrigger>
-              <SelectContent>
-                {MONTH_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Year Selector */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
-              Year:
-            </span>
-            <Select value={year} onValueChange={handleYearChange}>
-              <SelectTrigger className="w-[100px] h-9 text-xs">
-                <SelectValue placeholder="Year" />
-              </SelectTrigger>
-              <SelectContent>
-                {yearOptions.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Technician Selector (Admin can select any; Technician is locked) */}
-          {user.role === "ADMIN" && (
+      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Month Selector */}
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
-                Technician:
+                Month:
               </span>
-              <Select value={technicianFilter} onValueChange={handleTechChange}>
-                <SelectTrigger className="w-[170px] h-9 text-xs">
-                  <SelectValue placeholder="All Technicians" />
+              <Select value={month} onValueChange={handleMonthChange}>
+                <SelectTrigger className="w-[130px] h-9 text-xs">
+                  <SelectValue placeholder="Select Month" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">All Technicians</SelectItem>
-                  {techniciansList.map((tech) => (
-                    <SelectItem key={tech.id} value={tech.id}>
-                      {tech.name}{" "}
-                      {tech.department ? `(${tech.department})` : ""}
+                  {MONTH_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          )}
 
-          {/* Work Type Selector */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
-              Work Type:
-            </span>
-            <Select value={workTypeFilter} onValueChange={handleWorkTypeChange}>
-              <SelectTrigger className="w-[140px] h-9 text-xs">
-                <SelectValue placeholder="All Work Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Work Types</SelectItem>
-                <SelectItem value="PROJECT">Projects</SelectItem>
-                <SelectItem value="INSTALLATION">Installations</SelectItem>
-                <SelectItem value="SERVICE">Services</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Year Selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                Year:
+              </span>
+              <Select value={year} onValueChange={handleYearChange}>
+                <SelectTrigger className="w-[100px] h-9 text-xs">
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Technician Selector (Admin can select any; Technician is locked) */}
+            {user.role === "ADMIN" && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                  Technician:
+                </span>
+                <Select
+                  value={technicianFilter}
+                  onValueChange={handleTechChange}
+                >
+                  <SelectTrigger className="w-[170px] h-9 text-xs">
+                    <SelectValue placeholder="All Technicians" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Technicians</SelectItem>
+                    {techniciansList.map((tech) => (
+                      <SelectItem key={tech.id} value={tech.id}>
+                        {tech.name}{" "}
+                        {tech.department ? `(${tech.department})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Work Type Selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                Work Type:
+              </span>
+              <Select
+                value={workTypeFilter}
+                onValueChange={handleWorkTypeChange}
+              >
+                <SelectTrigger className="w-[140px] h-9 text-xs">
+                  <SelectValue placeholder="All Work Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Work Types</SelectItem>
+                  <SelectItem value="PROJECT">Projects</SelectItem>
+                  <SelectItem value="INSTALLATION">Installations</SelectItem>
+                  <SelectItem value="SERVICE">Services</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleResetFilters}
+              className="h-9 text-xs font-medium text-muted-foreground hover:text-foreground"
+              title="Reset to default"
+            >
+              <RefreshCw
+                className={cn("size-3.5 mr-1.5", isPending && "animate-spin")}
+              />
+              Reset
+            </Button>
           </div>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleResetFilters}
-            className="h-9 text-xs font-medium text-muted-foreground hover:text-foreground ml-auto"
-            title="Reset to default"
-          >
-            <RefreshCw
-              className={cn("size-3.5 mr-1.5", isPending && "animate-spin")}
+          {/* Search Input for Technicians Table */}
+          <div className="relative w-full sm:w-72 lg:w-80 ml-auto">
+            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Search technician by name or department..."
+              className="h-9 rounded-md pl-8 pr-8 text-xs"
             />
-            Reset
-          </Button>
-        </div>
-
-        {/* Search Input for Technicians Table */}
-        <div className="relative max-w-sm pt-1">
-          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search technician by name or department..."
-            className="h-8.5 rounded-md pl-8.5 text-xs bg-muted/20"
-          />
+            {searchQuery.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setPage(1);
+                }}
+                className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 rounded-full p-0.5 transition-colors focus:outline-none focus:ring-1 focus:ring-ring"
+                aria-label="Clear search"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -457,7 +507,7 @@ export function TechnicianReportsView({
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredTechnicians.map((tech, index) => {
+                visibleTechnicians.map((tech, index) => {
                   const isExportingThis = exportingTechId === tech.technicianId;
 
                   return (
@@ -466,7 +516,7 @@ export function TechnicianReportsView({
                       className="hover:bg-muted/20 transition-colors"
                     >
                       <TableCell className="text-center text-muted-foreground text-xs">
-                        {index + 1}
+                        {(safePage - 1) * perPage + index + 1}
                       </TableCell>
                       <TableCell>
                         <div className="font-semibold text-foreground text-xs">
@@ -545,6 +595,83 @@ export function TechnicianReportsView({
               )}
             </TableBody>
           </Table>
+        </div>
+      </div>
+
+      {/* Pagination Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-muted-foreground text-xs">
+          Showing{" "}
+          {filteredTechnicians.length === 0 ? 0 : (safePage - 1) * perPage + 1}–
+          {Math.min(safePage * perPage, filteredTechnicians.length)} of{" "}
+          {filteredTechnicians.length} technicians
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="text-muted-foreground flex items-center gap-2 text-xs">
+            Per page:
+            <select
+              value={perPage}
+              onChange={(e) => {
+                setPerPage(Number(e.target.value));
+                setPage(1);
+              }}
+              className="border-border rounded-md px-2 py-1 text-xs bg-background text-foreground"
+            >
+              {[10, 25, 50, 100].map((val) => (
+                <option key={val} value={val}>
+                  {val}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className="border-border rounded-md px-2 py-1 text-xs disabled:opacity-50 border bg-background text-foreground hover:bg-muted/50 transition-colors"
+              disabled={safePage <= 1}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              aria-label="Previous page"
+            >
+              ‹
+            </button>
+            {Array.from({ length: Math.min(3, pageCount) }, (_, i) => {
+              let pageNum = i + 1;
+              if (pageCount > 3 && safePage > 2) {
+                pageNum = safePage - 1 + i;
+                if (pageNum > pageCount) {
+                  pageNum = pageCount - 2 + i;
+                }
+              }
+              return pageNum;
+            }).map((pageNum) => (
+              <button
+                key={pageNum}
+                type="button"
+                className={cn(
+                  "border-border rounded-md px-2.5 py-1 text-xs border transition-colors",
+                  pageNum === safePage
+                    ? "bg-primary text-primary-foreground border-primary font-medium"
+                    : "bg-background text-foreground hover:bg-muted/50",
+                )}
+                onClick={() => setPage(pageNum)}
+              >
+                {pageNum}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="border-border rounded-md px-2 py-1 text-xs disabled:opacity-50 border bg-background text-foreground hover:bg-muted/50 transition-colors"
+              disabled={safePage >= pageCount}
+              onClick={() =>
+                setPage((current) => Math.min(pageCount, current + 1))
+              }
+              aria-label="Next page"
+            >
+              ›
+            </button>
+          </div>
         </div>
       </div>
 

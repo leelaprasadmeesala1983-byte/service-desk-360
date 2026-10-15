@@ -7,6 +7,7 @@ import { useEffect, useState, useTransition } from "react";
 import { type Resolver, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { CustomerSelectField } from "@/components/service-tickets/customer-select-field";
 import { DetailRow } from "@/components/service-tickets/detail-row";
 import {
   ControlledMultiSelect,
@@ -64,6 +65,9 @@ function ProjectFormDialog({
   const isTechnician = viewerRole === "TECHNICIAN";
   const [isPending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
+    null,
+  );
 
   const schema = !isEdit
     ? createProjectSchema
@@ -123,6 +127,7 @@ function ProjectFormDialog({
   useEffect(() => {
     if (!open) return;
     setServerError(null);
+    setSelectedCustomerId(null);
 
     const assignedIds = record
       ? Array.isArray(record.assignedTechnicianIds) &&
@@ -270,15 +275,62 @@ function ProjectFormDialog({
                   required
                   error={errors.customerName?.message}
                 >
-                  <Input
-                    className="h-9 rounded-md"
-                    {...form.register("customerName")}
+                  <CustomerSelectField
+                    value={form.watch("customerName") ?? ""}
+                    selectedCustomerId={selectedCustomerId}
+                    size="sm"
+                    onChange={(val) =>
+                      form.setValue("customerName", val, {
+                        shouldValidate: true,
+                      })
+                    }
+                    onCustomerSelect={(cust) => {
+                      setSelectedCustomerId(cust.id);
+                      form.setValue("customerName", cust.customerName, {
+                        shouldValidate: true,
+                      });
+                      form.setValue("mobileNo", cust.mobileNumber || "", {
+                        shouldValidate: true,
+                      });
+                      form.setValue("email", cust.email || "", {
+                        shouldValidate: true,
+                      });
+                      form.setValue(
+                        "location",
+                        cust.address && cust.address !== "—"
+                          ? cust.address
+                          : "",
+                        {
+                          shouldValidate: true,
+                        },
+                      );
+                    }}
+                    onClear={() => {
+                      setSelectedCustomerId(null);
+                      form.setValue("customerName", "", {
+                        shouldValidate: true,
+                      });
+                      form.setValue("mobileNo", "", {
+                        shouldValidate: true,
+                      });
+                      form.setValue("email", "", {
+                        shouldValidate: true,
+                      });
+                      form.setValue("location", "", {
+                        shouldValidate: true,
+                      });
+                    }}
+                    hasError={Boolean(errors.customerName)}
                   />
                 </Field>
                 <Field label="Email Address" error={errors.email?.message}>
                   <Input
                     type="email"
-                    className="h-9 rounded-md"
+                    readOnly
+                    tabIndex={-1}
+                    autoComplete="off"
+                    className="h-9 rounded-md bg-muted/40 cursor-not-allowed select-text"
+                    placeholder="Auto-populated from customer"
                     {...form.register("email")}
                   />
                 </Field>
@@ -288,7 +340,11 @@ function ProjectFormDialog({
                   error={errors.mobileNo?.message}
                 >
                   <PhoneInput
-                    className="h-9 rounded-md"
+                    readOnly
+                    tabIndex={-1}
+                    autoComplete="off"
+                    className="h-9 rounded-md bg-muted/40 cursor-not-allowed select-text"
+                    placeholder="Auto-populated from customer"
                     {...form.register("mobileNo")}
                   />
                 </Field>
@@ -316,7 +372,11 @@ function ProjectFormDialog({
                   error={errors.location?.message}
                 >
                   <Input
-                    className="h-9 rounded-md"
+                    readOnly
+                    tabIndex={-1}
+                    autoComplete="off"
+                    className="h-9 rounded-md bg-muted/40 cursor-not-allowed select-text"
+                    placeholder="Auto-populated from customer"
                     {...form.register("location")}
                   />
                 </Field>

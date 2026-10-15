@@ -13,6 +13,7 @@ import {
 import { type Resolver, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { CustomerSelectField } from "@/components/service-tickets/customer-select-field";
 import { DetailRow } from "@/components/service-tickets/detail-row";
 import {
   ControlledMultiSelect,
@@ -105,6 +106,9 @@ function ServiceFormDialog({
   const [isPending, startTransition] = useTransition();
 
   const [serverError, setServerError] = useState<string | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
+    null,
+  );
 
   const [imagePreview, setImagePreview] = useState<string | null>(
     typeof record?.imageUrl === "string" && record.imageUrl.trim().length > 0
@@ -241,6 +245,7 @@ function ServiceFormDialog({
 
     setServerError(null);
     setImageMessage(null);
+    setSelectedCustomerId(null);
 
     if (record) {
       const imageUrl =
@@ -601,9 +606,51 @@ function ServiceFormDialog({
                   required
                   error={errors.customerName?.message}
                 >
-                  <Input
-                    className="h-10 rounded-md"
-                    {...form.register("customerName")}
+                  <CustomerSelectField
+                    value={form.watch("customerName") ?? ""}
+                    selectedCustomerId={selectedCustomerId}
+                    onChange={(val) =>
+                      form.setValue("customerName", val, {
+                        shouldValidate: true,
+                      })
+                    }
+                    onCustomerSelect={(cust) => {
+                      setSelectedCustomerId(cust.id);
+                      form.setValue("customerName", cust.customerName, {
+                        shouldValidate: true,
+                      });
+                      form.setValue("phone", cust.mobileNumber || "", {
+                        shouldValidate: true,
+                      });
+                      form.setValue("email", cust.email || "", {
+                        shouldValidate: true,
+                      });
+                      form.setValue(
+                        "address",
+                        cust.address && cust.address !== "—"
+                          ? cust.address
+                          : "",
+                        {
+                          shouldValidate: true,
+                        },
+                      );
+                    }}
+                    onClear={() => {
+                      setSelectedCustomerId(null);
+                      form.setValue("customerName", "", {
+                        shouldValidate: true,
+                      });
+                      form.setValue("phone", "", {
+                        shouldValidate: true,
+                      });
+                      form.setValue("email", "", {
+                        shouldValidate: true,
+                      });
+                      form.setValue("address", "", {
+                        shouldValidate: true,
+                      });
+                    }}
+                    hasError={Boolean(errors.customerName)}
                   />
                 </Field>
 
@@ -613,7 +660,11 @@ function ServiceFormDialog({
                   error={errors.phone?.message}
                 >
                   <PhoneInput
-                    className="h-10 rounded-md"
+                    readOnly
+                    tabIndex={-1}
+                    autoComplete="off"
+                    className="h-10 rounded-md bg-muted/40 cursor-not-allowed select-text"
+                    placeholder="Auto-populated from customer"
                     {...form.register("phone")}
                   />
                 </Field>
@@ -621,7 +672,11 @@ function ServiceFormDialog({
                 <Field label="Email Address" error={errors.email?.message}>
                   <Input
                     type="email"
-                    className="h-10 rounded-md"
+                    readOnly
+                    tabIndex={-1}
+                    autoComplete="off"
+                    className="h-10 rounded-md bg-muted/40 cursor-not-allowed select-text"
+                    placeholder="Auto-populated from customer"
                     {...form.register("email")}
                   />
                 </Field>
@@ -656,7 +711,11 @@ function ServiceFormDialog({
                   error={errors.address?.message}
                 >
                   <Input
-                    className="h-10 rounded-md"
+                    readOnly
+                    tabIndex={-1}
+                    autoComplete="off"
+                    className="h-10 rounded-md bg-muted/40 cursor-not-allowed select-text"
+                    placeholder="Auto-populated from customer"
                     {...form.register("address")}
                   />
                 </Field>
