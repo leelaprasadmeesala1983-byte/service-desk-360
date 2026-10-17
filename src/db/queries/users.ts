@@ -5,6 +5,7 @@ import { and, asc, count, eq, ilike, isNull, or, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { user } from "@/db/schema/auth";
 import type { UserRole, UserStatus } from "@/lib/constants";
+import { formatRecordId } from "@/lib/format";
 
 type Viewer = {
   role: UserRole | string;
@@ -13,6 +14,8 @@ type Viewer = {
 
 type UserRow = {
   id: string;
+  seq?: number;
+  displayId?: string;
   firstName: string;
   lastName: string;
   name: string;
@@ -58,7 +61,7 @@ function buildUserScopeCondition(viewer?: Viewer): SQL | undefined {
   return eq(user.id, viewer.id);
 }
 
-function listUsers(
+async function listUsers(
   filters: UserListFilters = {},
   viewer?: Viewer,
 ): Promise<UserRow[]> {
@@ -88,14 +91,35 @@ function listUsers(
     );
   }
 
-  return db
-    .select(USER_COLUMNS)
-    .from(user)
-    .where(and(...clauses))
-    .orderBy(asc(user.createdAt));
+  const [rows, allInScope] = await Promise.all([
+    db
+      .select(USER_COLUMNS)
+      .from(user)
+      .where(and(...clauses))
+      .orderBy(asc(user.createdAt), asc(user.id)),
+    db
+      .select({ id: user.id })
+      .from(user)
+      .where(scopeCondition)
+      .orderBy(asc(user.createdAt), asc(user.id)),
+  ]);
+
+  const seqMap = new Map<string, number>();
+  allInScope.forEach((item, index) => {
+    seqMap.set(item.id, index + 1);
+  });
+
+  return rows.map((r) => {
+    const seq = seqMap.get(r.id) ?? 1;
+    return {
+      ...r,
+      seq,
+      displayId: formatRecordId("USER", seq),
+    };
+  });
 }
 
-function getUserById(
+async function getUserById(
   id: string,
   viewer?: Viewer,
 ): Promise<UserRow | undefined> {
@@ -109,11 +133,29 @@ function getUserById(
     clauses.push(scopeCondition);
   }
 
-  return db
-    .select(USER_COLUMNS)
-    .from(user)
-    .where(and(...clauses))
-    .then((rows) => rows[0]);
+  const [row, allInScope] = await Promise.all([
+    db
+      .select(USER_COLUMNS)
+      .from(user)
+      .where(and(...clauses))
+      .then((rows) => rows[0]),
+    db
+      .select({ id: user.id })
+      .from(user)
+      .where(scopeCondition)
+      .orderBy(asc(user.createdAt), asc(user.id)),
+  ]);
+
+  if (!row) return undefined;
+
+  const index = allInScope.findIndex((u) => u.id === row.id);
+  const seq = index >= 0 ? index + 1 : 1;
+
+  return {
+    ...row,
+    seq,
+    displayId: formatRecordId("USER", seq),
+  };
 }
 
 /** Active technicians scoped to current viewer/admin pool. */

@@ -45,7 +45,7 @@ import {
   type UserRole,
   type UserStatus,
 } from "@/lib/constants";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatRecordId } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type RoleFilter = UserRole | "ALL";
@@ -105,6 +105,8 @@ function UsersView({
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("ALL");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
 
   const [addOpen, setAddOpen] = useState(false);
   const [editUser, setEditUser] = useState<UserRow | undefined>();
@@ -125,12 +127,23 @@ function UsersView({
       if (statusFilter !== "ALL" && user.status !== statusFilter) return false;
       if (term) {
         const haystack =
-          `${user.name} ${user.email} ${user.phone ?? ""}`.toLowerCase();
+          `${user.name} ${user.email} ${user.phone ?? ""} ${user.displayId ?? ""}`.toLowerCase();
         if (!haystack.includes(term)) return false;
       }
       return true;
     });
   }, [usersList, roleFilter, statusFilter, search]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / perPage));
+  const safePage = Math.min(Math.max(1, page), pageCount);
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
+
+  const visible = useMemo(() => {
+    return filtered.slice((safePage - 1) * perPage, safePage * perPage);
+  }, [filtered, safePage, perPage]);
 
   const onToggleStatus = async (user: UserRow) => {
     const next: UserStatus = user.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
@@ -204,7 +217,9 @@ function UsersView({
       <div className="border-border bg-card/40 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border px-3 py-2 text-xs">
         <div className="flex items-center gap-1">
           <span className="text-muted-foreground font-medium">Total Users</span>
-          <span className="text-foreground font-bold">{currentStats.total}</span>
+          <span className="text-foreground font-bold">
+            {currentStats.total}
+          </span>
         </div>
         <span className="text-muted-foreground">|</span>
         <div className="flex items-center gap-1">
@@ -244,7 +259,10 @@ function UsersView({
               { value: "TECHNICIAN", label: USER_ROLE_LABELS.TECHNICIAN },
             ]}
             active={roleFilter}
-            onChange={setRoleFilter}
+            onChange={(val) => {
+              setRoleFilter(val);
+              setPage(1);
+            }}
           />
           <Pills
             options={[
@@ -253,7 +271,10 @@ function UsersView({
               { value: "INACTIVE", label: USER_STATUS_LABELS.INACTIVE },
             ]}
             active={statusFilter}
-            onChange={setStatusFilter}
+            onChange={(val) => {
+              setStatusFilter(val);
+              setPage(1);
+            }}
           />
         </div>
 
@@ -261,7 +282,10 @@ function UsersView({
           <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
           <Input
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(1);
+            }}
             placeholder="Search by name, email or phone"
             className="h-9 rounded-md pl-8"
           />
@@ -295,17 +319,20 @@ function UsersView({
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((user, index) => {
+                visible.map((user, index) => {
                   const isStatusUpdating = statusUpdatingUserId === user.id;
                   const isDeleting = deletingUserId === user.id;
 
                   return (
                     <TableRow key={user.id}>
                       <TableCell className="text-muted-foreground">
-                        {index + 1}
+                        {(safePage - 1) * perPage + index + 1}
                       </TableCell>
                       <TableCell className="font-mono text-xs">
-                        #{user.id.slice(0, 8).toUpperCase()}
+                        {user.displayId ||
+                          (user.seq
+                            ? formatRecordId("USER", user.seq)
+                            : `#${user.id.slice(0, 8).toUpperCase()}`)}
                       </TableCell>
                       <TableCell className="font-medium">{user.name}</TableCell>
                       <TableCell className="text-muted-foreground">
@@ -406,10 +433,79 @@ function UsersView({
         </div>
       </div>
 
-      <p className="text-muted-foreground text-xs">
-        {filtered.length} of {users.length} users · updated{" "}
-        {formatDate(new Date())}
-      </p>
+      {/* Pagination Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-muted-foreground text-xs">
+          Showing {filtered.length === 0 ? 0 : (safePage - 1) * perPage + 1}–
+          {Math.min(safePage * perPage, filtered.length)} of {filtered.length}{" "}
+          users
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="text-muted-foreground flex items-center gap-2 text-xs">
+            Per page:
+            <select
+              value={perPage}
+              onChange={(e) => {
+                setPerPage(Number(e.target.value));
+                setPage(1);
+              }}
+              className="border-border rounded-md px-2 py-1 text-xs"
+            >
+              {[10, 25, 50, 100].map((val) => (
+                <option key={val} value={val}>
+                  {val}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className="border-border rounded-md px-2 py-1 text-xs disabled:opacity-50"
+              disabled={safePage <= 1}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+            >
+              ‹
+            </button>
+            {Array.from({ length: Math.min(3, pageCount) }, (_, i) => {
+              let pageNum = i + 1;
+              if (pageCount > 3 && safePage > 2) {
+                pageNum = safePage - 1 + i;
+                if (pageNum > pageCount) {
+                  pageNum = pageCount - 2 + i;
+                }
+              }
+              return pageNum;
+            }).map((pageNum) => (
+              <button
+                key={pageNum}
+                type="button"
+                className={cn(
+                  "border-border rounded-md px-2 py-1 text-xs",
+                  pageNum === safePage
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background text-foreground",
+                )}
+                onClick={() => setPage(pageNum)}
+              >
+                {pageNum}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="border-border rounded-md px-2 py-1 text-xs disabled:opacity-50"
+              disabled={safePage >= pageCount}
+              onClick={() =>
+                setPage((current) => Math.min(pageCount, current + 1))
+              }
+            >
+              ›
+            </button>
+          </div>
+        </div>
+      </div>
 
       <UserFormDialog
         open={addOpen}

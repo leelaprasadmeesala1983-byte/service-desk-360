@@ -62,6 +62,15 @@ export default function UsersLoading() {
           ))}
         </div>
       </div>
+
+      {/* Pagination Skeleton */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Skeleton className="h-4 w-32 rounded-sm" />
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-7 w-20 rounded-md" />
+          <Skeleton className="h-7 w-24 rounded-md" />
+        </div>
+      </div>
     </div>
   );
 }

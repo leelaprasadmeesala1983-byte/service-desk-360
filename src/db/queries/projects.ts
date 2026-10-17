@@ -33,6 +33,8 @@ type ProjectRow = {
   technicianNames?: string[];
   technicianDepartment: string | null;
   createdByName: string | null;
+  pdfUrl?: string | null;
+  pdfName?: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -90,6 +92,8 @@ function mapRow(
     technicianNames,
     technicianDepartment: row.technicianDepartment,
     createdByName: row.createdByName,
+    pdfUrl: record.pdfUrl ?? null,
+    pdfName: record.pdfName ?? null,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   };

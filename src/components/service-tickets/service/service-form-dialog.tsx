@@ -13,6 +13,7 @@ import {
 import { type Resolver, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { CustomerSelectField } from "@/components/service-tickets/customer-select-field";
 import { DetailRow } from "@/components/service-tickets/detail-row";
 import {
   ControlledMultiSelect,
@@ -31,7 +32,6 @@ import {
 } from "@/components/ui/dialog";
 
 import { Input } from "@/components/ui/input";
-import { PhoneInput } from "@/components/ui/phone-input";
 import { Textarea } from "@/components/ui/textarea";
 
 import type { ServiceRequestRow } from "@/db/queries/service-requests";
@@ -105,6 +105,9 @@ function ServiceFormDialog({
   const [isPending, startTransition] = useTransition();
 
   const [serverError, setServerError] = useState<string | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
+    null,
+  );
 
   const [imagePreview, setImagePreview] = useState<string | null>(
     typeof record?.imageUrl === "string" && record.imageUrl.trim().length > 0
@@ -162,6 +165,7 @@ function ServiceFormDialog({
     defaultValues: record
       ? {
           id: record.id,
+          customerId: (record as any).customerId ?? "",
           customerName: record.customerName ?? "",
           phone: record.phone ?? "",
           email: record.email ?? "",
@@ -194,6 +198,7 @@ function ServiceFormDialog({
             : formatLocalDateTime(new Date()),
         }
       : {
+          customerId: "",
           customerName: "",
           phone: "",
           email: "",
@@ -241,6 +246,7 @@ function ServiceFormDialog({
 
     setServerError(null);
     setImageMessage(null);
+    setSelectedCustomerId(null);
 
     if (record) {
       const imageUrl =
@@ -269,6 +275,7 @@ function ServiceFormDialog({
 
       form.reset({
         id: record.id,
+        customerId: (record as any).customerId ?? "",
         customerName: record.customerName ?? "",
         phone: record.phone ?? "",
         email: record.email ?? "",
@@ -299,6 +306,7 @@ function ServiceFormDialog({
     setImageFileName(null);
 
     form.reset({
+      customerId: "",
       customerName: "",
       phone: "",
       email: "",
@@ -448,6 +456,11 @@ function ServiceFormDialog({
         const payload = {
           ...raw,
           id: raw.id,
+          customerId: selectedCustomerId || raw.customerId || undefined,
+          customerName: form.getValues("customerName") || raw.customerName,
+          phone: form.getValues("phone") || raw.phone,
+          email: form.getValues("email") || raw.email,
+          address: form.getValues("address") || raw.address,
           assignedTechnicianIds: normalizedTechnicianIds,
           assignedTechnicianId: normalizedTechnicianIds[0] || "",
           amount: normalizedAmount,
@@ -573,7 +586,7 @@ function ServiceFormDialog({
                   {record.customerName}
                 </DetailRow>
 
-                <DetailRow label="Phone Number">{record.phone}</DetailRow>
+                <DetailRow label="Mobile Number">{record.phone}</DetailRow>
 
                 <DetailRow label="Email Address">
                   {record.email || "—"}
@@ -597,31 +610,84 @@ function ServiceFormDialog({
             ) : (
               <>
                 <Field
+                  label="Mobile Number"
+                  required
+                  error={errors.phone?.message}
+                >
+                  <CustomerSelectField
+                    value={form.watch("phone") ?? ""}
+                    selectedCustomerId={selectedCustomerId}
+                    placeholder="Select Mobile Number"
+                    onChange={(val) =>
+                      form.setValue("phone", val, {
+                        shouldValidate: true,
+                      })
+                    }
+                    onCustomerSelect={(cust) => {
+                      setSelectedCustomerId(cust.id);
+                      form.setValue("customerId", cust.id);
+                      form.setValue("phone", cust.mobileNumber, {
+                        shouldValidate: true,
+                      });
+                      form.setValue("customerName", cust.customerName, {
+                        shouldValidate: true,
+                      });
+                      form.setValue("email", cust.email || "", {
+                        shouldValidate: true,
+                      });
+                      form.setValue(
+                        "address",
+                        cust.address && cust.address !== "—"
+                          ? cust.address
+                          : "",
+                        {
+                          shouldValidate: true,
+                        },
+                      );
+                    }}
+                    onClear={() => {
+                      setSelectedCustomerId(null);
+                      form.setValue("customerId", "");
+                      form.setValue("phone", "", {
+                        shouldValidate: true,
+                      });
+                      form.setValue("customerName", "", {
+                        shouldValidate: true,
+                      });
+                      form.setValue("email", "", {
+                        shouldValidate: true,
+                      });
+                      form.setValue("address", "", {
+                        shouldValidate: true,
+                      });
+                    }}
+                    hasError={Boolean(errors.phone)}
+                  />
+                </Field>
+
+                <Field
                   label="Customer Name"
                   required
                   error={errors.customerName?.message}
                 >
                   <Input
-                    className="h-10 rounded-md"
+                    readOnly
+                    tabIndex={-1}
+                    autoComplete="off"
+                    className="h-10 rounded-md bg-muted/40 cursor-not-allowed select-text"
+                    placeholder="Auto-populated from customer"
                     {...form.register("customerName")}
-                  />
-                </Field>
-
-                <Field
-                  label="Phone Number"
-                  required
-                  error={errors.phone?.message}
-                >
-                  <PhoneInput
-                    className="h-10 rounded-md"
-                    {...form.register("phone")}
                   />
                 </Field>
 
                 <Field label="Email Address" error={errors.email?.message}>
                   <Input
                     type="email"
-                    className="h-10 rounded-md"
+                    readOnly
+                    tabIndex={-1}
+                    autoComplete="off"
+                    className="h-10 rounded-md bg-muted/40 cursor-not-allowed select-text"
+                    placeholder="Auto-populated from customer"
                     {...form.register("email")}
                   />
                 </Field>
@@ -656,7 +722,11 @@ function ServiceFormDialog({
                   error={errors.address?.message}
                 >
                   <Input
-                    className="h-10 rounded-md"
+                    readOnly
+                    tabIndex={-1}
+                    autoComplete="off"
+                    className="h-10 rounded-md bg-muted/40 cursor-not-allowed select-text"
+                    placeholder="Auto-populated from customer"
                     {...form.register("address")}
                   />
                 </Field>
