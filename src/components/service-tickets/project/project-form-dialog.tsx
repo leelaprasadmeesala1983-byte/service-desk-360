@@ -23,7 +23,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { PhoneInput } from "@/components/ui/phone-input";
 import { Textarea } from "@/components/ui/textarea";
 import type { ProjectRow } from "@/db/queries/projects";
 import { createProject, updateProject } from "@/lib/actions/projects";
@@ -97,6 +96,7 @@ function ProjectFormDialog({
     defaultValues: record
       ? {
           id: record.id,
+          customerId: (record as any).customerId ?? "",
           companyName: record.companyName,
           customerName: record.customerName,
           email: record.email,
@@ -111,6 +111,7 @@ function ProjectFormDialog({
             : formatLocalDateTime(new Date()),
         }
       : {
+          customerId: "",
           companyName: "",
           customerName: "",
           email: "",
@@ -143,6 +144,7 @@ function ProjectFormDialog({
       record
         ? {
             id: record.id,
+            customerId: (record as any).customerId ?? "",
             companyName: record.companyName,
             customerName: record.customerName,
             email: record.email,
@@ -157,6 +159,7 @@ function ProjectFormDialog({
               : formatLocalDateTime(new Date()),
           }
         : {
+            customerId: "",
             companyName: "",
             customerName: "",
             email: "",
@@ -175,6 +178,11 @@ function ProjectFormDialog({
     setServerError(null);
     const payload = {
       ...raw,
+      customerId: selectedCustomerId || raw.customerId || undefined,
+      customerName: form.getValues("customerName") || raw.customerName,
+      mobileNo: form.getValues("mobileNo") || raw.mobileNo,
+      email: form.getValues("email") || raw.email,
+      location: form.getValues("location") || raw.location,
       assignedTechnicianIds: Array.isArray(raw.assignedTechnicianIds)
         ? raw.assignedTechnicianIds
         : [],
@@ -242,7 +250,7 @@ function ProjectFormDialog({
                   {record.customerName}
                 </DetailRow>
                 <DetailRow label="Email Address">{record.email}</DetailRow>
-                <DetailRow label="Mobile No">{record.mobileNo}</DetailRow>
+                <DetailRow label="Mobile Number">{record.mobileNo}</DetailRow>
                 <DetailRow label="Estimation No">
                   {record.estimationNo}
                 </DetailRow>
@@ -271,25 +279,27 @@ function ProjectFormDialog({
                   />
                 </Field>
                 <Field
-                  label="Customer Name"
+                  label="Mobile Number"
                   required
-                  error={errors.customerName?.message}
+                  error={errors.mobileNo?.message}
                 >
                   <CustomerSelectField
-                    value={form.watch("customerName") ?? ""}
+                    value={form.watch("mobileNo") ?? ""}
                     selectedCustomerId={selectedCustomerId}
+                    placeholder="Select Mobile Number"
                     size="sm"
                     onChange={(val) =>
-                      form.setValue("customerName", val, {
+                      form.setValue("mobileNo", val, {
                         shouldValidate: true,
                       })
                     }
                     onCustomerSelect={(cust) => {
                       setSelectedCustomerId(cust.id);
-                      form.setValue("customerName", cust.customerName, {
+                      form.setValue("customerId", cust.id);
+                      form.setValue("mobileNo", cust.mobileNumber, {
                         shouldValidate: true,
                       });
-                      form.setValue("mobileNo", cust.mobileNumber || "", {
+                      form.setValue("customerName", cust.customerName, {
                         shouldValidate: true,
                       });
                       form.setValue("email", cust.email || "", {
@@ -307,10 +317,11 @@ function ProjectFormDialog({
                     }}
                     onClear={() => {
                       setSelectedCustomerId(null);
-                      form.setValue("customerName", "", {
+                      form.setValue("customerId", "");
+                      form.setValue("mobileNo", "", {
                         shouldValidate: true,
                       });
-                      form.setValue("mobileNo", "", {
+                      form.setValue("customerName", "", {
                         shouldValidate: true,
                       });
                       form.setValue("email", "", {
@@ -320,7 +331,21 @@ function ProjectFormDialog({
                         shouldValidate: true,
                       });
                     }}
-                    hasError={Boolean(errors.customerName)}
+                    hasError={Boolean(errors.mobileNo)}
+                  />
+                </Field>
+                <Field
+                  label="Customer Name"
+                  required
+                  error={errors.customerName?.message}
+                >
+                  <Input
+                    readOnly
+                    tabIndex={-1}
+                    autoComplete="off"
+                    className="h-9 rounded-md bg-muted/40 cursor-not-allowed select-text"
+                    placeholder="Auto-populated from customer"
+                    {...form.register("customerName")}
                   />
                 </Field>
                 <Field label="Email Address" error={errors.email?.message}>
@@ -332,20 +357,6 @@ function ProjectFormDialog({
                     className="h-9 rounded-md bg-muted/40 cursor-not-allowed select-text"
                     placeholder="Auto-populated from customer"
                     {...form.register("email")}
-                  />
-                </Field>
-                <Field
-                  label="Mobile No"
-                  required
-                  error={errors.mobileNo?.message}
-                >
-                  <PhoneInput
-                    readOnly
-                    tabIndex={-1}
-                    autoComplete="off"
-                    className="h-9 rounded-md bg-muted/40 cursor-not-allowed select-text"
-                    placeholder="Auto-populated from customer"
-                    {...form.register("mobileNo")}
                   />
                 </Field>
 

@@ -41,7 +41,7 @@ export function CustomerSelectField({
   onClear,
   selectedCustomerId,
   size = "default",
-  placeholder = "Select Customer",
+  placeholder = "Select Mobile Number",
   disabled,
   hasError,
   className,
@@ -50,25 +50,33 @@ export function CustomerSelectField({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   // Load customers when popover opens or search changes with race condition prevention
   useEffect(() => {
     if (!open) {
       setSearch("");
+      setError(null);
       return;
     }
 
     let active = true;
     startTransition(async () => {
       try {
+        setError(null);
         const result = await searchCustomersDropdown(search);
-        if (active && result.ok) {
-          setCustomers(result.data);
+        if (active) {
+          if (result.ok) {
+            setCustomers(result.data);
+          } else {
+            setError(result.error || "Failed to load customers.");
+          }
         }
       } catch (err) {
         if (active) {
           console.error("Failed to search customers:", err);
+          setError("Failed to load customers. Please try again.");
         }
       }
     });
@@ -79,19 +87,35 @@ export function CustomerSelectField({
   }, [open, search]);
 
   const filteredCustomers = useMemo(() => {
-    if (!search.trim()) return customers;
-    const term = search.toLowerCase().trim();
-    return customers.filter(
+    // Exclude records with missing or empty mobile numbers
+    const valid = customers.filter(
       (c) =>
-        c.customerName.toLowerCase().includes(term) ||
-        c.mobileNumber.toLowerCase().includes(term) ||
-        (c.email && c.email.toLowerCase().includes(term)),
+        typeof c.mobileNumber === "string" && c.mobileNumber.trim().length > 0,
     );
+
+    // Filter dynamically by search term matching mobile number
+    const term = search.trim().toLowerCase();
+    const matched = term
+      ? valid.filter((c) => c.mobileNumber.toLowerCase().includes(term))
+      : valid;
+
+    // Handle duplicate mobile numbers appropriately by deduplicating
+    const seen = new Set<string>();
+    const deduplicated: CustomerOption[] = [];
+    for (const c of matched) {
+      const num = c.mobileNumber.trim();
+      if (!seen.has(num)) {
+        seen.add(num);
+        deduplicated.push(c);
+      }
+    }
+
+    return deduplicated;
   }, [customers, search]);
 
   const handleSelect = (customer: CustomerOption) => {
-    // Single select: display only the customer's clean name and immediately close dropdown
-    onChange(customer.customerName);
+    // Single select: display only the mobile number and immediately close dropdown
+    onChange(customer.mobileNumber);
     onCustomerSelect?.(customer);
     setOpen(false);
   };
@@ -142,8 +166,8 @@ export function CustomerSelectField({
               type="button"
               onClick={handleClear}
               className="hover:bg-muted-foreground/20 rounded-full p-0.5 transition-colors cursor-pointer"
-              aria-label="Clear customer selection"
-              title="Clear customer"
+              aria-label="Clear mobile number selection"
+              title="Clear mobile number"
             >
               <X className="size-3.5 text-muted-foreground hover:text-foreground" />
             </button>
@@ -163,13 +187,13 @@ export function CustomerSelectField({
         sideOffset={4}
         className="w-[var(--anchor-width)] min-w-[280px] max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-lg gap-1"
       >
-        {/* Search bar inside dropdown - matches Assign Technician */}
+        {/* Search bar inside dropdown */}
         <div className="relative px-1 pt-0.5 pb-1">
           <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search customer..."
+            placeholder="Search mobile number..."
             className="h-8 rounded-md pl-8 pr-7 text-xs"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
@@ -183,7 +207,7 @@ export function CustomerSelectField({
                 setSearch("");
               }}
               className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 rounded-full p-0.5 transition-colors cursor-pointer"
-              aria-label="Clear customer search"
+              aria-label="Clear mobile number search"
             >
               <X className="size-3" />
             </button>
@@ -192,24 +216,27 @@ export function CustomerSelectField({
 
         <div className="h-px bg-border my-0.5" />
 
-        {/* Single-select List of Customers - displays ONLY the customer name */}
+        {/* Single-select List of Customers - displays ONLY the mobile number */}
         <div className="max-h-56 overflow-y-auto space-y-0.5 px-0.5">
-          {isPending && customers.length === 0 ? (
+          {error ? (
+            <div className="py-4 text-center text-xs text-destructive">
+              {error}
+            </div>
+          ) : isPending && customers.length === 0 ? (
             <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
               <Loader2 className="size-3.5 animate-spin" />
-              <span>Loading customers...</span>
+              <span>Loading mobile numbers...</span>
             </div>
           ) : filteredCustomers.length === 0 ? (
             <div className="py-4 text-center text-xs text-muted-foreground">
-              {search ? "No customers match your search" : "No customers found"}
+              No customers found
             </div>
           ) : (
             filteredCustomers.map((c) => {
               const isSelected =
                 (selectedCustomerId && c.id === selectedCustomerId) ||
                 (!selectedCustomerId &&
-                  value?.trim().toLowerCase() ===
-                    c.customerName.trim().toLowerCase());
+                  value?.trim() === c.mobileNumber.trim());
 
               return (
                 <button
@@ -223,7 +250,7 @@ export function CustomerSelectField({
                       : "hover:bg-accent hover:text-accent-foreground text-foreground",
                   )}
                 >
-                  <span className="truncate">{c.customerName}</span>
+                  <span className="truncate">{c.mobileNumber}</span>
                   {isSelected && (
                     <Check className="text-primary size-3.5 shrink-0 ml-2" />
                   )}

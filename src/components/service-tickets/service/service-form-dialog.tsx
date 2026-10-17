@@ -32,7 +32,6 @@ import {
 } from "@/components/ui/dialog";
 
 import { Input } from "@/components/ui/input";
-import { PhoneInput } from "@/components/ui/phone-input";
 import { Textarea } from "@/components/ui/textarea";
 
 import type { ServiceRequestRow } from "@/db/queries/service-requests";
@@ -166,6 +165,7 @@ function ServiceFormDialog({
     defaultValues: record
       ? {
           id: record.id,
+          customerId: (record as any).customerId ?? "",
           customerName: record.customerName ?? "",
           phone: record.phone ?? "",
           email: record.email ?? "",
@@ -198,6 +198,7 @@ function ServiceFormDialog({
             : formatLocalDateTime(new Date()),
         }
       : {
+          customerId: "",
           customerName: "",
           phone: "",
           email: "",
@@ -274,6 +275,7 @@ function ServiceFormDialog({
 
       form.reset({
         id: record.id,
+        customerId: (record as any).customerId ?? "",
         customerName: record.customerName ?? "",
         phone: record.phone ?? "",
         email: record.email ?? "",
@@ -304,6 +306,7 @@ function ServiceFormDialog({
     setImageFileName(null);
 
     form.reset({
+      customerId: "",
       customerName: "",
       phone: "",
       email: "",
@@ -453,6 +456,11 @@ function ServiceFormDialog({
         const payload = {
           ...raw,
           id: raw.id,
+          customerId: selectedCustomerId || raw.customerId || undefined,
+          customerName: form.getValues("customerName") || raw.customerName,
+          phone: form.getValues("phone") || raw.phone,
+          email: form.getValues("email") || raw.email,
+          address: form.getValues("address") || raw.address,
           assignedTechnicianIds: normalizedTechnicianIds,
           assignedTechnicianId: normalizedTechnicianIds[0] || "",
           amount: normalizedAmount,
@@ -578,7 +586,7 @@ function ServiceFormDialog({
                   {record.customerName}
                 </DetailRow>
 
-                <DetailRow label="Phone Number">{record.phone}</DetailRow>
+                <DetailRow label="Mobile Number">{record.phone}</DetailRow>
 
                 <DetailRow label="Email Address">
                   {record.email || "—"}
@@ -602,24 +610,26 @@ function ServiceFormDialog({
             ) : (
               <>
                 <Field
-                  label="Customer Name"
+                  label="Mobile Number"
                   required
-                  error={errors.customerName?.message}
+                  error={errors.phone?.message}
                 >
                   <CustomerSelectField
-                    value={form.watch("customerName") ?? ""}
+                    value={form.watch("phone") ?? ""}
                     selectedCustomerId={selectedCustomerId}
+                    placeholder="Select Mobile Number"
                     onChange={(val) =>
-                      form.setValue("customerName", val, {
+                      form.setValue("phone", val, {
                         shouldValidate: true,
                       })
                     }
                     onCustomerSelect={(cust) => {
                       setSelectedCustomerId(cust.id);
-                      form.setValue("customerName", cust.customerName, {
+                      form.setValue("customerId", cust.id);
+                      form.setValue("phone", cust.mobileNumber, {
                         shouldValidate: true,
                       });
-                      form.setValue("phone", cust.mobileNumber || "", {
+                      form.setValue("customerName", cust.customerName, {
                         shouldValidate: true,
                       });
                       form.setValue("email", cust.email || "", {
@@ -637,10 +647,11 @@ function ServiceFormDialog({
                     }}
                     onClear={() => {
                       setSelectedCustomerId(null);
-                      form.setValue("customerName", "", {
+                      form.setValue("customerId", "");
+                      form.setValue("phone", "", {
                         shouldValidate: true,
                       });
-                      form.setValue("phone", "", {
+                      form.setValue("customerName", "", {
                         shouldValidate: true,
                       });
                       form.setValue("email", "", {
@@ -650,22 +661,22 @@ function ServiceFormDialog({
                         shouldValidate: true,
                       });
                     }}
-                    hasError={Boolean(errors.customerName)}
+                    hasError={Boolean(errors.phone)}
                   />
                 </Field>
 
                 <Field
-                  label="Phone Number"
+                  label="Customer Name"
                   required
-                  error={errors.phone?.message}
+                  error={errors.customerName?.message}
                 >
-                  <PhoneInput
+                  <Input
                     readOnly
                     tabIndex={-1}
                     autoComplete="off"
                     className="h-10 rounded-md bg-muted/40 cursor-not-allowed select-text"
                     placeholder="Auto-populated from customer"
-                    {...form.register("phone")}
+                    {...form.register("customerName")}
                   />
                 </Field>
 

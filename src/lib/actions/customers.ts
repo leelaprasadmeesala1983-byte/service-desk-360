@@ -245,3 +245,30 @@ export async function searchCustomersDropdown(search?: string): Promise<
     return actionError("Failed to search customers.");
   }
 }
+
+export async function getCustomerByMobileAction(mobileNumber: string): Promise<
+  ActionResult<{
+    id: string;
+    customerName: string;
+    mobileNumber: string;
+    email: string | null;
+    address: string;
+  } | null>
+> {
+  await requireUser();
+
+  try {
+    const cust = await getCustomerByMobile(mobileNumber);
+    if (!cust) return actionOk(null);
+    return actionOk({
+      id: cust.id,
+      customerName: cust.customerName,
+      mobileNumber: cust.mobileNumber,
+      email: cust.email,
+      address: cust.address,
+    });
+  } catch (err) {
+    console.error("Error fetching customer by mobile:", err);
+    return actionError("Failed to fetch customer details.");
+  }
+}

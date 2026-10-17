@@ -332,6 +332,6 @@ export async function listCustomersForDropdown(
     })
     .from(customer)
     .where(whereClause)
-    .orderBy(customer.customerName)
+    .orderBy(customer.mobileNumber, customer.customerName)
     .limit(50);
 }
