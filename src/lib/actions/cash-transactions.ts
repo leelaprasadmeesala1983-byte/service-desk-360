@@ -608,7 +608,10 @@ async function syncServiceRequestAmount(
           ),
         );
       if (existing && createdById) {
-        await recalculateDailyCashRegister(formatLocalDate(new Date()), createdById);
+        await recalculateDailyCashRegister(
+          formatLocalDate(new Date()),
+          createdById,
+        );
       }
       return;
     }
@@ -651,7 +654,10 @@ async function syncServiceRequestAmount(
     }
 
     if (createdById) {
-      await recalculateDailyCashRegister(formatLocalDate(new Date()), createdById);
+      await recalculateDailyCashRegister(
+        formatLocalDate(new Date()),
+        createdById,
+      );
     }
   } catch (error) {
     console.error("syncServiceRequestAmount error:", error);

@@ -223,10 +223,7 @@ export function WorkHistoryDialog({
             : detailsForm.paymentMode === "CASH"
               ? "PAID"
               : null,
-        amount:
-          detailsForm.paymentMode === "CASH"
-            ? detailsForm.amount
-            : null,
+        amount: detailsForm.paymentMode === "CASH" ? detailsForm.amount : null,
       };
 
       let res: { ok: boolean; data?: any; error?: string };
@@ -243,7 +240,10 @@ export function WorkHistoryDialog({
         if (apiRes.ok && data.success) {
           res = { ok: true, data: data.data };
         } else {
-          res = { ok: false, error: data.error || "Failed to update installation details" };
+          res = {
+            ok: false,
+            error: data.error || "Failed to update installation details",
+          };
         }
       } catch {
         res = await updateInstallationDetails(payload);
@@ -426,7 +426,11 @@ export function WorkHistoryDialog({
                                 accountPassword: e.target.value,
                               }))
                             }
-                            placeholder={hasPassword ? "Leave blank to keep existing" : "Enter password"}
+                            placeholder={
+                              hasPassword
+                                ? "Leave blank to keep existing"
+                                : "Enter password"
+                            }
                             className="h-8 text-xs pr-8 font-mono"
                             autoComplete="new-password"
                           />
@@ -435,10 +439,14 @@ export function WorkHistoryDialog({
                             onClick={() => setShowEditPassword((prev) => !prev)}
                             className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
                             title={
-                              showEditPassword ? "Hide password" : "Show password"
+                              showEditPassword
+                                ? "Hide password"
+                                : "Show password"
                             }
                             aria-label={
-                              showEditPassword ? "Hide password" : "Show password"
+                              showEditPassword
+                                ? "Hide password"
+                                : "Show password"
                             }
                           >
                             {showEditPassword ? (
@@ -514,13 +522,19 @@ export function WorkHistoryDialog({
                             </span>
                             <button
                               type="button"
-                              onClick={() => setShowViewPassword((prev) => !prev)}
+                              onClick={() =>
+                                setShowViewPassword((prev) => !prev)
+                              }
                               className="text-muted-foreground hover:text-foreground p-0.5 rounded transition-colors inline-flex items-center"
                               title={
-                                showViewPassword ? "Hide password" : "Show password"
+                                showViewPassword
+                                  ? "Hide password"
+                                  : "Show password"
                               }
                               aria-label={
-                                showViewPassword ? "Hide password" : "Show password"
+                                showViewPassword
+                                  ? "Hide password"
+                                  : "Show password"
                               }
                             >
                               {showViewPassword ? (
@@ -940,7 +954,17 @@ export function WorkHistoryDialog({
             Total {logs.length} timeline{" "}
             {logs.length === 1 ? "record" : "records"}
           </span>
-          <DialogClose render={<Button variant="outline" size="sm" className="h-8 px-3 text-xs" />}>Close</DialogClose>
+          <DialogClose
+            render={
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs"
+              />
+            }
+          >
+            Close
+          </DialogClose>
         </DialogFooter>
       </DialogContent>
 

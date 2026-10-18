@@ -13,6 +13,7 @@ import { getOpeningBalance as getOpeningBalanceSetting } from "@/db/queries/quic
 import { user } from "@/db/schema/auth";
 import { cashTransaction } from "@/db/schema/cash-transaction";
 import { dailyCashRegister } from "@/db/schema/daily-cash-register";
+import { withDbRetry } from "@/lib/db-resilience";
 import {
   APP_TIMEZONE,
   formatLocalDate,
@@ -94,25 +95,35 @@ async function listCashTransactions(
 
     const whereClause = filters.length > 0 ? and(...filters) : undefined;
 
-    const [rows, totalResult] = await Promise.all([
-      db
-        .select({
-          transaction: cashTransaction,
-          createdByName: creatorUser.name,
-          technicianName: technicianUser.name,
-        })
-        .from(cashTransaction)
-        .leftJoin(creatorUser, eq(cashTransaction.createdById, creatorUser.id))
-        .leftJoin(
-          technicianUser,
-          eq(cashTransaction.assignedTechnicianId, technicianUser.id),
-        )
-        .where(whereClause)
-        .orderBy(desc(cashTransaction.createdAt), desc(cashTransaction.seq))
-        .limit(params.limit)
-        .offset(offset),
-      db.select({ count: count() }).from(cashTransaction).where(whereClause),
-    ]);
+    const [rows, totalResult] = await withDbRetry(
+      () =>
+        Promise.all([
+          db
+            .select({
+              transaction: cashTransaction,
+              createdByName: creatorUser.name,
+              technicianName: technicianUser.name,
+            })
+            .from(cashTransaction)
+            .leftJoin(
+              creatorUser,
+              eq(cashTransaction.createdById, creatorUser.id),
+            )
+            .leftJoin(
+              technicianUser,
+              eq(cashTransaction.assignedTechnicianId, technicianUser.id),
+            )
+            .where(whereClause)
+            .orderBy(desc(cashTransaction.createdAt), desc(cashTransaction.seq))
+            .limit(params.limit)
+            .offset(offset),
+          db
+            .select({ count: count() })
+            .from(cashTransaction)
+            .where(whereClause),
+        ]),
+      { retries: 2, delayMs: 150, operationName: "listCashTransactions" },
+    );
 
     return {
       rows: rows.map((r) =>
@@ -243,19 +254,23 @@ async function listDailyRegisters(params: {
       registerFilters.push(eq(dailyCashRegister.userId, params.userId));
     }
 
-    const [savedRegisters, totalCountResult] = await Promise.all([
-      db
-        .select()
-        .from(dailyCashRegister)
-        .where(and(...registerFilters))
-        .orderBy(desc(dailyCashRegister.date))
-        .limit(params.limit)
-        .offset(offset),
-      db
-        .select({ count: count() })
-        .from(dailyCashRegister)
-        .where(and(...registerFilters)),
-    ]);
+    const [savedRegisters, totalCountResult] = await withDbRetry(
+      () =>
+        Promise.all([
+          db
+            .select()
+            .from(dailyCashRegister)
+            .where(and(...registerFilters))
+            .orderBy(desc(dailyCashRegister.date))
+            .limit(params.limit)
+            .offset(offset),
+          db
+            .select({ count: count() })
+            .from(dailyCashRegister)
+            .where(and(...registerFilters)),
+        ]),
+      { retries: 2, delayMs: 150, operationName: "listDailyRegisters" },
+    );
 
     const total = totalCountResult[0]?.count || 0;
 

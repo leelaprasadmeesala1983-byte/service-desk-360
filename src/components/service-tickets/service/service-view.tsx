@@ -110,7 +110,10 @@ function ServiceView({
     }
   }, [recordsList, viewRecord]);
 
-  const handleSaveSuccess = (savedRecord?: ServiceRequestRow, isEdit?: boolean) => {
+  const handleSaveSuccess = (
+    savedRecord?: ServiceRequestRow,
+    isEdit?: boolean,
+  ) => {
     if (savedRecord) {
       setRecordsList((prev) => {
         if (isEdit) {
@@ -198,7 +201,11 @@ function ServiceView({
               Log Request
             </Button>
             {isAdmin && (
-              <Button onClick={() => setCreateOpen(true)} className="gap-1.5">
+              <Button
+                id="btn-new-service-request"
+                onClick={() => setCreateOpen(true)}
+                className="gap-1.5"
+              >
                 <Plus className="size-4" />
                 New Service Request
               </Button>

@@ -117,7 +117,10 @@ function InstallationView({
     }
   }, [recordsList, historyRecord]);
 
-  const handleSaveSuccess = (savedRecord?: InstallationRow, isEdit?: boolean) => {
+  const handleSaveSuccess = (
+    savedRecord?: InstallationRow,
+    isEdit?: boolean,
+  ) => {
     if (savedRecord) {
       setRecordsList((prev) => {
         if (isEdit) {
@@ -206,7 +209,11 @@ function InstallationView({
               Log Request
             </Button>
             {isAdmin && (
-              <Button onClick={() => setCreateOpen(true)} className="gap-1.5">
+              <Button
+                id="btn-new-installation"
+                onClick={() => setCreateOpen(true)}
+                className="gap-1.5"
+              >
                 <Plus className="size-4" />
                 New Installation
               </Button>

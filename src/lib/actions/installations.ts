@@ -6,8 +6,8 @@ import type { ZodError } from "zod";
 
 import { db } from "@/db";
 import {
-  type InstallationRow,
   getInstallation,
+  type InstallationRow,
   listInstallations,
 } from "@/db/queries/installations";
 import {
@@ -709,12 +709,11 @@ async function updateInstallationDetails(
       .where(eq(installation.id, id));
 
     const label = formatRecordId("INSTALLATION", existing.seq);
-    const technicianIds =
-      existing.assignedTechnicianIds?.length
-        ? existing.assignedTechnicianIds
-        : existing.assignedTechnicianId
-          ? [existing.assignedTechnicianId]
-          : [];
+    const technicianIds = existing.assignedTechnicianIds?.length
+      ? existing.assignedTechnicianIds
+      : existing.assignedTechnicianId
+        ? [existing.assignedTechnicianId]
+        : [];
 
     if (paymentMode === "CASH" && amount && Number(amount) > 0) {
       await syncServiceRequestAmount(

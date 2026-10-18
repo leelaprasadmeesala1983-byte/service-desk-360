@@ -101,7 +101,9 @@ function InstallationDetailsDialog({
                         onClick={() => setShowPassword((prev) => !prev)}
                         className="text-muted-foreground hover:text-foreground p-0.5 rounded transition-colors inline-flex items-center"
                         title={showPassword ? "Hide password" : "Show password"}
-                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        aria-label={
+                          showPassword ? "Hide password" : "Show password"
+                        }
                       >
                         {showPassword ? (
                           <EyeOff className="size-3.5" />

@@ -38,7 +38,9 @@ async function run() {
     END $$;
   `);
 
-  console.log("Migration executed successfully: project.pdf_url and project.pdf_name are verified.");
+  console.log(
+    "Migration executed successfully: project.pdf_url and project.pdf_name are verified.",
+  );
 
   const res = await client.query(`
     SELECT column_name, data_type, is_nullable 

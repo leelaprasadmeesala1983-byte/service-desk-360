@@ -31,6 +31,7 @@ type CustomerFormDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customer?: CustomerRow;
+  initialSearch?: string;
   onSuccess?: (customer: CustomerRow) => void;
 };
 
@@ -38,6 +39,7 @@ export function CustomerFormDialog({
   open,
   onOpenChange,
   customer,
+  initialSearch,
   onSuccess,
 }: CustomerFormDialogProps) {
   const router = useRouter();
@@ -79,18 +81,27 @@ export function CustomerFormDialog({
           address: customer.address,
         });
       } else {
+        const rawSearch = initialSearch?.trim() || "";
+        const digitsOnly = rawSearch.replace(/\D/g, "");
+        const isNumeric = digitsOnly.length >= 7 || /^\d+$/.test(rawSearch);
         form.reset({
-          customerName: "",
-          mobileNumber: "",
+          customerName: isNumeric ? "" : rawSearch,
+          mobileNumber: isNumeric ? digitsOnly.slice(0, 10) : "",
           email: "",
           address: "",
         });
       }
     }
-  }, [open, customer, form]);
+  }, [open, customer, initialSearch, form]);
 
-  const handleOpenChange = (newOpen: boolean) => {
+  const handleOpenChange = (
+    newOpen: boolean,
+    eventDetails?: { reason?: string },
+  ) => {
     if (isPending && !newOpen) return;
+    if (!newOpen && eventDetails?.reason === "focusOut") {
+      return;
+    }
     onOpenChange(newOpen);
     if (!newOpen) {
       setFormError(null);
@@ -100,6 +111,7 @@ export function CustomerFormDialog({
 
   const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    event.stopPropagation();
     setFormError(null);
 
     void form.handleSubmit(
@@ -164,7 +176,7 @@ export function CustomerFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6 z-[60]">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? "Edit Customer" : "Add New Customer"}
@@ -189,6 +201,7 @@ export function CustomerFormDialog({
             error={errors.customerName?.message}
           >
             <Input
+              id="customer-form-name"
               placeholder="e.g. John Doe / Tech Corp"
               className="h-10 rounded-md"
               {...form.register("customerName")}
@@ -202,6 +215,7 @@ export function CustomerFormDialog({
             hint="10-digit mobile number"
           >
             <PhoneInput
+              id="customer-form-mobile"
               placeholder="9876543210"
               className="h-10 rounded-md"
               {...form.register("mobileNumber")}
@@ -210,6 +224,7 @@ export function CustomerFormDialog({
 
           <Field label="Email Address" error={errors.email?.message}>
             <Input
+              id="customer-form-email"
               type="email"
               placeholder="customer@example.com (optional)"
               className="h-10 rounded-md"
@@ -219,6 +234,7 @@ export function CustomerFormDialog({
 
           <Field label="Address" required error={errors.address?.message}>
             <Textarea
+              id="customer-form-address"
               rows={3}
               placeholder="Complete street address, city, and pincode"
               className="resize-none rounded-md"
@@ -228,14 +244,19 @@ export function CustomerFormDialog({
 
           <div className="flex items-center justify-end gap-2 pt-2">
             <Button
+              id="btn-customer-cancel"
               type="button"
               variant="outline"
               disabled={isPending}
-              onClick={() => handleOpenChange(false)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleOpenChange(false);
+              }}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isPending}>
+            <Button id="btn-customer-submit" type="submit" disabled={isPending}>
               {isPending && <Loader2 className="size-4 animate-spin" />}
               {isEdit ? "Save Changes" : "Create Customer"}
             </Button>
