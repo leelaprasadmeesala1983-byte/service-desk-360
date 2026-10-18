@@ -141,6 +141,7 @@ const dateTimeField = (label: string) =>
 // --- Service Request -------------------------------------------------------
 
 const serviceRequestCoreShape = {
+  customerId: z.string().optional().nullable(),
   customerName: requiredText("Customer name"),
   phone: phoneField,
   email: optionalEmailField,
@@ -226,6 +227,7 @@ const optionalAssignedTechniciansField = z.preprocess((value) => {
 // --- Installation --------------------------------------------------------
 
 const installationCoreShape = {
+  customerId: z.string().optional().nullable(),
   customerName: requiredText("Customer name"),
   contactNumber: phoneField,
   email: optionalEmailField,
@@ -325,6 +327,7 @@ const technicianInstallationSchema = z
 // --- Project ------------------------------------------------------------
 
 const projectCoreShape = {
+  customerId: z.string().optional().nullable(),
   companyName: requiredText("Company name"),
   customerName: requiredText("Customer name"),
   email: optionalEmailField,

@@ -330,28 +330,7 @@ export function CustomerReportsView({ initialData }: CustomerReportsViewProps) {
 
       {/* 3. Filter Bar */}
       <div className="rounded-xl border border-border bg-card p-4 shadow-xs space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Search Box */}
-          <div className="relative w-full sm:max-w-xs">
-            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
-            <Input
-              value={search}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Search by customer, phone, email..."
-              className="h-9 rounded-md pl-8 pr-8 text-xs"
-            />
-            {search.length > 0 && (
-              <button
-                type="button"
-                onClick={() => handleSearchChange("")}
-                className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 rounded-full p-0.5"
-                aria-label="Clear search"
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
-          </div>
-
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           {/* Module Type & Status Filters */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Type Selector */}
@@ -410,6 +389,27 @@ export function CustomerReportsView({ initialData }: CustomerReportsViewProps) {
                 <RefreshCw className="size-3.5" />
                 Reset
               </Button>
+            )}
+          </div>
+
+          {/* Search Box */}
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
+            <Input
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Search by customer, phone, email..."
+              className="h-9 rounded-md pl-8 pr-8 text-xs"
+            />
+            {search.length > 0 && (
+              <button
+                type="button"
+                onClick={() => handleSearchChange("")}
+                className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 rounded-full p-0.5"
+                aria-label="Clear search"
+              >
+                <X className="size-3.5" />
+              </button>
             )}
           </div>
         </div>
