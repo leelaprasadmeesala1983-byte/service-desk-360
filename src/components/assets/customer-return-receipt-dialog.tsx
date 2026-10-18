@@ -104,10 +104,7 @@ export function CustomerReturnReceiptDialog({
             className="customer-receipt w-full max-w-[700px] my-auto bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 rounded-xl border border-zinc-200 dark:border-zinc-800 p-5 sm:p-8 shadow-xs box-border print:border-0 print:shadow-none print:p-0 print:bg-white print:text-black"
           >
             {/* Header Section */}
-            <PrintReportHeader
-              reportTitle="CUSTOMER RETURN RECEIPT"
-              className="dark:border-zinc-800 [&>h1]:dark:text-zinc-100 [&>p]:dark:text-zinc-400 [&>div]:dark:bg-zinc-900 [&>div]:dark:text-zinc-100 [&>div]:dark:border-zinc-800"
-            />
+            <PrintReportHeader reportTitle="CUSTOMER RETURN RECEIPT" />
 
             {/* Metadata / Receipt Details Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-4 border-b border-zinc-200 dark:border-zinc-800 text-xs">

@@ -4,6 +4,7 @@ import type {
   TechnicianMonthlySummaryReport,
 } from "@/db/queries/technician-reports";
 import { formatDateTime } from "@/lib/format";
+import { drawPdfLetterhead } from "@/lib/pdf-letterhead";
 
 const MONTH_NAMES = [
   "January",
@@ -63,47 +64,30 @@ export function exportMonthlyTechnicianSummaryPdf(
     y += 6;
   }
 
-  // --- Header Banner ---
-  doc.setFillColor(...lightGray);
-  doc.roundedRect(margin, y, contentWidth, 24, 2, 2, "F");
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(15);
-  doc.setTextColor(...primaryColor);
-  doc.text("Technician Productivity Report", margin + 5, y + 9);
-
+  // --- Letterhead ---
+  y = drawPdfLetterhead(doc, {
+    margin,
+    title: "Technician Productivity Report",
+    date: formatDateTime(new Date()),
+  });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...secondaryColor);
   doc.text(
     `Period: ${monthName} ${report.year} (${report.startDate} to ${report.endDate})`,
-    margin + 5,
-    y + 16,
+    pageWidth / 2,
+    y,
+    { align: "center" },
   );
-  doc.text(`Generated on: ${formatDateTime(new Date())}`, margin + 5, y + 21);
-
-  // Stats badge on the right
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(...accentColor);
+  y += 5;
   doc.text(
-    `Total Worked Days: ${report.stats.totalWorkedDays}`,
-    pageWidth - margin - 5,
-    y + 11,
-    { align: "right" },
+    `Total Worked Days: ${report.stats.totalWorkedDays}  •  ${report.technicians.length} Technicians Analyzed`,
+    pageWidth / 2,
+    y,
+    { align: "center" },
   );
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(...secondaryColor);
-  doc.text(
-    `${report.technicians.length} Technicians Analyzed`,
-    pageWidth - margin - 5,
-    y + 18,
-    { align: "right" },
-  );
-
-  y += 30;
+  y += 5;
+  y += 3;
 
   // --- Summary Cards Grid ---
   const colWidth = (contentWidth - 9) / 4;
@@ -289,51 +273,32 @@ export function exportTechnicianDetailedPdf(
     y += 6;
   }
 
-  // --- Header Banner ---
-  doc.setFillColor(...lightGray);
-  doc.roundedRect(margin, y, contentWidth, 26, 2, 2, "F");
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.setTextColor(...primaryColor);
-  doc.text(report.technician.name, margin + 5, y + 8);
-
+  // --- Letterhead ---
+  y = drawPdfLetterhead(doc, {
+    margin,
+    title: "Technician Detail Report",
+    date: formatDateTime(new Date()),
+  });
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
+  doc.setFontSize(9);
   doc.setTextColor(...secondaryColor);
+  doc.text(report.technician.name, pageWidth / 2, y, { align: "center" });
+  y += 5;
   doc.text(
     `Department: ${report.technician.department || "General"}  •  Email: ${report.technician.email}`,
-    margin + 5,
-    y + 14,
+    pageWidth / 2,
+    y,
+    { align: "center" },
   );
+  y += 5;
   doc.text(
-    `Report Period: ${monthName} ${report.year}  •  Exported on: ${formatDateTime(new Date())}`,
-    margin + 5,
-    y + 20,
+    `Report Period: ${monthName} ${report.year}  •  ${report.summary.totalWorkedDays} Worked Days`,
+    pageWidth / 2,
+    y,
+    { align: "center" },
   );
-
-  // Total Worked Days Badge
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.setTextColor(...accentColor);
-  doc.text(
-    `${report.summary.totalWorkedDays} Worked Days`,
-    pageWidth - margin - 5,
-    y + 11,
-    { align: "right" },
-  );
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(...secondaryColor);
-  doc.text(
-    `Unique calendar work dates in ${monthName}`,
-    pageWidth - margin - 5,
-    y + 18,
-    { align: "right" },
-  );
-
-  y += 32;
+  y += 5;
+  y += 3;
 
   // --- Summary Metrics Row ---
   const colWidth = (contentWidth - 6) / 3;

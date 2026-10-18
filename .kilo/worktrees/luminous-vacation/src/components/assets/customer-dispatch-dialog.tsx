@@ -323,7 +323,7 @@ export function CustomerDispatchDialog({
                   htmlFor="dispatchDate"
                   className="text-xs font-semibold text-foreground"
                 >
-                  Dispatch Date <span className="text-destructive">*</span>
+                  Dispatch Datess <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="dispatchDate"

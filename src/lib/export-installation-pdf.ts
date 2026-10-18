@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import type { InstallationRow } from "@/db/queries/installations";
 import { RECORD_STATUS_LABELS } from "@/lib/constants";
 import { formatDateTime } from "@/lib/format";
+import { drawPdfLetterhead } from "@/lib/pdf-letterhead";
 
 export function exportInstallationToPdf(record: InstallationRow): void {
   const doc = new jsPDF({
@@ -38,36 +39,24 @@ export function exportInstallationToPdf(record: InstallationRow): void {
     y += 6;
   }
 
-  // --- Top Header Banner ---
-  doc.setFillColor(...lightGray);
-  doc.roundedRect(margin, y, contentWidth, 24, 2, 2, "F");
-
-  // Title
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.setTextColor(...primaryColor);
-  doc.text("Installation Details", margin + 5, y + 10);
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(...secondaryColor);
-  doc.text(`Exported on: ${formatDateTime(new Date())}`, margin + 5, y + 17);
-
-  // Status & Record Badge on the right
-  const statusText = RECORD_STATUS_LABELS[record.status] || record.status;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.setTextColor(...accentColor);
-  doc.text(record.recordId, pageWidth - margin - 5, y + 10, { align: "right" });
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(...secondaryColor);
-  doc.text(`Status: ${statusText}`, pageWidth - margin - 5, y + 17, {
-    align: "right",
+  // --- Letterhead ---
+  y = drawPdfLetterhead(doc, {
+    margin,
+    title: "Installation Details",
+    refId: record.recordId,
+    date: formatDateTime(new Date()),
   });
-
-  y += 30;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...secondaryColor);
+  doc.text(
+    `Status: ${RECORD_STATUS_LABELS[record.status] || record.status}`,
+    pageWidth / 2,
+    y,
+    { align: "center" },
+  );
+  y += 5;
+  y += 3;
 
   // --- Helper to draw a section header ---
   function drawSectionTitle(title: string) {
@@ -178,7 +167,7 @@ export function exportInstallationToPdf(record: InstallationRow): void {
     "Assigned Technician(s)",
     techDisplay,
     "Current Status",
-    statusText,
+    RECORD_STATUS_LABELS[record.status] || record.status,
   );
   drawTwoColumnRow(
     "Created Date",

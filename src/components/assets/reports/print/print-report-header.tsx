@@ -1,31 +1,42 @@
 import { cn } from "@/lib/utils";
 
 export type PrintReportHeaderProps = {
-  companyName?: string;
-  subtitle?: string;
   reportTitle: string;
+  /** Document number shown top-right. */
+  refId?: string;
+  /** Pre-formatted date shown under the document number. */
+  date?: string;
   className?: string;
 };
 
 export function PrintReportHeader({
-  companyName = "MARUTHI IT SERVICES",
-  subtitle = "SERVICE & REPAIR MATERIAL TRACKING SYSTEM",
   reportTitle,
+  refId,
+  date,
   className,
 }: PrintReportHeaderProps) {
   return (
-    <div
-      className={cn("border-b-2 border-zinc-900 pb-5 text-center", className)}
-    >
-      <h1 className="text-2xl font-black tracking-tight text-zinc-900 uppercase">
-        {companyName}
-      </h1>
-      <p className="text-xs font-semibold tracking-wider text-zinc-600 uppercase mt-0.5">
-        {subtitle}
-      </p>
-      <div className="inline-block mt-3 px-4 py-1 rounded bg-zinc-100 text-zinc-900 font-bold text-xs tracking-wide uppercase border border-zinc-300">
-        {reportTitle}
+    <div className={cn("pb-1", className)}>
+      <div className="flex items-start justify-between gap-4">
+        {/* biome-ignore lint/performance/noImgElement: static logo, also used in print */}
+        <img
+          src="/maruthi-logo.png"
+          alt="MARUTHI IT SERVICES"
+          className="h-20 w-auto rounded bg-white -ml-2"
+        />
+        <div className="text-right text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
+          {refId ? (
+            <div className="font-mono text-[13px] font-extrabold text-zinc-900 dark:text-zinc-100">
+              {refId}
+            </div>
+          ) : null}
+          {date ? <div>{date}</div> : null}
+        </div>
       </div>
+      <div className="mt-2 h-[3px] bg-blue-600" />
+      <h1 className="mt-5 text-center text-[17px] font-extrabold tracking-[0.14em] text-zinc-900 uppercase dark:text-zinc-100">
+        {reportTitle}
+      </h1>
     </div>
   );
 }

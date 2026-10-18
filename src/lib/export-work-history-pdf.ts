@@ -1,8 +1,8 @@
 import jsPDF from "jspdf";
-
 import type { WorkHistoryItem } from "@/db/queries/work-history";
 import { RECORD_STATUS_LABELS } from "@/lib/constants";
 import { formatDateTime } from "@/lib/format";
+import { drawPdfLetterhead } from "@/lib/pdf-letterhead";
 
 export type WorkHistoryExportContext = {
   recordId: string;
@@ -50,30 +50,28 @@ export function exportWorkHistoryToPdf(
     y += 6;
   }
 
-  // Header Banner
-  doc.setFillColor(...lightGray);
-  doc.roundedRect(margin, y, contentWidth, 24, 2, 2, "F");
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(15);
-  doc.setTextColor(...primaryColor);
-  doc.text(`Work History Report — ${context.recordId}`, margin + 5, y + 9);
-
+  // Letterhead
+  y = drawPdfLetterhead(doc, {
+    margin,
+    title: "Work History Report",
+    refId: context.recordId,
+    date: formatDateTime(new Date()),
+  });
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
+  doc.setFontSize(9);
   doc.setTextColor(...secondaryColor);
   doc.text(
     `Customer: ${context.customerName}  •  Phone: ${context.phone}  •  Status: ${context.status}`,
-    margin + 5,
-    y + 16,
+    pageWidth / 2,
+    y,
+    { align: "center" },
   );
-  doc.text(
-    `Generated on: ${formatDateTime(new Date())}  •  Total Logs: ${items.length}`,
-    margin + 5,
-    y + 21,
-  );
-
-  y += 28;
+  y += 5;
+  doc.text(`Total Logs: ${items.length}`, pageWidth / 2, y, {
+    align: "center",
+  });
+  y += 5;
+  y += 3;
 
   // Logs List
   if (items.length === 0) {
