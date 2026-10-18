@@ -18,7 +18,7 @@ declare global {
  */
 export function getMsUntilNextMidnight(timeZone = APP_TIMEZONE): number {
   const now = new Date();
-  
+
   // Get current local date in timeZone
   const todayStr = formatLocalDate(now, timeZone);
   const parts = todayStr.split("-").map(Number);
@@ -28,7 +28,7 @@ export function getMsUntilNextMidnight(timeZone = APP_TIMEZONE): number {
 
   // Tomorrow's date
   const tomorrowUtc = new Date(Date.UTC(year, month, day + 1, 0, 0, 0, 0));
-  
+
   // Find tomorrow's midnight in UTC for the target timezone
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone,
@@ -40,9 +40,10 @@ export function getMsUntilNextMidnight(timeZone = APP_TIMEZONE): number {
     second: "numeric",
     hourCycle: "h23",
   });
-  
+
   const partsTz = formatter.formatToParts(tomorrowUtc);
-  const getPart = (type: string) => Number(partsTz.find((p) => p.type === type)?.value || 0);
+  const getPart = (type: string) =>
+    Number(partsTz.find((p) => p.type === type)?.value || 0);
   const tzYear = getPart("year");
   const tzMonth = getPart("month") - 1;
   const tzDay = getPart("day");
@@ -66,14 +67,18 @@ export function getMsUntilNextMidnight(timeZone = APP_TIMEZONE): number {
  */
 async function runMidnightRolloverTask(): Promise<void> {
   const todayStr = formatLocalDate(new Date(), APP_TIMEZONE);
-  console.log(`[Quick Cash Scheduler] Executing midnight rollover for date: ${todayStr} (Timezone: ${APP_TIMEZONE})...`);
-  
+  console.log(
+    `[Quick Cash Scheduler] Executing midnight rollover for date: ${todayStr} (Timezone: ${APP_TIMEZONE})...`,
+  );
+
   try {
     await performMidnightRolloverForAllUsers();
     globalThis.__quickCashLastRolloverDate__ = todayStr;
     revalidatePath("/quick-cash");
     revalidatePath("/");
-    console.log(`[Quick Cash Scheduler] Midnight rollover completed successfully.`);
+    console.log(
+      `[Quick Cash Scheduler] Midnight rollover completed successfully.`,
+    );
   } catch (error) {
     console.error("[Quick Cash Scheduler] Midnight rollover error:", error);
   } finally {
@@ -104,15 +109,23 @@ function scheduleNextMidnightRun(): void {
  */
 export function initMidnightRolloverScheduler(): void {
   // Prevent duplicate initializations in HMR / dev mode
-  if (globalThis.__quickCashMidnightTimer__ && globalThis.__quickCashHeartbeatInterval__) {
+  if (
+    globalThis.__quickCashMidnightTimer__ &&
+    globalThis.__quickCashHeartbeatInterval__
+  ) {
     return;
   }
 
-  console.log(`[Quick Cash Scheduler] Initializing automatic midnight rollover (Timezone: ${APP_TIMEZONE})...`);
+  console.log(
+    `[Quick Cash Scheduler] Initializing automatic midnight rollover (Timezone: ${APP_TIMEZONE})...`,
+  );
 
   // Run initial catch-up immediately on startup
   void performMidnightRolloverForAllUsers().then(() => {
-    globalThis.__quickCashLastRolloverDate__ = formatLocalDate(new Date(), APP_TIMEZONE);
+    globalThis.__quickCashLastRolloverDate__ = formatLocalDate(
+      new Date(),
+      APP_TIMEZONE,
+    );
   });
 
   // Schedule exact midnight timer
@@ -120,15 +133,20 @@ export function initMidnightRolloverScheduler(): void {
 
   // Set safety heartbeat check every 5 minutes
   if (!globalThis.__quickCashHeartbeatInterval__) {
-    globalThis.__quickCashHeartbeatInterval__ = setInterval(() => {
-      const todayStr = formatLocalDate(new Date(), APP_TIMEZONE);
-      if (
-        globalThis.__quickCashLastRolloverDate__ &&
-        globalThis.__quickCashLastRolloverDate__ < todayStr
-      ) {
-        console.log(`[Quick Cash Scheduler] Heartbeat detected date transition (${globalThis.__quickCashLastRolloverDate__} -> ${todayStr}). Triggering catch-up...`);
-        void runMidnightRolloverTask();
-      }
-    }, 5 * 60 * 1000);
+    globalThis.__quickCashHeartbeatInterval__ = setInterval(
+      () => {
+        const todayStr = formatLocalDate(new Date(), APP_TIMEZONE);
+        if (
+          globalThis.__quickCashLastRolloverDate__ &&
+          globalThis.__quickCashLastRolloverDate__ < todayStr
+        ) {
+          console.log(
+            `[Quick Cash Scheduler] Heartbeat detected date transition (${globalThis.__quickCashLastRolloverDate__} -> ${todayStr}). Triggering catch-up...`,
+          );
+          void runMidnightRolloverTask();
+        }
+      },
+      5 * 60 * 1000,
+    );
   }
 }

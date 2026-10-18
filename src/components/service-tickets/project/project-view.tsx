@@ -182,7 +182,11 @@ function ProjectView({
               Log Request
             </Button>
             {isAdmin && (
-              <Button onClick={() => setCreateOpen(true)} className="gap-1.5">
+              <Button
+                id="btn-new-project"
+                onClick={() => setCreateOpen(true)}
+                className="gap-1.5"
+              >
                 <Plus className="size-4" />
                 New Project
               </Button>

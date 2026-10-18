@@ -4,6 +4,7 @@ import { cache } from "react";
 
 import { auth } from "@/lib/auth";
 import type { UserRole, UserStatus } from "@/lib/constants";
+import { withDbRetry } from "@/lib/db-resilience";
 
 type CurrentUser = {
   id: string;
@@ -20,7 +21,11 @@ type CurrentUser = {
 /** Deduped per request so several server components can call it freely. */
 const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
+    const reqHeaders = await headers();
+    const session = await withDbRetry(
+      () => auth.api.getSession({ headers: reqHeaders }),
+      { retries: 2, delayMs: 150, operationName: "auth.api.getSession" },
+    );
     if (!session?.user) return null;
 
     const user = session.user as typeof session.user & {

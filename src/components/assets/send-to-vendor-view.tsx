@@ -232,47 +232,47 @@ export function SendToVendorView({
         <PageHeader title="Send to Vendor" count={totalCount} />
 
         <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
-        {/* Search Input */}
-        <div className="relative w-full sm:w-80 shrink-0">
-          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search Track ID, Customer, Serial..."
-            className="h-9 rounded-md pl-8.5 pr-8.5 bg-card text-xs border-border shadow-2xs w-full"
-          />
+          {/* Search Input */}
+          <div className="relative w-full sm:w-80 shrink-0">
+            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search Track ID, Customer, Serial..."
+              className="h-9 rounded-md pl-8.5 pr-8.5 bg-card text-xs border-border shadow-2xs w-full"
+            />
 
-          {search.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 rounded-full p-0.5 transition-colors focus:outline-none cursor-pointer"
-              aria-label="Clear search"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
+            {search.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 rounded-full p-0.5 transition-colors focus:outline-none cursor-pointer"
+                aria-label="Clear search"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
 
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handlePrintClick}
-          className="h-9 gap-2 text-xs cursor-pointer shrink-0"
-        >
-          <Printer className="size-3.5" />
-          {selectMode ? `Print (${selected.size})` : "Print"}
-        </Button>
-        {selectMode && (
           <Button
             type="button"
-            variant="ghost"
-            onClick={cancelSelect}
-            className="h-9 text-xs cursor-pointer shrink-0"
+            variant="outline"
+            onClick={handlePrintClick}
+            className="h-9 gap-2 text-xs cursor-pointer shrink-0"
           >
-            Cancel
+            <Printer className="size-3.5" />
+            {selectMode ? `Print (${selected.size})` : "Print"}
           </Button>
-        )}
+          {selectMode && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={cancelSelect}
+              className="h-9 text-xs cursor-pointer shrink-0"
+            >
+              Cancel
+            </Button>
+          )}
         </div>
       </div>
 

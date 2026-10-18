@@ -1123,5 +1123,3 @@ export async function listSelectableProjects(
     };
   });
 }
-
-

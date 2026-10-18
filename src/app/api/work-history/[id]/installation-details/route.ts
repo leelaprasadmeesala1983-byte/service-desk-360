@@ -25,7 +25,9 @@ export async function PUT(
     return NextResponse.json({ success: true, data: result.data });
   } catch (err: unknown) {
     const msg =
-      err instanceof Error ? err.message : "Failed to update installation details";
+      err instanceof Error
+        ? err.message
+        : "Failed to update installation details";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

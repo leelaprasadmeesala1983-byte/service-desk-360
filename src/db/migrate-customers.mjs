@@ -58,7 +58,9 @@ async function run() {
   `);
 
   const allRecords = [...s.rows, ...i.rows, ...p.rows];
-  console.log(`Gathered ${allRecords.length} records across service, installation, and project.`);
+  console.log(
+    `Gathered ${allRecords.length} records across service, installation, and project.`,
+  );
 
   // Consolidate distinct customers by mobile number
   const customerMap = new Map();
@@ -83,13 +85,18 @@ async function run() {
       if ((!existing.address || existing.address === "—") && r.address) {
         existing.address = r.address.trim();
       }
-      if (r.created_at && new Date(r.created_at) < new Date(existing.createdAt)) {
+      if (
+        r.created_at &&
+        new Date(r.created_at) < new Date(existing.createdAt)
+      ) {
         existing.createdAt = r.created_at;
       }
     }
   }
 
-  console.log(`Found ${customerMap.size} unique customer phone numbers to backfill.`);
+  console.log(
+    `Found ${customerMap.size} unique customer phone numbers to backfill.`,
+  );
 
   let insertedCount = 0;
   for (const cust of customerMap.values()) {
@@ -110,14 +117,16 @@ async function run() {
         cust.address,
         cust.createdById,
         cust.createdAt,
-      ]
+      ],
     );
     if (res.rowCount && res.rowCount > 0) {
       insertedCount++;
     }
   }
 
-  console.log(`Successfully migrated and synced ${insertedCount} customer records.`);
+  console.log(
+    `Successfully migrated and synced ${insertedCount} customer records.`,
+  );
 
   const countRes = await client.query(`SELECT count(*) FROM "customer"`);
   console.log(`Total customers in database: ${countRes.rows[0].count}`);

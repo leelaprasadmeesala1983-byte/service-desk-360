@@ -169,7 +169,10 @@ export async function createWorkHistory(input: unknown): Promise<ActionResult> {
       .limit(1);
     if (validCreator) validCreatorId = validCreator.id;
     let workDateStr = "";
-    if (typeof data.workDateTime === "string" && data.workDateTime.trim().length > 0) {
+    if (
+      typeof data.workDateTime === "string" &&
+      data.workDateTime.trim().length > 0
+    ) {
       const clean = data.workDateTime.trim();
       if (clean.includes("T")) workDateStr = clean.split("T")[0];
       else if (clean.includes(" ")) workDateStr = clean.split(" ")[0];

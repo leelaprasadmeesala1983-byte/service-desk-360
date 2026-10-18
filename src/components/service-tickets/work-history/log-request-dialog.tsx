@@ -29,7 +29,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { SelectableRecord } from "@/db/queries/work-history";
 import { createWorkHistory } from "@/lib/actions/work-history";
-import { RECORD_STATUS_LABELS, type RecordStatus, type RecordType } from "@/lib/constants";
+import {
+  RECORD_STATUS_LABELS,
+  type RecordStatus,
+  type RecordType,
+} from "@/lib/constants";
 import { formatRecordId } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
@@ -329,7 +333,10 @@ export function LogRequestDialog({
                   <span className="font-medium text-foreground">
                     {selectedTicket.recordId ||
                       (selectedTicket.seq
-                        ? formatRecordId(workType ?? "SERVICE", selectedTicket.seq)
+                        ? formatRecordId(
+                            workType ?? "SERVICE",
+                            selectedTicket.seq,
+                          )
                         : selectedTicket.id)}
                   </span>
                 ) : (
@@ -369,7 +376,9 @@ export function LogRequestDialog({
                               : "hover:bg-muted text-foreground",
                           )}
                         >
-                          <span className="font-semibold text-foreground">{displayId}</span>
+                          <span className="font-semibold text-foreground">
+                            {displayId}
+                          </span>
                           {isSelected && (
                             <Check className="text-primary size-4 shrink-0 ml-2" />
                           )}
