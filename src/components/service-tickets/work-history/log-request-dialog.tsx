@@ -128,6 +128,27 @@ function resolveAssignedTechIds(
   return Array.from(resolved);
 }
 
+export function getTicketDisplayLabel(
+  ticket: SelectableRecord,
+  workType?: RecordType,
+): string {
+  const displayId =
+    ticket.recordId ||
+    (ticket.seq
+      ? formatRecordId(workType ?? "SERVICE", ticket.seq)
+      : ticket.id);
+
+  const rawName =
+    ticket.ticketName ||
+    ticket.description ||
+    (workType === "PROJECT" ? ticket.companyName : "") ||
+    "";
+
+  const cleanName = rawName.replace(/\r?\n+/g, " ").replace(/\s+/g, " ").trim();
+
+  return cleanName ? `${displayId} - ${cleanName}` : displayId;
+}
+
 export function LogRequestDialog({
   open,
   onOpenChange,
@@ -330,14 +351,11 @@ export function LogRequestDialog({
                 )}
               >
                 {selectedTicket ? (
-                  <span className="font-medium text-foreground">
-                    {selectedTicket.recordId ||
-                      (selectedTicket.seq
-                        ? formatRecordId(
-                            workType ?? "SERVICE",
-                            selectedTicket.seq,
-                          )
-                        : selectedTicket.id)}
+                  <span
+                    className="font-medium text-foreground truncate mr-2"
+                    title={getTicketDisplayLabel(selectedTicket, workType)}
+                  >
+                    {getTicketDisplayLabel(selectedTicket, workType)}
                   </span>
                 ) : (
                   <span className="text-muted-foreground">
@@ -359,16 +377,13 @@ export function LogRequestDialog({
                   ) : (
                     activeSelectableTickets.map((ticket) => {
                       const isSelected = ticket.id === selectedTicketId;
-                      const displayId =
-                        ticket.recordId ||
-                        (ticket.seq
-                          ? formatRecordId(workType ?? "SERVICE", ticket.seq)
-                          : ticket.id);
+                      const label = getTicketDisplayLabel(ticket, workType);
                       return (
                         <button
                           key={ticket.id}
                           type="button"
                           onClick={() => handleTicketSelect(ticket)}
+                          title={label}
                           className={cn(
                             "flex w-full cursor-pointer items-center justify-between rounded-md px-3 py-2 text-xs transition-colors text-left outline-none font-medium",
                             isSelected
@@ -376,11 +391,11 @@ export function LogRequestDialog({
                               : "hover:bg-muted text-foreground",
                           )}
                         >
-                          <span className="font-semibold text-foreground">
-                            {displayId}
+                          <span className="text-foreground truncate mr-2 font-medium">
+                            {label}
                           </span>
                           {isSelected && (
-                            <Check className="text-primary size-4 shrink-0 ml-2" />
+                            <Check className="text-primary size-4 shrink-0 ml-auto" />
                           )}
                         </button>
                       );

@@ -433,21 +433,29 @@ function ProjectView({
         workType="PROJECT"
         selectableTickets={(recordsList ?? [])
           .filter((r) => r && r.status !== "CLOSED")
-          .map((r) => ({
-            id: r.id,
-            seq: r.seq,
-            recordId: r.recordId,
-            customerName: r.customerName,
-            phone: r.mobileNo,
-            email: r.email,
-            category: r.companyName,
-            address: r.location,
-            status: r.status,
-            assignedTechnicianId: r.assignedTechnicianId,
-            assignedTechnicianIds: r.assignedTechnicianIds,
-            technicianName: r.technicianName,
-            technicianNames: r.technicianNames,
-          }))}
+          .map((r) => {
+            const ticketName = (r.description || r.companyName)
+              ? (r.description || r.companyName).replace(/\r?\n+/g, " ").replace(/\s+/g, " ").trim()
+              : "";
+            return {
+              id: r.id,
+              seq: r.seq,
+              recordId: r.recordId,
+              customerName: r.customerName,
+              phone: r.mobileNo,
+              email: r.email,
+              category: r.companyName,
+              address: r.location,
+              status: r.status,
+              assignedTechnicianId: r.assignedTechnicianId,
+              assignedTechnicianIds: r.assignedTechnicianIds,
+              technicianName: r.technicianName,
+              technicianNames: r.technicianNames,
+              ticketName,
+              companyName: r.companyName,
+              description: r.description,
+            };
+          })}
         technicians={technicians}
         onSuccess={() => router.refresh()}
       />
