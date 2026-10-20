@@ -220,14 +220,50 @@ export function printVendorDispatch(
   );
 }
 
+function uniqueJoin(values: string[]): string {
+  const unique = Array.from(new Set(values.filter((v) => v && v !== "—")));
+  return unique.length > 0 ? unique.join(", ") : "—";
+}
+
 /**
- * Generates one HTML document with every selected dispatch on its own page,
- * each in the same layout as a single dispatch print.
+ * Merges dispatches that share a vendor into one document so their materials
+ * list in a single table.
+ */
+function mergeDispatchesByVendor(
+  docs: VendorDispatchDocumentData[],
+): VendorDispatchDocumentData[] {
+  const groups = new Map<string, VendorDispatchDocumentData[]>();
+  for (const d of docs) {
+    const key = d.vendor.name.trim().toLowerCase();
+    const group = groups.get(key);
+    if (group) group.push(d);
+    else groups.set(key, [d]);
+  }
+
+  return Array.from(groups.values()).map((group) => {
+    if (group.length === 1) return group[0];
+    const first = group[0];
+    return {
+      ...first,
+      dispatchId: uniqueJoin(group.map((d) => d.dispatchId)),
+      materials: group.flatMap((d) => d.materials),
+      numberOfPackages: group.reduce((s, d) => s + d.numberOfPackages, 0),
+      courier: uniqueJoin(group.map((d) => d.courier)),
+      docketAwbNumber: uniqueJoin(group.map((d) => d.docketAwbNumber)),
+    };
+  });
+}
+
+/**
+ * Generates one HTML document for the selected dispatches. Dispatches to the
+ * same vendor share one page/table; each different vendor gets its own page.
  */
 export function generateVendorDispatchListHtml(
   rows: SendToVendorRow[],
 ): string {
-  const docs = rows.map(normalizeVendorDispatchDocumentData);
+  const docs = mergeDispatchesByVendor(
+    rows.map(normalizeVendorDispatchDocumentData),
+  );
   const body = docs
     .map(
       (d, i) =>
