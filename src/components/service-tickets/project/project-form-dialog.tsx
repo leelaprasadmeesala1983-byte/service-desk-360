@@ -7,6 +7,7 @@ import { useEffect, useState, useTransition } from "react";
 import { type Resolver, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { CustomerModeSwitcher } from "@/components/service-tickets/customer-mode-switcher";
 import { CustomerSelectField } from "@/components/service-tickets/customer-select-field";
 import { DetailRow } from "@/components/service-tickets/detail-row";
 import {
@@ -339,65 +340,22 @@ function ProjectFormDialog({
               </>
             ) : (
               <>
-                <Field
-                  label="Company Name"
-                  required
-                  error={errors.companyName?.message}
-                >
-                  <Input
-                    className="h-9 rounded-md"
-                    {...form.register("companyName")}
+                {!isEdit && (
+                  <CustomerModeSwitcher
+                    isNewCustomer={isNewCustomerMode}
+                    onModeChange={(mode) =>
+                      mode === "new"
+                        ? handleAddNewCustomer()
+                        : handleReturnToExistingCustomer()
+                    }
                   />
-                </Field>
-                {!isEdit && isNewCustomerMode && (
-                  <div className="sm:col-span-2 rounded-md border border-primary/20 bg-primary/5 p-3 flex items-center justify-between gap-2 text-xs">
-                    <div className="flex items-center gap-2 text-primary font-medium">
-                      <UserPlus className="size-4 shrink-0" />
-                      <span>
-                        Adding New Customer — Enter the customer details below
-                        and submit.
-                      </span>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleReturnToExistingCustomer}
-                      className="h-7 px-2 text-xs font-medium text-muted-foreground hover:text-foreground cursor-pointer flex items-center gap-1"
-                    >
-                      <ArrowLeft className="size-3.5" />
-                      <span>Select Existing Customer</span>
-                    </Button>
-                  </div>
                 )}
 
+                {/* Row 1: Mobile Number & Customer Name */}
                 <Field
                   label="Mobile Number"
                   required
                   error={errors.mobileNo?.message}
-                  action={
-                    !isEdit ? (
-                      isNewCustomerMode ? (
-                        <button
-                          type="button"
-                          onClick={handleReturnToExistingCustomer}
-                          className="text-xs text-muted-foreground hover:text-foreground font-normal inline-flex items-center gap-1 cursor-pointer transition-colors"
-                        >
-                          <ArrowLeft className="size-3" />
-                          <span>Select Existing</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleAddNewCustomer()}
-                          className="text-xs text-primary hover:underline font-normal inline-flex items-center gap-1 cursor-pointer transition-colors"
-                        >
-                          <UserPlus className="size-3" />
-                          <span>Add New Customer</span>
-                        </button>
-                      )
-                    ) : undefined
-                  }
                 >
                   {isNewCustomerMode ? (
                     <Input
@@ -406,7 +364,7 @@ function ProjectFormDialog({
                       maxLength={10}
                       autoFocus
                       placeholder="Enter 10-digit mobile number"
-                      className="h-9 rounded-md"
+                      className="h-10 rounded-lg text-sm"
                       {...form.register("mobileNo", {
                         onChange: (e) => {
                           const cleaned = e.target.value
@@ -424,7 +382,6 @@ function ProjectFormDialog({
                       value={form.watch("mobileNo") ?? ""}
                       selectedCustomerId={selectedCustomerId}
                       placeholder="Enter or select mobile number"
-                      size="sm"
                       autoSelectIfSingle={!isEdit}
                       parentOpen={open}
                       onAddNewCustomer={handleAddNewCustomer}
@@ -476,6 +433,7 @@ function ProjectFormDialog({
                     />
                   )}
                 </Field>
+
                 <Field
                   label="Customer Name"
                   required
@@ -484,22 +442,54 @@ function ProjectFormDialog({
                   <Input
                     id="customerName"
                     autoComplete="name"
-                    className="h-9 rounded-md"
+                    className="h-10 rounded-lg text-sm"
                     placeholder="Enter customer name"
                     {...form.register("customerName")}
                   />
                 </Field>
+
+                {/* Row 2: Email Address & Company Name */}
                 <Field label="Email Address" error={errors.email?.message}>
                   <Input
                     id="email"
                     type="email"
                     autoComplete="email"
-                    className="h-9 rounded-md"
+                    className="h-10 rounded-lg text-sm"
                     placeholder="Enter email address (optional)"
                     {...form.register("email")}
                   />
                 </Field>
 
+                <Field
+                  label="Company Name"
+                  required
+                  error={errors.companyName?.message}
+                >
+                  <Input
+                    id="companyName"
+                    className="h-10 rounded-lg text-sm"
+                    placeholder="Enter company name"
+                    {...form.register("companyName")}
+                  />
+                </Field>
+
+                {/* Row 3: Location / Customer Address (spans full width) */}
+                <Field
+                  label="Location"
+                  required
+                  className="sm:col-span-2"
+                  error={errors.location?.message}
+                >
+                  <Input
+                    id="location"
+                    autoComplete="street-address"
+                    className="h-10 rounded-lg text-sm"
+                    placeholder="Enter location / customer address"
+                    {...form.register("location")}
+                  />
+                </Field>
+
+                {/* Row 4: Assign Technician & Status */}
                 <ControlledMultiSelect
                   control={form.control}
                   name="assignedTechnicianIds"
@@ -516,27 +506,14 @@ function ProjectFormDialog({
                   required
                   options={STATUS_OPTIONS}
                 />
-
-                <Field
-                  label="Location"
-                  required
-                  error={errors.location?.message}
-                >
-                  <Input
-                    id="location"
-                    autoComplete="street-address"
-                    className="h-9 rounded-md"
-                    placeholder="Enter location / customer address"
-                    {...form.register("location")}
-                  />
-                </Field>
                 <Field
                   label="Estimation No"
                   required
                   error={errors.estimationNo?.message}
                 >
                   <Input
-                    className="h-9 rounded-md"
+                    className="h-10 rounded-lg text-sm"
+                    placeholder="Enter estimation number"
                     {...form.register("estimationNo")}
                   />
                 </Field>
@@ -550,7 +527,7 @@ function ProjectFormDialog({
                   >
                     <Input
                       type="datetime-local"
-                      className="h-9 rounded-md"
+                      className="h-10 rounded-lg text-sm"
                       {...form.register("createdAt")}
                     />
                   </Field>

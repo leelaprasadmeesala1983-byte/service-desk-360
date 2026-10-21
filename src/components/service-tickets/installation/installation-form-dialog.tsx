@@ -7,6 +7,7 @@ import { useEffect, useState, useTransition } from "react";
 import { type Resolver, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { CustomerModeSwitcher } from "@/components/service-tickets/customer-mode-switcher";
 import { CustomerSelectField } from "@/components/service-tickets/customer-select-field";
 import { DetailRow } from "@/components/service-tickets/detail-row";
 import {
@@ -447,55 +448,22 @@ function InstallationFormDialog({
               </>
             ) : (
               <>
-                {!isEdit && isNewCustomerMode && (
-                  <div className="sm:col-span-2 flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
-                    <div className="flex items-center gap-2 font-medium text-primary">
-                      <UserPlus className="size-4 shrink-0" />
-                      <span>New Customer Mode</span>
-                      <span className="hidden sm:inline text-muted-foreground font-normal text-[11px]">
-                        — Enter customer details directly below
-                      </span>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleReturnToExistingCustomer}
-                      className="h-7 px-2 text-xs font-medium text-muted-foreground hover:text-foreground cursor-pointer flex items-center gap-1"
-                    >
-                      <ArrowLeft className="size-3.5" />
-                      <span>Select Existing Customer</span>
-                    </Button>
-                  </div>
+                {!isEdit && (
+                  <CustomerModeSwitcher
+                    isNewCustomer={isNewCustomerMode}
+                    onModeChange={(mode) =>
+                      mode === "new"
+                        ? handleAddNewCustomer()
+                        : handleReturnToExistingCustomer()
+                    }
+                  />
                 )}
 
+                {/* Row 1: Mobile Number & Customer Name */}
                 <Field
                   label="Mobile Number"
                   required
                   error={errors.contactNumber?.message}
-                  action={
-                    !isEdit ? (
-                      isNewCustomerMode ? (
-                        <button
-                          type="button"
-                          onClick={handleReturnToExistingCustomer}
-                          className="text-xs text-muted-foreground hover:text-foreground font-normal inline-flex items-center gap-1 cursor-pointer transition-colors"
-                        >
-                          <ArrowLeft className="size-3" />
-                          <span>Select Existing</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleAddNewCustomer()}
-                          className="text-xs text-primary hover:underline font-normal inline-flex items-center gap-1 cursor-pointer transition-colors"
-                        >
-                          <UserPlus className="size-3" />
-                          <span>Add New Customer</span>
-                        </button>
-                      )
-                    ) : undefined
-                  }
                 >
                   {isNewCustomerMode ? (
                     <Input
@@ -504,7 +472,7 @@ function InstallationFormDialog({
                       maxLength={10}
                       autoFocus
                       placeholder="Enter 10-digit mobile number"
-                      className="h-9 rounded-md"
+                      className="h-10 rounded-lg text-sm"
                       {...form.register("contactNumber", {
                         onChange: (e) => {
                           const cleaned = e.target.value
@@ -522,7 +490,6 @@ function InstallationFormDialog({
                       value={form.watch("contactNumber") ?? ""}
                       selectedCustomerId={selectedCustomerId}
                       placeholder="Enter or select mobile number"
-                      size="sm"
                       autoSelectIfSingle={!isEdit}
                       parentOpen={open}
                       onAddNewCustomer={handleAddNewCustomer}
@@ -574,6 +541,7 @@ function InstallationFormDialog({
                     />
                   )}
                 </Field>
+
                 <Field
                   label="Customer Name"
                   required
@@ -582,36 +550,24 @@ function InstallationFormDialog({
                   <Input
                     id="customerName"
                     autoComplete="name"
-                    className="h-9 rounded-md"
+                    className="h-10 rounded-lg text-sm"
                     placeholder="Enter customer name"
                     {...form.register("customerName")}
                   />
                 </Field>
+
+                {/* Row 2: Email Address & Assign Technician */}
                 <Field label="Email Address" error={errors.email?.message}>
                   <Input
                     id="email"
                     type="email"
                     autoComplete="email"
-                    className="h-9 rounded-md"
+                    className="h-10 rounded-lg text-sm"
                     placeholder="Enter email address (optional)"
                     {...form.register("email")}
                   />
                 </Field>
 
-                <Field
-                  label="Address"
-                  required
-                  className="sm:col-span-2"
-                  error={errors.address?.message}
-                >
-                  <Input
-                    id="address"
-                    autoComplete="street-address"
-                    className="h-9 rounded-md"
-                    placeholder="Enter customer address"
-                    {...form.register("address")}
-                  />
-                </Field>
                 <ControlledMultiSelect
                   control={form.control}
                   name="assignedTechnicianIds"
@@ -621,6 +577,22 @@ function InstallationFormDialog({
                   hint="Only technicians appear in this list."
                   error={errors.assignedTechnicianIds?.message}
                 />
+
+                {/* Row 3: Customer Address (spans full width) */}
+                <Field
+                  label="Customer Address"
+                  required
+                  className="sm:col-span-2"
+                  error={errors.address?.message}
+                >
+                  <Input
+                    id="address"
+                    autoComplete="street-address"
+                    className="h-10 rounded-lg text-sm"
+                    placeholder="Enter customer address"
+                    {...form.register("address")}
+                  />
+                </Field>
               </>
             )}
 
@@ -641,7 +613,7 @@ function InstallationFormDialog({
               >
                 <Input
                   type="datetime-local"
-                  className="h-9 rounded-md"
+                  className="h-10 rounded-lg text-sm"
                   {...form.register("createdAt")}
                 />
               </Field>

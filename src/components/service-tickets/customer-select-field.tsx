@@ -266,7 +266,7 @@ export function CustomerSelectField({
           placeholder={placeholder}
           disabled={disabled}
           className={cn(
-            "pr-16 text-foreground font-normal rounded-md cursor-pointer",
+            "pr-16 text-foreground font-normal rounded-lg cursor-pointer",
             size === "sm" ? "h-9 text-xs" : "h-10 text-sm",
             hasError && "border-destructive",
           )}

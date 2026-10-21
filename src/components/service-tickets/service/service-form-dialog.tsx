@@ -13,6 +13,7 @@ import {
 import { type Resolver, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { CustomerModeSwitcher } from "@/components/service-tickets/customer-mode-switcher";
 import { CustomerSelectField } from "@/components/service-tickets/customer-select-field";
 import { DetailRow } from "@/components/service-tickets/detail-row";
 import {
@@ -646,55 +647,21 @@ function ServiceFormDialog({
               </>
             ) : (
               <>
-                {!isEdit && isNewCustomerMode && (
-                  <div className="sm:col-span-2 flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
-                    <div className="flex items-center gap-2 font-medium text-primary">
-                      <UserPlus className="size-4 shrink-0" />
-                      <span>New Customer Mode</span>
-                      <span className="hidden sm:inline text-muted-foreground font-normal text-[11px]">
-                        — Enter customer details directly below
-                      </span>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleReturnToExistingCustomer}
-                      className="h-7 px-2 text-xs font-medium text-muted-foreground hover:text-foreground cursor-pointer flex items-center gap-1"
-                    >
-                      <ArrowLeft className="size-3.5" />
-                      <span>Select Existing Customer</span>
-                    </Button>
-                  </div>
+                {!isEdit && (
+                  <CustomerModeSwitcher
+                    isNewCustomer={isNewCustomerMode}
+                    onModeChange={(mode) =>
+                      mode === "new"
+                        ? handleAddNewCustomer()
+                        : handleReturnToExistingCustomer()
+                    }
+                  />
                 )}
 
                 <Field
                   label="Mobile Number"
                   required
                   error={errors.phone?.message}
-                  action={
-                    !isEdit ? (
-                      isNewCustomerMode ? (
-                        <button
-                          type="button"
-                          onClick={handleReturnToExistingCustomer}
-                          className="text-xs text-muted-foreground hover:text-foreground font-normal inline-flex items-center gap-1 cursor-pointer transition-colors"
-                        >
-                          <ArrowLeft className="size-3" />
-                          <span>Select Existing</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleAddNewCustomer()}
-                          className="text-xs text-primary hover:underline font-normal inline-flex items-center gap-1 cursor-pointer transition-colors"
-                        >
-                          <UserPlus className="size-3" />
-                          <span>Add New Customer</span>
-                        </button>
-                      )
-                    ) : undefined
-                  }
                 >
                   {isNewCustomerMode ? (
                     <Input
@@ -703,7 +670,7 @@ function ServiceFormDialog({
                       maxLength={10}
                       autoFocus
                       placeholder="Enter 10-digit mobile number"
-                      className="h-10 rounded-md"
+                      className="h-10 rounded-lg text-sm"
                       {...form.register("phone", {
                         onChange: (e) => {
                           const cleaned = e.target.value
@@ -781,7 +748,7 @@ function ServiceFormDialog({
                   <Input
                     id="customerName"
                     autoComplete="name"
-                    className="h-10 rounded-md"
+                    className="h-10 rounded-lg text-sm"
                     placeholder="Enter customer name"
                     {...form.register("customerName")}
                   />
@@ -792,7 +759,7 @@ function ServiceFormDialog({
                     id="email"
                     type="email"
                     autoComplete="email"
-                    className="h-10 rounded-md"
+                    className="h-10 rounded-lg text-sm"
                     placeholder="Enter email address (optional)"
                     {...form.register("email")}
                   />
@@ -815,7 +782,7 @@ function ServiceFormDialog({
                   >
                     <Input
                       placeholder="Enter custom issue type"
-                      className="h-10 rounded-md"
+                      className="h-10 rounded-lg text-sm"
                       {...form.register("otherCategory")}
                     />
                   </Field>
@@ -830,7 +797,7 @@ function ServiceFormDialog({
                   <Input
                     id="address"
                     autoComplete="street-address"
-                    className="h-10 rounded-md"
+                    className="h-10 rounded-lg text-sm"
                     placeholder="Enter customer address"
                     {...form.register("address")}
                   />
