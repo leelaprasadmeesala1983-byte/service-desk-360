@@ -4,7 +4,7 @@ import { cache } from "react";
 
 import { auth } from "@/lib/auth";
 import type { UserRole, UserStatus } from "@/lib/constants";
-import { withDbRetry } from "@/lib/db-resilience";
+import { isTransientDbError, withDbRetry } from "@/lib/db-resilience";
 
 type CurrentUser = {
   id: string;
@@ -24,7 +24,7 @@ const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     const reqHeaders = await headers();
     const session = await withDbRetry(
       () => auth.api.getSession({ headers: reqHeaders }),
-      { retries: 2, delayMs: 150, operationName: "auth.api.getSession" },
+      { retries: 3, delayMs: 200, operationName: "auth.api.getSession" },
     );
     if (!session?.user) return null;
 
@@ -60,6 +60,17 @@ const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     ) {
       throw error;
     }
+
+    // Do NOT treat transient DB connectivity issues as unauthenticated.
+    // Re-throwing lets the page retry or render the error boundary without wiping user state.
+    if (isTransientDbError(error)) {
+      console.warn(
+        "Transient DB error during user session retrieval; re-throwing to prevent false logout:",
+        error instanceof Error ? error.message : String(error),
+      );
+      throw error;
+    }
+
     console.error("Failed to retrieve user session:", error);
     return null;
   }
@@ -67,7 +78,26 @@ const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 
 async function requireUser(): Promise<CurrentUser> {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) {
+    let redirectUrl = "/login";
+    try {
+      const reqHeaders = await headers();
+      const currentPath =
+        reqHeaders.get("x-invoke-path") ||
+        reqHeaders.get("next-url") ||
+        reqHeaders.get("x-url");
+      if (
+        currentPath &&
+        currentPath !== "/" &&
+        !currentPath.startsWith("/login")
+      ) {
+        redirectUrl = `/login?next=${encodeURIComponent(currentPath)}`;
+      }
+    } catch {
+      // Fallback to default /login if headers inspection fails
+    }
+    redirect(redirectUrl);
+  }
   return user;
 }
 
