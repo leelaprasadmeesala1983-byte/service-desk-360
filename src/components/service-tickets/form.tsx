@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 
 type FieldProps = {
   label: string;
+  action?: ReactNode;
   htmlFor?: string;
   required?: boolean;
   error?: string;
@@ -38,6 +39,7 @@ type FieldProps = {
 /** Label + control + inline error, matching the profile panel's field layout. */
 function Field({
   label,
+  action,
   htmlFor,
   required,
   error,
@@ -47,10 +49,13 @@ function Field({
 }: FieldProps) {
   return (
     <div className={cn("space-y-1.5", className)}>
-      <Label htmlFor={htmlFor}>
-        {label}
-        {required && <span className="text-destructive"> *</span>}
-      </Label>
+      <div className="flex items-center justify-between">
+        <Label htmlFor={htmlFor}>
+          {label}
+          {required && <span className="text-destructive"> *</span>}
+        </Label>
+        {action}
+      </div>
       {children}
       {hint && !error && (
         <p className="text-muted-foreground text-xs">{hint}</p>

@@ -59,11 +59,6 @@ export function proxy(request: NextRequest) {
   // Full session verification is authoritatively performed in server components/layouts.
   const hasSession = hasSessionCookie(request);
 
-  // 3. Authenticated user accessing public login route -> redirect to home
-  if (hasSession && pathname === "/login") {
-    return NextResponse.redirect(new URL("/", request.url));
-  }
-
   // 4. Unauthenticated access to protected route -> redirect to /login
   if (!hasSession && !isPublic) {
     if (pathname === "/login") {

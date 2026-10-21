@@ -6,6 +6,11 @@ import type { ZodError } from "zod";
 
 import { db } from "@/db";
 import {
+  getCustomerByEmail,
+  getCustomerById,
+  getCustomerByMobile,
+} from "@/db/queries/customers";
+import {
   getServiceRequest,
   listServiceRequests,
   type ServiceRequestRow,
@@ -15,6 +20,7 @@ import {
   logTechnicianWorkDate,
 } from "@/db/queries/technician-reports";
 import { user } from "@/db/schema/auth";
+import { customer } from "@/db/schema/customer";
 import { serviceRequest } from "@/db/schema/service-request";
 import { workHistory } from "@/db/schema/work-history";
 import { syncServiceRequestAmount } from "@/lib/actions/cash-transactions";
@@ -74,16 +80,170 @@ async function createServiceRequest(
       ? data.otherCategory
       : SERVICE_CATEGORY_LABELS[data.category] || data.category;
 
+  const mobile = data.phone.trim();
+  const cleanName = data.customerName.trim();
+  const cleanEmail = data.email?.trim().toLowerCase() || null;
+  const cleanAddress = data.address.trim();
+
+  let customerId = data.customerId?.trim() || null;
+
+  if (customerId) {
+    // Existing customer was selected or auto-selected
+    const existingCust = await getCustomerById(customerId, {
+      role: current.role,
+      id: current.id,
+    });
+
+    if (existingCust) {
+      const isNameChanged = cleanName !== existingCust.customerName;
+      const isMobileChanged = mobile !== existingCust.mobileNumber;
+      const isEmailChanged =
+        (cleanEmail || null) !==
+        (existingCust.email ? existingCust.email.toLowerCase() : null);
+      const isAddressChanged =
+        cleanAddress !== existingCust.address &&
+        !(cleanAddress === "" && existingCust.address === "—");
+
+      if (
+        isNameChanged ||
+        isMobileChanged ||
+        isEmailChanged ||
+        isAddressChanged
+      ) {
+        if (isMobileChanged) {
+          const duplicateMobile = await getCustomerByMobile(mobile, customerId);
+          if (duplicateMobile) {
+            return actionError(
+              "A customer with this mobile number already exists.",
+              {
+                phone: [
+                  "This mobile number is already registered to another customer.",
+                ],
+              },
+            );
+          }
+        }
+
+        if (isEmailChanged && cleanEmail) {
+          const duplicateEmail = await getCustomerByEmail(
+            cleanEmail,
+            customerId,
+          );
+          if (duplicateEmail) {
+            return actionError(
+              "A customer with this email address already exists.",
+              {
+                email: [
+                  "This email address is already registered to another customer.",
+                ],
+              },
+            );
+          }
+        }
+
+        await db
+          .update(customer)
+          .set({
+            customerName: cleanName,
+            mobileNumber: mobile,
+            email: cleanEmail,
+            address: cleanAddress || "—",
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(customer.id, customerId),
+              eq(customer.createdById, current.id),
+            ),
+          );
+
+        revalidatePath("/service-tickets/customers");
+      }
+    } else {
+      const fallbackCust = await getCustomerByMobile(mobile);
+      if (fallbackCust) {
+        customerId = fallbackCust.id;
+      }
+    }
+  }
+
+  if (!customerId) {
+    const existingByMobile = await getCustomerByMobile(mobile);
+    if (existingByMobile) {
+      customerId = existingByMobile.id;
+      await db
+        .update(customer)
+        .set({
+          customerName: cleanName,
+          email: cleanEmail,
+          address: cleanAddress || "—",
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(customer.id, customerId),
+            eq(customer.createdById, current.id),
+          ),
+        );
+      revalidatePath("/service-tickets/customers");
+    } else {
+      if (cleanEmail) {
+        const existingByEmail = await getCustomerByEmail(cleanEmail);
+        if (existingByEmail) {
+          return actionError(
+            "A customer with this email address already exists.",
+            {
+              email: [
+                "This email address is already registered to another customer.",
+              ],
+            },
+          );
+        }
+      }
+
+      try {
+        const [newCust] = await db
+          .insert(customer)
+          .values({
+            customerName: cleanName,
+            mobileNumber: mobile,
+            email: cleanEmail,
+            address: cleanAddress || "—",
+            createdById: current.id,
+          })
+          .returning({ id: customer.id });
+
+        if (newCust) {
+          customerId = newCust.id;
+          revalidatePath("/service-tickets/customers");
+        }
+      } catch (custErr) {
+        console.error(
+          "Failed to create customer for service request:",
+          custErr,
+        );
+        const fallbackCust = await getCustomerByMobile(mobile);
+        if (fallbackCust) {
+          customerId = fallbackCust.id;
+        } else {
+          return actionError(
+            "Failed to save customer record. Please try again.",
+          );
+        }
+      }
+    }
+  }
+
   const [row] = await db
     .insert(serviceRequest)
     .values({
-      customerName: data.customerName,
-      phone: data.phone,
-      email: data.email ?? null,
+      customerName: cleanName,
+      phone: mobile,
+      email: cleanEmail,
       category: data.category,
       otherCategory:
         data.category === "OTHER" ? (data.otherCategory ?? null) : null,
-      address: data.address,
+      address: cleanAddress,
       issueTitle: categoryLabel,
       description: data.description,
       status: data.status,
@@ -161,6 +321,7 @@ async function createServiceRequest(
   }
 
   revalidatePath(PATH);
+  revalidatePath("/service-tickets/customers");
   revalidatePath("/service-tickets/technician-reports");
   revalidatePath("/", "layout");
   const created = await getServiceRequest(row.id, {
