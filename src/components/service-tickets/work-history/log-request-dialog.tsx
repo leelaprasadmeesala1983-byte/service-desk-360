@@ -139,8 +139,7 @@ export function getTicketDisplayLabel(
       : ticket.id);
 
   const rawName =
-    ticket.ticketName ||
-    ticket.description ||
+    ticket.customerName ||
     (workType === "PROJECT" ? ticket.companyName : "") ||
     "";
 
