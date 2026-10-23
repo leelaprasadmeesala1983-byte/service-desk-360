@@ -78,6 +78,10 @@ export function isTransientDbError(error: unknown): boolean {
     lowerMessage.includes("getaddrinfo") ||
     lowerMessage.includes("fetch failed") ||
     lowerMessage.includes("pool has been destroyed") ||
+    lowerMessage.includes("server closed the connection") ||
+    lowerMessage.includes(
+      "terminating connection due to administrator command",
+    ) ||
     lowerBodyMessage.includes("connection terminated") ||
     lowerBodyMessage.includes("read econnreset") ||
     lowerBodyMessage.includes("connection reset")
@@ -86,8 +90,13 @@ export function isTransientDbError(error: unknown): boolean {
   }
 
   // Check nested cause recursively if available
-  if (err.cause && typeof err.cause === "object") {
-    return isTransientDbError(err.cause);
+  if (err.cause) {
+    if (typeof err.cause === "object") {
+      return isTransientDbError(err.cause);
+    }
+    if (typeof err.cause === "string") {
+      return isTransientDbError({ message: err.cause });
+    }
   }
 
   return false;

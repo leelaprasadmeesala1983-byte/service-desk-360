@@ -98,5 +98,27 @@ export const auth = betterAuth({
     },
   },
 
+  logger: {
+    log: (level, message, ...args) => {
+      if (level === "error") {
+        const err = args[0] as any;
+        const cause = err?.cause as any;
+        console.error("[BetterAuth Error Diagnostic]", {
+          message,
+          errorName: err?.name,
+          errorMessage: err?.message,
+          errorCode: err?.code,
+          causeName: cause?.name,
+          causeMessage: cause?.message,
+          causeCode: cause?.code,
+          causeDetail: cause?.detail,
+          causeHint: cause?.hint,
+          causeSchema: cause?.schema,
+          causeTable: cause?.table,
+        });
+      }
+    },
+  },
+
   plugins: [nextCookies()],
 });

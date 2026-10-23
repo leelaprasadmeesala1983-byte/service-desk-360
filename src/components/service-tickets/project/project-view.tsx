@@ -434,9 +434,13 @@ function ProjectView({
         selectableTickets={(recordsList ?? [])
           .filter((r) => r && r.status !== "CLOSED")
           .map((r) => {
-            const ticketName = (r.description || r.companyName)
-              ? (r.description || r.companyName).replace(/\r?\n+/g, " ").replace(/\s+/g, " ").trim()
-              : "";
+            const ticketName =
+              r.description || r.companyName
+                ? (r.description || r.companyName)
+                    .replace(/\r?\n+/g, " ")
+                    .replace(/\s+/g, " ")
+                    .trim()
+                : "";
             return {
               id: r.id,
               seq: r.seq,

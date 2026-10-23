@@ -111,15 +111,17 @@ function SidebarContent({ moduleKey, user }: AppSidebarProps) {
         })}
       </nav>
 
-      <div className="border-sidebar-border border-t px-5 py-3">
-        <Link
-          href="/"
-          onClick={closeMobileNav}
-          className="text-sidebar-foreground hover:text-sidebar-accent-foreground text-xs font-semibold"
-        >
-          ← Back to Modules
-        </Link>
-      </div>
+      {user.role !== "TECHNICIAN" && (
+        <div className="border-sidebar-border border-t px-5 py-3">
+          <Link
+            href="/"
+            onClick={closeMobileNav}
+            className="text-sidebar-foreground hover:text-sidebar-accent-foreground text-xs font-semibold"
+          >
+            ← Back to Modules
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
