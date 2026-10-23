@@ -927,7 +927,10 @@ export async function listSelectableServiceRequests(
       .filter((n): n is string => Boolean(n));
 
     const ticketName = r.description
-      ? r.description.replace(/\r?\n+/g, " ").replace(/\s+/g, " ").trim()
+      ? r.description
+          .replace(/\r?\n+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
       : "";
 
     return {
@@ -1029,7 +1032,10 @@ export async function listSelectableInstallations(
       .filter((n): n is string => Boolean(n));
 
     const ticketName = r.description
-      ? r.description.replace(/\r?\n+/g, " ").replace(/\s+/g, " ").trim()
+      ? r.description
+          .replace(/\r?\n+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
       : "";
 
     return {
@@ -1130,9 +1136,13 @@ export async function listSelectableProjects(
       .map((id) => techMap.get(id))
       .filter((n): n is string => Boolean(n));
 
-    const ticketName = (r.description || r.companyName)
-      ? (r.description || r.companyName).replace(/\r?\n+/g, " ").replace(/\s+/g, " ").trim()
-      : "";
+    const ticketName =
+      r.description || r.companyName
+        ? (r.description || r.companyName)
+            .replace(/\r?\n+/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+        : "";
 
     return {
       id: r.id,

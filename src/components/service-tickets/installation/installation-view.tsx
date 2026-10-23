@@ -460,7 +460,10 @@ function InstallationView({
           .filter((r) => r && r.status !== "CLOSED")
           .map((r) => {
             const ticketName = r.description
-              ? r.description.replace(/\r?\n+/g, " ").replace(/\s+/g, " ").trim()
+              ? r.description
+                  .replace(/\r?\n+/g, " ")
+                  .replace(/\s+/g, " ")
+                  .trim()
               : "";
             return {
               id: r.id,

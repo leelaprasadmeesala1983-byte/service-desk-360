@@ -61,17 +61,22 @@ const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
       throw error;
     }
 
-    // Do NOT treat transient DB connectivity issues as unauthenticated.
-    // Re-throwing lets the page retry or render the error boundary without wiping user state.
-    if (isTransientDbError(error)) {
-      console.warn(
-        "Transient DB error during user session retrieval; re-throwing to prevent false logout:",
-        error instanceof Error ? error.message : String(error),
-      );
-      throw error;
-    }
+    // Safe diagnostic logging for session retrieval failures without exposing sensitive data
+    const err = error as any;
+    const cause = err?.cause as any;
+    console.error("[Session Retrieval Diagnostic]", {
+      errorName: err?.name,
+      errorMessage: err?.message,
+      errorCode: err?.code,
+      causeName: cause?.name,
+      causeMessage: cause?.message,
+      causeCode: cause?.code,
+      causeDetail: cause?.detail,
+      causeHint: cause?.hint,
+      causeSchema: cause?.schema,
+      causeTable: cause?.table,
+    });
 
-    console.error("Failed to retrieve user session:", error);
     return null;
   }
 });

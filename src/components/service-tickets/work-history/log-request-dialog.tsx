@@ -144,7 +144,10 @@ export function getTicketDisplayLabel(
     (workType === "PROJECT" ? ticket.companyName : "") ||
     "";
 
-  const cleanName = rawName.replace(/\r?\n+/g, " ").replace(/\s+/g, " ").trim();
+  const cleanName = rawName
+    .replace(/\r?\n+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
   return cleanName ? `${displayId} - ${cleanName}` : displayId;
 }

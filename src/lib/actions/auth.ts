@@ -153,7 +153,14 @@ async function completePasswordReset(input: unknown): Promise<ActionResult> {
 }
 
 async function logout(): Promise<ActionResult> {
-  await auth.api.signOut({ headers: await headers() });
+  try {
+    await auth.api.signOut({ headers: await headers() });
+  } catch (error) {
+    console.warn(
+      "Non-fatal error during signOut (session may already be expired/deleted):",
+      error instanceof Error ? error.message : String(error),
+    );
+  }
   return actionOk();
 }
 
