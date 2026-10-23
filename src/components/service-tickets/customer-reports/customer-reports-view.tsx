@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/table";
 import type {
   Customer360Data,
+  CustomerDetailedReportData,
   CustomerReportResult,
   CustomerRow,
   CustomerSummaryStats,
@@ -39,6 +40,7 @@ import type {
 import {
   exportCustomerReportsExcel,
   fetchCustomer360,
+  fetchCustomerDetailedReport,
   fetchCustomerReports,
 } from "@/lib/actions/customer-reports";
 import { downloadExcelBase64 } from "@/lib/excel-export";
@@ -75,7 +77,7 @@ export function CustomerReportsView({ initialData }: CustomerReportsViewProps) {
 
   // Customer 360 modal state
   const [selectedCustomer360, setSelectedCustomer360] =
-    useState<Customer360Data | null>(null);
+    useState<CustomerDetailedReportData | null>(null);
   const [customer360Open, setCustomer360Open] = useState(false);
   const [customer360Loading, setCustomer360Loading] = useState(false);
 
@@ -177,7 +179,7 @@ export function CustomerReportsView({ initialData }: CustomerReportsViewProps) {
     setSelectedCustomer360(null);
 
     try {
-      const res = await fetchCustomer360(customer.id);
+      const res = await fetchCustomerDetailedReport(customer.id);
       if (res.ok && res.data) {
         setSelectedCustomer360(res.data);
       } else {

@@ -4,10 +4,12 @@ import { unstable_rethrow } from "next/navigation";
 
 import {
   type Customer360Data,
+  type CustomerDetailedReportData,
   type CustomerReportFilterParams,
   type CustomerReportResult,
   getAllFilteredCustomersForExport,
   getCustomer360Details,
+  getCustomerDetailedReport,
   getCustomerReports,
 } from "@/db/queries/customer-reports";
 import { buildExcelSpreadsheet } from "@/lib/excel-export";
@@ -65,6 +67,34 @@ export async function fetchCustomer360(
     unstable_rethrow(error);
     console.error("fetchCustomer360 error:", error);
     return actionError("Failed to fetch customer 360 data.");
+  }
+}
+
+/**
+ * Fetch detailed customer report with day-by-day work history, manpower, materials, and closure details.
+ */
+export async function fetchCustomerDetailedReport(
+  customerKey: string,
+): Promise<ActionResult<CustomerDetailedReportData>> {
+  const current = await requireUser();
+  if (current.role !== "ADMIN") {
+    return actionError("Admins only.");
+  }
+
+  try {
+    const data = await getCustomerDetailedReport(customerKey, {
+      role: current.role,
+      id: current.id,
+    });
+    if (!data) {
+      return actionError("Customer not found.");
+    }
+
+    return actionOk(data);
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("fetchCustomerDetailedReport error:", error);
+    return actionError("Failed to fetch customer detailed report.");
   }
 }
 

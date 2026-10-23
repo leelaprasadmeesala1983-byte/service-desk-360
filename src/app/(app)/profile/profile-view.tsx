@@ -86,11 +86,13 @@ function ProfileView({ user }: { user: CurrentUser }) {
         {/* Navigation Breadcrumb */}
         <div className="mb-4">
           <Link
-            href="/"
+            href={user.role === "TECHNICIAN" ? "/service-tickets" : "/"}
             className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs font-medium transition-colors"
           >
             <ArrowLeft className="size-3.5" />
-            Back to Dashboard
+            {user.role === "TECHNICIAN"
+              ? "Back to Tickets"
+              : "Back to Dashboard"}
           </Link>
         </div>
 

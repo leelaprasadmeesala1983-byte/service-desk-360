@@ -42,7 +42,21 @@ function hasSessionCookie(request: NextRequest): boolean {
     "better_auth.session_token",
     "session_token",
   ];
-  return knownCookies.some((name) => Boolean(request.cookies.get(name)?.value));
+  if (knownCookies.some((name) => Boolean(request.cookies.get(name)?.value))) {
+    return true;
+  }
+
+  // Inspect all cookies for better-auth session token variations
+  return request.cookies.getAll().some((cookie) => {
+    const name = cookie.name.toLowerCase();
+    return (
+      (name.includes("better-auth") ||
+        name.includes("better_auth") ||
+        name.includes("session")) &&
+      (name.includes("token") || name.includes("data")) &&
+      Boolean(cookie.value)
+    );
+  });
 }
 
 export function proxy(request: NextRequest) {
@@ -59,16 +73,18 @@ export function proxy(request: NextRequest) {
   // Full session verification is authoritatively performed in server components/layouts.
   const hasSession = hasSessionCookie(request);
 
-  // 3. Authenticated user accessing public login route -> redirect to home
-  if (hasSession && pathname === "/login") {
-    return NextResponse.redirect(new URL("/", request.url));
-  }
-
-  // 4. Unauthenticated access to protected route -> redirect to /login
+  // 3. Unauthenticated access to protected route:
+  // - If it's an API route, return 401 Unauthorized JSON (never redirect API to HTML /login)
+  // - If it's a page route, redirect to /login preserving destination
   if (!hasSession && !isPublic) {
     if (pathname === "/login") {
       return NextResponse.next();
     }
+
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const loginUrl = new URL("/login", request.url);
     if (pathname !== "/") {
       loginUrl.searchParams.set("next", pathname);
@@ -81,7 +97,7 @@ export function proxy(request: NextRequest) {
     return response;
   }
 
-  // 5. Allowed requests proceed
+  // 4. Allowed requests proceed
   return NextResponse.next();
 }
 

@@ -4,7 +4,7 @@ import { cache } from "react";
 
 import { auth } from "@/lib/auth";
 import type { UserRole, UserStatus } from "@/lib/constants";
-import { withDbRetry } from "@/lib/db-resilience";
+import { isTransientDbError, withDbRetry } from "@/lib/db-resilience";
 
 type CurrentUser = {
   id: string;
@@ -24,7 +24,7 @@ const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     const reqHeaders = await headers();
     const session = await withDbRetry(
       () => auth.api.getSession({ headers: reqHeaders }),
-      { retries: 2, delayMs: 150, operationName: "auth.api.getSession" },
+      { retries: 3, delayMs: 200, operationName: "auth.api.getSession" },
     );
     if (!session?.user) return null;
 
@@ -60,14 +60,49 @@ const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     ) {
       throw error;
     }
-    console.error("Failed to retrieve user session:", error);
+
+    // Safe diagnostic logging for session retrieval failures without exposing sensitive data
+    const err = error as any;
+    const cause = err?.cause as any;
+    console.error("[Session Retrieval Diagnostic]", {
+      errorName: err?.name,
+      errorMessage: err?.message,
+      errorCode: err?.code,
+      causeName: cause?.name,
+      causeMessage: cause?.message,
+      causeCode: cause?.code,
+      causeDetail: cause?.detail,
+      causeHint: cause?.hint,
+      causeSchema: cause?.schema,
+      causeTable: cause?.table,
+    });
+
     return null;
   }
 });
 
 async function requireUser(): Promise<CurrentUser> {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) {
+    let redirectUrl = "/login";
+    try {
+      const reqHeaders = await headers();
+      const currentPath =
+        reqHeaders.get("x-invoke-path") ||
+        reqHeaders.get("next-url") ||
+        reqHeaders.get("x-url");
+      if (
+        currentPath &&
+        currentPath !== "/" &&
+        !currentPath.startsWith("/login")
+      ) {
+        redirectUrl = `/login?next=${encodeURIComponent(currentPath)}`;
+      }
+    } catch {
+      // Fallback to default /login if headers inspection fails
+    }
+    redirect(redirectUrl);
+  }
   return user;
 }
 

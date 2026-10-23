@@ -1,12 +1,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { type Resolver, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { CustomerModeSwitcher } from "@/components/service-tickets/customer-mode-switcher";
 import { CustomerSelectField } from "@/components/service-tickets/customer-select-field";
 import { DetailRow } from "@/components/service-tickets/detail-row";
 import {
@@ -29,6 +30,7 @@ import { createProject, updateProject } from "@/lib/actions/projects";
 import { RECORD_STATUS_LABELS, type UserRole } from "@/lib/constants";
 import { formatDateTime, formatLocalDateTime } from "@/lib/format";
 import { UNASSIGNED_VALUE } from "@/lib/service-ticket";
+import { cn } from "@/lib/utils";
 import {
   createProjectSchema,
   editProjectSchema,
@@ -67,6 +69,7 @@ function ProjectFormDialog({
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
     null,
   );
+  const [isNewCustomerMode, setIsNewCustomerMode] = useState(false);
 
   const schema = !isEdit
     ? createProjectSchema
@@ -129,6 +132,7 @@ function ProjectFormDialog({
     if (!open) return;
     setServerError(null);
     setSelectedCustomerId(null);
+    setIsNewCustomerMode(false);
 
     const assignedIds = record
       ? Array.isArray(record.assignedTechnicianIds) &&
@@ -174,43 +178,111 @@ function ProjectFormDialog({
     );
   }, [open, record, form]);
 
-  const submit = form.handleSubmit((raw) => {
-    setServerError(null);
-    const payload = {
-      ...raw,
-      customerId: selectedCustomerId || raw.customerId || undefined,
-      customerName: form.getValues("customerName") || raw.customerName,
-      mobileNo: form.getValues("mobileNo") || raw.mobileNo,
-      email: form.getValues("email") || raw.email,
-      location: form.getValues("location") || raw.location,
-      assignedTechnicianIds: Array.isArray(raw.assignedTechnicianIds)
-        ? raw.assignedTechnicianIds
-        : [],
-    };
+  const handleAddNewCustomer = (initialSearch?: string) => {
+    setIsNewCustomerMode(true);
+    setSelectedCustomerId(null);
+    form.setValue("customerId", "");
 
-    startTransition(async () => {
-      const result = isEdit
-        ? await updateProject(payload)
-        : await createProject(payload);
+    const raw = initialSearch?.trim() || "";
+    const digits = raw.replace(/\D/g, "");
+    const isNumeric = digits.length >= 7 || /^\d+$/.test(raw);
 
-      if (!result.ok) {
-        setServerError(result.error);
-        for (const [key, messages] of Object.entries(
-          result.fieldErrors ?? {},
-        )) {
-          if (messages?.[0]) form.setError(key, { message: messages[0] });
-        }
-        return;
-      }
+    if (isNumeric) {
+      form.setValue("mobileNo", digits.slice(0, 10), {
+        shouldValidate: true,
+      });
+      form.setValue("customerName", "", { shouldValidate: false });
+    } else if (raw) {
+      form.setValue("customerName", raw, { shouldValidate: true });
+      form.setValue("mobileNo", "", { shouldValidate: false });
+    } else {
+      form.setValue("mobileNo", "");
+      form.setValue("customerName", "");
+    }
+    form.setValue("email", "");
+    form.setValue("location", "");
 
-      if (result.data) {
-        onSuccess?.(result.data, isEdit);
-      }
-      toast.success(isEdit ? "Project updated" : "Project created");
-      onOpenChange(false);
-      router.refresh();
-    });
-  });
+    form.clearErrors(["mobileNo", "customerName", "email", "location"]);
+  };
+
+  const handleReturnToExistingCustomer = () => {
+    setIsNewCustomerMode(false);
+    setSelectedCustomerId(null);
+    form.setValue("customerId", "");
+    form.setValue("mobileNo", "");
+    form.setValue("customerName", "");
+    form.setValue("email", "");
+    form.setValue("location", "");
+
+    form.clearErrors(["mobileNo", "customerName", "email", "location"]);
+  };
+
+  const handleOpenChange = (newOpen: boolean) => {
+    if (isPending && !newOpen) return;
+    onOpenChange(newOpen);
+    if (!newOpen) {
+      setServerError(null);
+      setIsNewCustomerMode(false);
+    }
+  };
+
+  const submit = (event?: React.BaseSyntheticEvent) => {
+    if (isPending) return;
+    form.handleSubmit(
+      (raw) => {
+        setServerError(null);
+        const payload = {
+          ...raw,
+          customerId: selectedCustomerId || raw.customerId || undefined,
+          customerName: form.getValues("customerName") || raw.customerName,
+          mobileNo: form.getValues("mobileNo") || raw.mobileNo,
+          email: form.getValues("email") || raw.email,
+          location: form.getValues("location") || raw.location,
+          assignedTechnicianIds: Array.isArray(raw.assignedTechnicianIds)
+            ? raw.assignedTechnicianIds
+            : [],
+        };
+
+        startTransition(async () => {
+          try {
+            const result = isEdit
+              ? await updateProject(payload)
+              : await createProject(payload);
+
+            if (!result.ok) {
+              setServerError(
+                result.error || "Please correct the highlighted fields.",
+              );
+              for (const [key, messages] of Object.entries(
+                result.fieldErrors ?? {},
+              )) {
+                if (messages?.[0]) {
+                  form.setError(key, {
+                    type: "server",
+                    message: messages[0],
+                  });
+                }
+              }
+              return;
+            }
+
+            if (result.data) {
+              onSuccess?.(result.data, isEdit);
+            }
+            toast.success(isEdit ? "Project updated" : "Project created");
+            handleOpenChange(false);
+            router.refresh();
+          } catch (error) {
+            console.error("Project submit failed:", error);
+            setServerError("Something went wrong while saving the project.");
+          }
+        });
+      },
+      () => {
+        // Validation failed; form.formState.errors updated reactively.
+      },
+    )(event);
+  };
 
   const errors = form.formState.errors as Record<
     string,
@@ -228,7 +300,7 @@ function ProjectFormDialog({
   const statusOnly = isTechnician && Boolean(record);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="w-[calc(100vw-2rem)] max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>
@@ -268,98 +340,156 @@ function ProjectFormDialog({
               </>
             ) : (
               <>
-                <Field
-                  label="Company Name"
-                  required
-                  error={errors.companyName?.message}
-                >
-                  <Input
-                    className="h-9 rounded-md"
-                    {...form.register("companyName")}
+                {!isEdit && (
+                  <CustomerModeSwitcher
+                    isNewCustomer={isNewCustomerMode}
+                    onModeChange={(mode) =>
+                      mode === "new"
+                        ? handleAddNewCustomer()
+                        : handleReturnToExistingCustomer()
+                    }
                   />
-                </Field>
+                )}
+
+                {/* Row 1: Mobile Number & Customer Name */}
                 <Field
                   label="Mobile Number"
                   required
                   error={errors.mobileNo?.message}
                 >
-                  <CustomerSelectField
-                    value={form.watch("mobileNo") ?? ""}
-                    selectedCustomerId={selectedCustomerId}
-                    placeholder="Select Mobile Number"
-                    size="sm"
-                    onChange={(val) =>
-                      form.setValue("mobileNo", val, {
-                        shouldValidate: true,
-                      })
-                    }
-                    onCustomerSelect={(cust) => {
-                      setSelectedCustomerId(cust.id);
-                      form.setValue("customerId", cust.id);
-                      form.setValue("mobileNo", cust.mobileNumber, {
-                        shouldValidate: true,
-                      });
-                      form.setValue("customerName", cust.customerName, {
-                        shouldValidate: true,
-                      });
-                      form.setValue("email", cust.email || "", {
-                        shouldValidate: true,
-                      });
-                      form.setValue(
-                        "location",
-                        cust.address && cust.address !== "—"
-                          ? cust.address
-                          : "",
-                        {
-                          shouldValidate: true,
+                  {isNewCustomerMode ? (
+                    <Input
+                      id="mobileNo"
+                      type="tel"
+                      maxLength={10}
+                      autoFocus
+                      placeholder="Enter 10-digit mobile number"
+                      className="h-10 rounded-lg text-sm"
+                      {...form.register("mobileNo", {
+                        onChange: (e) => {
+                          const cleaned = e.target.value
+                            .replace(/\D/g, "")
+                            .slice(0, 10);
+                          form.setValue("mobileNo", cleaned, {
+                            shouldValidate: true,
+                          });
                         },
-                      );
-                    }}
-                    onClear={() => {
-                      setSelectedCustomerId(null);
-                      form.setValue("customerId", "");
-                      form.setValue("mobileNo", "", {
-                        shouldValidate: true,
-                      });
-                      form.setValue("customerName", "", {
-                        shouldValidate: true,
-                      });
-                      form.setValue("email", "", {
-                        shouldValidate: true,
-                      });
-                      form.setValue("location", "", {
-                        shouldValidate: true,
-                      });
-                    }}
-                    hasError={Boolean(errors.mobileNo)}
-                  />
+                      })}
+                    />
+                  ) : (
+                    <CustomerSelectField
+                      id="mobileNo"
+                      value={form.watch("mobileNo") ?? ""}
+                      selectedCustomerId={selectedCustomerId}
+                      placeholder="Enter or select mobile number"
+                      autoSelectIfSingle={!isEdit}
+                      parentOpen={open}
+                      onAddNewCustomer={handleAddNewCustomer}
+                      onNoCustomers={() => setIsNewCustomerMode(true)}
+                      onChange={(val) =>
+                        form.setValue("mobileNo", val, {
+                          shouldValidate: true,
+                        })
+                      }
+                      onCustomerSelect={(cust) => {
+                        setSelectedCustomerId(cust.id);
+                        form.setValue("customerId", cust.id);
+                        form.setValue("mobileNo", cust.mobileNumber, {
+                          shouldValidate: true,
+                        });
+                        form.setValue("customerName", cust.customerName, {
+                          shouldValidate: true,
+                        });
+                        form.setValue("email", cust.email || "", {
+                          shouldValidate: true,
+                        });
+                        form.setValue(
+                          "location",
+                          cust.address && cust.address !== "—"
+                            ? cust.address
+                            : "",
+                          {
+                            shouldValidate: true,
+                          },
+                        );
+                      }}
+                      onClear={() => {
+                        setSelectedCustomerId(null);
+                        form.setValue("customerId", "");
+                        form.setValue("mobileNo", "", {
+                          shouldValidate: true,
+                        });
+                        form.setValue("customerName", "", {
+                          shouldValidate: true,
+                        });
+                        form.setValue("email", "", {
+                          shouldValidate: true,
+                        });
+                        form.setValue("location", "", {
+                          shouldValidate: true,
+                        });
+                      }}
+                      hasError={Boolean(errors.mobileNo)}
+                    />
+                  )}
                 </Field>
+
                 <Field
                   label="Customer Name"
                   required
                   error={errors.customerName?.message}
                 >
                   <Input
-                    readOnly
-                    tabIndex={-1}
-                    autoComplete="off"
-                    className="h-9 rounded-md bg-muted/40 cursor-not-allowed select-text"
-                    placeholder="Auto-populated from customer"
+                    id="customerName"
+                    autoComplete="name"
+                    className="h-10 rounded-lg text-sm"
+                    placeholder="Enter customer name"
                     {...form.register("customerName")}
                   />
                 </Field>
+
+                {/* Row 2: Email Address & Company Name */}
                 <Field label="Email Address" error={errors.email?.message}>
                   <Input
+                    id="email"
                     type="email"
-                    readOnly
-                    tabIndex={-1}
-                    autoComplete="off"
-                    className="h-9 rounded-md bg-muted/40 cursor-not-allowed select-text"
-                    placeholder="Auto-populated from customer"
+                    autoComplete="email"
+                    className="h-10 rounded-lg text-sm"
+                    placeholder="Enter email address (optional)"
                     {...form.register("email")}
                   />
                 </Field>
 
+                <Field
+                  label="Company Name"
+                  required
+                  error={errors.companyName?.message}
+                >
+                  <Input
+                    id="companyName"
+                    className="h-10 rounded-lg text-sm"
+                    placeholder="Enter company name"
+                    {...form.register("companyName")}
+                  />
+                </Field>
+
+                {/* Row 3: Location / Customer Address (spans full width) */}
+                <Field
+                  label="Location"
+                  required
+                  className="sm:col-span-2"
+                  error={errors.location?.message}
+                >
+                  <Input
+                    id="location"
+                    autoComplete="street-address"
+                    className="h-10 rounded-lg text-sm"
+                    placeholder="Enter location / customer address"
+                    {...form.register("location")}
+                  />
+                </Field>
+
+                {/* Row 4: Assign Technician & Status */}
                 <ControlledMultiSelect
                   control={form.control}
                   name="assignedTechnicianIds"
@@ -376,28 +506,14 @@ function ProjectFormDialog({
                   required
                   options={STATUS_OPTIONS}
                 />
-
-                <Field
-                  label="Location"
-                  required
-                  error={errors.location?.message}
-                >
-                  <Input
-                    readOnly
-                    tabIndex={-1}
-                    autoComplete="off"
-                    className="h-9 rounded-md bg-muted/40 cursor-not-allowed select-text"
-                    placeholder="Auto-populated from customer"
-                    {...form.register("location")}
-                  />
-                </Field>
                 <Field
                   label="Estimation No"
                   required
                   error={errors.estimationNo?.message}
                 >
                   <Input
-                    className="h-9 rounded-md"
+                    className="h-10 rounded-lg text-sm"
+                    placeholder="Enter estimation number"
                     {...form.register("estimationNo")}
                   />
                 </Field>
@@ -411,7 +527,7 @@ function ProjectFormDialog({
                   >
                     <Input
                       type="datetime-local"
-                      className="h-9 rounded-md"
+                      className="h-10 rounded-lg text-sm"
                       {...form.register("createdAt")}
                     />
                   </Field>
@@ -471,7 +587,7 @@ function ProjectFormDialog({
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => handleOpenChange(false)}
               disabled={isPending}
               className="w-full sm:w-auto"
             >

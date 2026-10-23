@@ -27,24 +27,24 @@ async function findAccountByIdentifier(identifier: string) {
   if (isEmail) {
     return db.query.user.findFirst({
       where: eq(user.email, trimmed.toLowerCase()),
-      columns: { id: true, email: true, status: true },
+      columns: { id: true, email: true, status: true, role: true },
     });
   }
 
   return db.query.user.findFirst({
     where: eq(user.phone, trimmed),
-    columns: { id: true, email: true, status: true },
+    columns: { id: true, email: true, status: true, role: true },
   });
 }
 
 async function findAccountByEmail(email: string) {
   return db.query.user.findFirst({
     where: eq(user.email, email),
-    columns: { id: true, email: true, status: true },
+    columns: { id: true, email: true, status: true, role: true },
   });
 }
 
-async function login(input: unknown): Promise<ActionResult> {
+async function login(input: unknown): Promise<ActionResult<{ role: string }>> {
   const parsed = loginSchema.safeParse(input);
   if (!parsed.success) {
     return actionError(
@@ -72,7 +72,7 @@ async function login(input: unknown): Promise<ActionResult> {
     return actionError(INVALID_CREDENTIALS);
   }
 
-  return actionOk();
+  return actionOk({ role: account.role });
 }
 
 function isInactiveAccountError(error: unknown): boolean {
@@ -153,7 +153,14 @@ async function completePasswordReset(input: unknown): Promise<ActionResult> {
 }
 
 async function logout(): Promise<ActionResult> {
-  await auth.api.signOut({ headers: await headers() });
+  try {
+    await auth.api.signOut({ headers: await headers() });
+  } catch (error) {
+    console.warn(
+      "Non-fatal error during signOut (session may already be expired/deleted):",
+      error instanceof Error ? error.message : String(error),
+    );
+  }
   return actionOk();
 }
 

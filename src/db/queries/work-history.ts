@@ -97,6 +97,10 @@ export type SelectableRecord = {
   assignedTechnicianId?: string | null;
   technicianNames?: string[];
   technicianName?: string | null;
+  ticketName?: string;
+  description?: string | null;
+  issueTitle?: string | null;
+  companyName?: string | null;
 };
 
 /**
@@ -871,6 +875,9 @@ export async function listSelectableServiceRequests(
       phone: serviceRequest.phone,
       email: serviceRequest.email,
       category: serviceRequest.category,
+      otherCategory: serviceRequest.otherCategory,
+      issueTitle: serviceRequest.issueTitle,
+      description: serviceRequest.description,
       address: serviceRequest.address,
       status: serviceRequest.status,
       assignedTechnicianId: serviceRequest.assignedTechnicianId,
@@ -919,6 +926,13 @@ export async function listSelectableServiceRequests(
       .map((id) => techMap.get(id))
       .filter((n): n is string => Boolean(n));
 
+    const ticketName = r.description
+      ? r.description
+          .replace(/\r?\n+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+      : "";
+
     return {
       id: r.id,
       seq: r.seq,
@@ -931,6 +945,9 @@ export async function listSelectableServiceRequests(
       status: r.status,
       assignedTechnicianIds,
       technicianNames,
+      ticketName,
+      issueTitle: r.issueTitle,
+      description: r.description,
     };
   });
 }
@@ -966,6 +983,7 @@ export async function listSelectableInstallations(
       phone: installation.contactNumber,
       email: installation.email,
       address: installation.address,
+      description: installation.description,
       status: installation.status,
       assignedTechnicianId: installation.assignedTechnicianId,
       assignedTechnicianIds: installation.assignedTechnicianIds,
@@ -1013,6 +1031,13 @@ export async function listSelectableInstallations(
       .map((id) => techMap.get(id))
       .filter((n): n is string => Boolean(n));
 
+    const ticketName = r.description
+      ? r.description
+          .replace(/\r?\n+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+      : "";
+
     return {
       id: r.id,
       seq: r.seq,
@@ -1025,6 +1050,8 @@ export async function listSelectableInstallations(
       status: r.status,
       assignedTechnicianIds,
       technicianNames,
+      ticketName,
+      description: r.description,
     };
   });
 }
@@ -1061,6 +1088,7 @@ export async function listSelectableProjects(
       mobileNo: project.mobileNo,
       email: project.email,
       location: project.location,
+      description: project.description,
       status: project.status,
       assignedTechnicianId: project.assignedTechnicianId,
       assignedTechnicianIds: project.assignedTechnicianIds,
@@ -1108,6 +1136,14 @@ export async function listSelectableProjects(
       .map((id) => techMap.get(id))
       .filter((n): n is string => Boolean(n));
 
+    const ticketName =
+      r.description || r.companyName
+        ? (r.description || r.companyName)
+            .replace(/\r?\n+/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+        : "";
+
     return {
       id: r.id,
       seq: r.seq,
@@ -1120,6 +1156,9 @@ export async function listSelectableProjects(
       status: r.status,
       assignedTechnicianIds,
       technicianNames,
+      ticketName,
+      companyName: r.companyName,
+      description: r.description,
     };
   });
 }

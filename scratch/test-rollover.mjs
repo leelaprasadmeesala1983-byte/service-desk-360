@@ -1,7 +1,9 @@
 import dotenv from "dotenv";
+
 dotenv.config();
 
 import pg from "pg";
+
 const { Pool } = pg;
 
 async function runTest() {
@@ -26,7 +28,7 @@ async function runTest() {
 
   // 2. Query daily_cash_register
   const regRes = await pool.query(
-    "SELECT date, user_id, opening_balance, closing_balance, status FROM daily_cash_register ORDER BY date DESC LIMIT 5"
+    "SELECT date, user_id, opening_balance, closing_balance, status FROM daily_cash_register ORDER BY date DESC LIMIT 5",
   );
   console.log("2. Recent daily cash registers:", regRes.rows);
 
@@ -38,7 +40,9 @@ async function runTest() {
     HAVING count(*) > 1
   `);
   if (dupRes.rows.length === 0) {
-    console.log("3. Uniqueness check passed: 0 duplicate registers found in database.");
+    console.log(
+      "3. Uniqueness check passed: 0 duplicate registers found in database.",
+    );
   } else {
     console.error("3. Duplicate registers detected:", dupRes.rows);
   }
@@ -46,7 +50,7 @@ async function runTest() {
   // 4. Test upsert idempotency with ON CONFLICT
   const testUserId = regRes.rows[0]?.user_id || "test-user";
   const testDate = "2026-10-18";
-  
+
   const upsertQuery = `
     INSERT INTO daily_cash_register (date, user_id, opening_balance, total_cash_in, total_cash_out, closing_balance, status)
     VALUES ($1, $2, '0.00', '0.00', '0.00', '0.00', 'OPEN')
@@ -60,7 +64,9 @@ async function runTest() {
   console.log("4. Upsert 2 result (idempotent):", upsert2.rows[0]);
 
   // 5. Check sessions table
-  const sessionRes = await pool.query("SELECT id, user_id, expires_at FROM session LIMIT 3");
+  const sessionRes = await pool.query(
+    "SELECT id, user_id, expires_at FROM session LIMIT 3",
+  );
   console.log("5. Active sessions sample count:", sessionRes.rows.length);
 
   await pool.end();

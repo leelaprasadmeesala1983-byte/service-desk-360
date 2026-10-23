@@ -1,10 +1,15 @@
 import { Sparkles } from "lucide-react";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/session";
 
 import { ModuleGrid } from "./module-grid";
 
 export default async function HomePage() {
   const user = await requireUser();
+
+  if (user.role === "TECHNICIAN") {
+    redirect("/service-tickets");
+  }
   const displayName =
     user?.name?.trim() ||
     `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim() ||

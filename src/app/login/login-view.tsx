@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, Loader2, Zap } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 
@@ -46,7 +46,6 @@ function LoginForm({
   onForgot: () => void;
   notice: string | null;
 }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [formError, setFormError] = useState<string | null>(null);
@@ -68,8 +67,11 @@ function LoginForm({
       }
 
       const next = searchParams.get("next");
-      router.replace(next?.startsWith("/") ? next : "/");
-      router.refresh();
+      const isTechnician = result.data?.role === "TECHNICIAN";
+      const defaultTarget = isTechnician ? "/service-tickets" : "/";
+      const target =
+        next?.startsWith("/") && next !== "/" ? next : defaultTarget;
+      window.location.href = target;
     });
   });
 

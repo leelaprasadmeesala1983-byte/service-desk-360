@@ -458,21 +458,31 @@ function InstallationView({
         workType="INSTALLATION"
         selectableTickets={(recordsList ?? [])
           .filter((r) => r && r.status !== "CLOSED")
-          .map((r) => ({
-            id: r.id,
-            seq: r.seq,
-            recordId: r.recordId,
-            customerName: r.customerName,
-            phone: r.contactNumber,
-            email: r.email,
-            category: "Installation",
-            address: r.address,
-            status: r.status,
-            assignedTechnicianId: r.assignedTechnicianId,
-            assignedTechnicianIds: r.assignedTechnicianIds,
-            technicianName: r.technicianName,
-            technicianNames: r.technicianNames,
-          }))}
+          .map((r) => {
+            const ticketName = r.description
+              ? r.description
+                  .replace(/\r?\n+/g, " ")
+                  .replace(/\s+/g, " ")
+                  .trim()
+              : "";
+            return {
+              id: r.id,
+              seq: r.seq,
+              recordId: r.recordId,
+              customerName: r.customerName,
+              phone: r.contactNumber,
+              email: r.email,
+              category: "Installation",
+              address: r.address,
+              status: r.status,
+              assignedTechnicianId: r.assignedTechnicianId,
+              assignedTechnicianIds: r.assignedTechnicianIds,
+              technicianName: r.technicianName,
+              technicianNames: r.technicianNames,
+              ticketName,
+              description: r.description,
+            };
+          })}
         technicians={technicians}
         onSuccess={() => router.refresh()}
       />

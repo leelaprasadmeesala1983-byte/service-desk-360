@@ -8,6 +8,8 @@ import { db } from "@/db";
 import * as schema from "@/db/schema/auth";
 import { SESSION_IDLE_TIMEOUT_SECONDS } from "@/lib/constants";
 
+import { withDbRetry } from "@/lib/db-resilience";
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -69,10 +71,18 @@ export const auth = betterAuth({
     session: {
       create: {
         before: async (session) => {
-          const account = await db.query.user.findFirst({
-            where: eq(schema.user.id, session.userId),
-            columns: { status: true },
-          });
+          const account = await withDbRetry(
+            () =>
+              db.query.user.findFirst({
+                where: eq(schema.user.id, session.userId),
+                columns: { status: true },
+              }),
+            {
+              retries: 3,
+              delayMs: 200,
+              operationName: "checkUserStatusBeforeSession",
+            },
+          );
 
           if (account?.status === "INACTIVE") {
             throw new APIError("FORBIDDEN", {
@@ -84,19 +94,29 @@ export const auth = betterAuth({
 
           return { data: session };
         },
-
-        after: async (session) => {
-          // One active session per user: signing in elsewhere ends the others.
-          await db
-            .delete(schema.session)
-            .where(
-              and(
-                eq(schema.session.userId, session.userId),
-                ne(schema.session.id, session.id),
-              ),
-            );
-        },
       },
+    },
+  },
+
+  logger: {
+    log: (level, message, ...args) => {
+      if (level === "error") {
+        const err = args[0] as any;
+        const cause = err?.cause as any;
+        console.error("[BetterAuth Error Diagnostic]", {
+          message,
+          errorName: err?.name,
+          errorMessage: err?.message,
+          errorCode: err?.code,
+          causeName: cause?.name,
+          causeMessage: cause?.message,
+          causeCode: cause?.code,
+          causeDetail: cause?.detail,
+          causeHint: cause?.hint,
+          causeSchema: cause?.schema,
+          causeTable: cause?.table,
+        });
+      }
     },
   },
 

@@ -9,11 +9,33 @@ export function isTransientDbError(error: unknown): boolean {
   const err = error as {
     code?: string;
     message?: string;
+    status?: string | number;
+    statusCode?: number;
     cause?: unknown;
+    body?: {
+      code?: string;
+      message?: string;
+    };
   };
 
   const code = typeof err.code === "string" ? err.code : "";
+  const bodyCode = typeof err.body?.code === "string" ? err.body.code : "";
   const message = typeof err.message === "string" ? err.message : "";
+  const bodyMessage =
+    typeof err.body?.message === "string" ? err.body.message : "";
+
+  const lowerMessage = message.toLowerCase();
+  const lowerBodyMessage = bodyMessage.toLowerCase();
+
+  // Better-auth APIError for DB failures during getSession
+  if (
+    bodyCode === "FAILED_TO_GET_SESSION" ||
+    bodyCode === "DATABASE_ERROR" ||
+    lowerMessage.includes("failed to get session") ||
+    lowerBodyMessage.includes("failed to get session")
+  ) {
+    return true;
+  }
 
   // Common transient network / socket / postgres error codes:
   // ECONNRESET: Socket closed abruptly by remote server or proxy
@@ -34,27 +56,47 @@ export function isTransientDbError(error: unknown): boolean {
     code === "57P03" ||
     code === "08000" ||
     code === "08003" ||
-    code === "08006"
+    code === "08006" ||
+    bodyCode === "ECONNRESET" ||
+    bodyCode === "ENOTFOUND" ||
+    bodyCode === "ETIMEDOUT"
   ) {
     return true;
   }
 
   // Inspect message text for driver-level disconnection errors
   if (
-    message.includes("Connection terminated unexpectedly") ||
-    message.includes("read ECONNRESET") ||
-    message.includes("connection reset") ||
-    message.includes("client was closed") ||
-    message.includes("terminating connection due to administrator command") ||
-    message.includes("Connection terminated due to connection timeout") ||
-    message.includes("FAILED_TO_GET_SESSION")
+    lowerMessage.includes("connection terminated") ||
+    lowerMessage.includes("read econnreset") ||
+    lowerMessage.includes("connection reset") ||
+    lowerMessage.includes("client was closed") ||
+    lowerMessage.includes("terminating connection") ||
+    lowerMessage.includes("connection timeout") ||
+    lowerMessage.includes("connect econnrefused") ||
+    lowerMessage.includes("socket hang up") ||
+    lowerMessage.includes("neon.tech") ||
+    lowerMessage.includes("getaddrinfo") ||
+    lowerMessage.includes("fetch failed") ||
+    lowerMessage.includes("pool has been destroyed") ||
+    lowerMessage.includes("server closed the connection") ||
+    lowerMessage.includes(
+      "terminating connection due to administrator command",
+    ) ||
+    lowerBodyMessage.includes("connection terminated") ||
+    lowerBodyMessage.includes("read econnreset") ||
+    lowerBodyMessage.includes("connection reset")
   ) {
     return true;
   }
 
   // Check nested cause recursively if available
-  if (err.cause && typeof err.cause === "object") {
-    return isTransientDbError(err.cause);
+  if (err.cause) {
+    if (typeof err.cause === "object") {
+      return isTransientDbError(err.cause);
+    }
+    if (typeof err.cause === "string") {
+      return isTransientDbError({ message: err.cause });
+    }
   }
 
   return false;
@@ -75,8 +117,8 @@ export async function withDbRetry<T>(
   options: RetryOptions = {},
 ): Promise<T> {
   const {
-    retries = 2,
-    delayMs = 150,
+    retries = 3,
+    delayMs = 200,
     operationName = "DB Operation",
   } = options;
 
