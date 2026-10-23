@@ -165,7 +165,11 @@ function AppHeader({
     return (
       <>
         <header className="bg-card border-border sticky top-0 z-40 flex h-14 items-center justify-between border-b px-4 sm:px-6 lg:h-[68px] lg:px-8">
-          <ServiceDeskLogo variant="light" subtitle="SERVICE PLATFORM" />
+          <ServiceDeskLogo
+            variant="light"
+            subtitle="SERVICE PLATFORM"
+            href={user.role === "TECHNICIAN" ? "/service-tickets" : "/"}
+          />
 
           {/* Desktop */}
           <div className="hidden flex-1 items-center justify-end gap-3 px-4 lg:flex lg:px-6">
@@ -229,7 +233,11 @@ function AppHeader({
               <Menu className="size-5" />
             </button>
           )}
-          <ServiceDeskLogo variant="admin" subtitle={subtitle} />
+          <ServiceDeskLogo
+            variant="admin"
+            subtitle={subtitle}
+            href={user.role === "TECHNICIAN" ? "/service-tickets" : "/"}
+          />
         </div>
 
         {/* Desktop controls */}

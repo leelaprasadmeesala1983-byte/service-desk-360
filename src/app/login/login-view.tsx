@@ -67,7 +67,10 @@ function LoginForm({
       }
 
       const next = searchParams.get("next");
-      const target = next?.startsWith("/") ? next : "/";
+      const isTechnician = result.data?.role === "TECHNICIAN";
+      const defaultTarget = isTechnician ? "/service-tickets" : "/";
+      const target =
+        next?.startsWith("/") && next !== "/" ? next : defaultTarget;
       window.location.href = target;
     });
   });

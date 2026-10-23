@@ -7,7 +7,9 @@ import { LoginView } from "./login-view";
 
 export default async function LoginPage() {
   const user = await getCurrentUser();
-  if (user) redirect("/");
+  if (user) {
+    redirect(user.role === "TECHNICIAN" ? "/service-tickets" : "/");
+  }
 
   return (
     <Suspense>
