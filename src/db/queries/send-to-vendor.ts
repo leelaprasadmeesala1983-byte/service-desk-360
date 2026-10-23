@@ -5,7 +5,7 @@ import { type AssetProduct, asset } from "@/db/schema/asset";
 import { assetStatusHistory } from "@/db/schema/asset-status-history";
 import { user } from "@/db/schema/auth";
 import { type DispatchItem, sendToVendor } from "@/db/schema/send-to-vendor";
-import { parseRecordIdSearch } from "@/lib/format";
+import { formatRecordId, parseRecordIdSearch } from "@/lib/format";
 import type {
   CreateSendToVendorInput,
   SendToVendor,
@@ -151,11 +151,7 @@ export async function listSendToVendor(
         : fallbackProducts.map((p, idx) => ({
             receivedMaterialId: row.assetId || "",
             receivedItemId: p.id || `item-${idx}`,
-            trackId: row.assetSeq
-              ? parseRecordIdSearch(String(row.assetSeq)) !== null
-                ? `AST-${row.assetSeq + 1000}`
-                : `AST-${row.assetSeq}`
-              : "—",
+            trackId: row.assetSeq ? formatRecordId("ASSET", row.assetSeq) : "—",
             productName: p.productType || "Product",
             serialNumber: p.serialNumber || "",
             brandName: p.brandName || "",
@@ -282,7 +278,7 @@ export async function getSendToVendorById(
       : fallbackProducts.map((p, idx) => ({
           receivedMaterialId: row.assetId || "",
           receivedItemId: p.id || `item-${idx}`,
-          trackId: row.assetSeq ? `AST-${row.assetSeq + 1000}` : "—",
+          trackId: row.assetSeq ? formatRecordId("ASSET", row.assetSeq) : "—",
           productName: p.productType || "Product",
           serialNumber: p.serialNumber || "",
           brandName: p.brandName || "",

@@ -202,9 +202,12 @@ export function VendorReceivedView({
                 ) : (
                   data.map((item, index) => {
                     const sNo = (safePage - 1) * limit + index + 1;
-                    const displayId = item.seq
-                      ? formatRecordId("STV", item.seq)
-                      : item.id;
+                    // The asset id (AST-) is fixed at creation; the STV seq is not.
+                    const displayId = item.assetSeq
+                      ? formatRecordId("ASSET", item.assetSeq)
+                      : item.seq
+                        ? formatRecordId("STV", item.seq)
+                        : item.id;
                     const items = Array.isArray(item.items) ? item.items : [];
 
                     const status = item.repairStatus || "REPAIR_COMPLETED";

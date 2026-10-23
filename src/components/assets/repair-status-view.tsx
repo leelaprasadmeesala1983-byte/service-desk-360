@@ -204,11 +204,14 @@ export function RepairStatusView({ initialDispatches }: RepairStatusViewProps) {
                 ) : (
                   data.map((item, index) => {
                     const sNo = (safePage - 1) * limit + index + 1;
-                    const repairId = item.seq
-                      ? formatRecordId("REP", item.seq)
-                      : item.id
-                        ? item.id.slice(0, 8)
-                        : "—";
+                    // The asset id (AST-) is fixed at creation; the REP seq is not.
+                    const repairId = item.assetSeq
+                      ? formatRecordId("ASSET", item.assetSeq)
+                      : item.seq
+                        ? formatRecordId("REP", item.seq)
+                        : item.id
+                          ? item.id.slice(0, 8)
+                          : "—";
 
                     const items = Array.isArray(item.items) ? item.items : [];
                     const primaryItem = items[0];

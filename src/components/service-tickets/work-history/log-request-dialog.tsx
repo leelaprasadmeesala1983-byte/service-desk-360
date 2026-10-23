@@ -338,6 +338,9 @@ export function LogRequestDialog({
                             selectedTicket.seq,
                           )
                         : selectedTicket.id)}
+                    {selectedTicket.customerName
+                      ? ` - ${selectedTicket.customerName}`
+                      : ""}
                   </span>
                 ) : (
                   <span className="text-muted-foreground">
@@ -378,6 +381,9 @@ export function LogRequestDialog({
                         >
                           <span className="font-semibold text-foreground">
                             {displayId}
+                            {ticket.customerName
+                              ? ` - ${ticket.customerName}`
+                              : ""}
                           </span>
                           {isSelected && (
                             <Check className="text-primary size-4 shrink-0 ml-2" />
