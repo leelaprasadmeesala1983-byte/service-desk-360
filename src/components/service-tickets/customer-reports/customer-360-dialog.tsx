@@ -16,11 +16,13 @@ import {
   PackageCheck,
   PackageOpen,
   Phone,
+  Printer,
   UserCheck,
   Users,
   Wrench,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { StatusBadge } from "@/components/service-tickets/status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +48,7 @@ import type {
 import { SERVICE_CATEGORY_LABELS } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { printCustomer360 } from "@/lib/utils/print-customer-360";
 
 type Customer360DialogProps = {
   open: boolean;
@@ -68,6 +71,9 @@ export function Customer360Dialog({
   // Record selection state when multiple records exist in the active module
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
 
+  // Records ticked in the selector for a combined print (2+ => one page)
+  const [printIds, setPrintIds] = useState<string[]>([]);
+
   // Tab state for work history vs manpower summary
   const [historyTab, setHistoryTab] = useState<"all" | "history" | "manpower">(
     "all",
@@ -75,6 +81,7 @@ export function Customer360Dialog({
 
   // Sync selected record when module changes or data loads
   useEffect(() => {
+    setPrintIds([]);
     if (!data) {
       setSelectedRecordId(null);
       return;
@@ -108,6 +115,25 @@ export function Customer360Dialog({
     currentRecords.find((r) => r.id === selectedRecordId) ||
     currentRecords[0] ||
     null;
+
+  const togglePrintId = (id: string) =>
+    setPrintIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+
+  const handlePrint = () => {
+    if (!data || !selectedRecord) return;
+    const chosen =
+      printIds.length >= 2
+        ? currentRecords.filter((r) => printIds.includes(r.id))
+        : [selectedRecord];
+    printCustomer360(
+      data.customer,
+      [{ module: activeModule, records: chosen }],
+      chosen.length >= 2,
+      () => toast.error("Allow pop-ups to print."),
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -151,6 +177,19 @@ export function Customer360Dialog({
                 </div>
               </div>
             </div>
+            {c && selectedRecord && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handlePrint}
+                className="gap-1.5 sm:mr-8"
+              >
+                <Printer className="size-4" />
+                Print
+                {printIds.length >= 2 ? ` (${printIds.length} records)` : ""}
+              </Button>
+            )}
           </div>
 
           {/* Quick Module Counts Bar */}
@@ -297,22 +336,33 @@ export function Customer360Dialog({
                     Select Record ({currentRecords.length}):
                   </span>
                   {currentRecords.map((r) => (
-                    <button
+                    <div
                       key={r.id}
-                      type="button"
-                      onClick={() => setSelectedRecordId(r.id)}
                       className={cn(
-                        "px-3 py-1.5 rounded-md font-mono text-xs transition-colors border flex items-center gap-1.5",
+                        "rounded-md font-mono text-xs transition-colors border flex items-center",
                         r.id === selectedRecord.id
                           ? "bg-primary text-primary-foreground border-primary shadow-xs font-bold"
                           : "bg-card text-foreground border-border hover:bg-muted",
                       )}
                     >
-                      <span>{r.recordId}</span>
-                      <span className="text-[10px] opacity-80">
-                        ({r.status})
-                      </span>
-                    </button>
+                      <input
+                        type="checkbox"
+                        checked={printIds.includes(r.id)}
+                        onChange={() => togglePrintId(r.id)}
+                        aria-label={`Include ${r.recordId} in combined print`}
+                        className="ml-2 size-3.5 cursor-pointer accent-current"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRecordId(r.id)}
+                        className="px-2.5 py-1.5 flex items-center gap-1.5"
+                      >
+                        <span>{r.recordId}</span>
+                        <span className="text-[10px] opacity-80">
+                          ({r.status})
+                        </span>
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}

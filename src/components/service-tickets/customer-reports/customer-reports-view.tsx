@@ -9,6 +9,7 @@ import {
   FileSpreadsheet,
   FolderKanban,
   Loader2,
+  Printer,
   RefreshCw,
   Search,
   Users,
@@ -46,6 +47,7 @@ import {
 import { downloadExcelBase64 } from "@/lib/excel-export";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { printCustomer360 } from "@/lib/utils/print-customer-360";
 
 type CustomerReportsViewProps = {
   initialData: CustomerReportResult;
@@ -74,6 +76,7 @@ export function CustomerReportsView({ initialData }: CustomerReportsViewProps) {
   >("ALL");
 
   const [isExporting, setIsExporting] = useState(false);
+  const [printingId, setPrintingId] = useState<string | null>(null);
 
   // Customer 360 modal state
   const [selectedCustomer360, setSelectedCustomer360] =
@@ -191,6 +194,36 @@ export function CustomerReportsView({ initialData }: CustomerReportsViewProps) {
       setCustomer360Open(false);
     } finally {
       setCustomer360Loading(false);
+    }
+  };
+
+  // Print every record of a customer, one record per page
+  const handlePrintCustomer = async (customer: CustomerRow) => {
+    if (printingId) return;
+    setPrintingId(customer.id);
+    try {
+      const res = await fetchCustomerDetailedReport(customer.id);
+      if (!res.ok || !res.data) {
+        toast.error("Failed to load customer records for printing.");
+        return;
+      }
+      const { services, installations, projects } = res.data;
+      const groups = [
+        { module: "services" as const, records: services },
+        { module: "installations" as const, records: installations },
+        { module: "projects" as const, records: projects },
+      ].filter((g) => g.records.length > 0);
+      if (groups.length === 0) {
+        toast.error("This customer has no records to print.");
+        return;
+      }
+      printCustomer360(res.data.customer, groups, false, () =>
+        toast.error("Allow pop-ups to print."),
+      );
+    } catch {
+      toast.error("An error occurred while preparing the print.");
+    } finally {
+      setPrintingId(null);
     }
   };
 
@@ -436,7 +469,7 @@ export function CustomerReportsView({ initialData }: CustomerReportsViewProps) {
                   Total Requests
                 </TableHead>
                 <TableHead className="w-36">Last Activity Date</TableHead>
-                <TableHead className="w-24 text-right">Actions</TableHead>
+                <TableHead className="w-44 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -528,7 +561,21 @@ export function CustomerReportsView({ initialData }: CustomerReportsViewProps) {
                     <TableCell className="text-muted-foreground whitespace-nowrap">
                       {formatDate(c.lastActivityDate)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right whitespace-nowrap">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handlePrintCustomer(c)}
+                        disabled={printingId === c.id}
+                        className="h-7 px-2.5 text-xs gap-1 font-medium mr-1.5"
+                      >
+                        {printingId === c.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Printer className="size-3.5" />
+                        )}
+                        Print
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"
