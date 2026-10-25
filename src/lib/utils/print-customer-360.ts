@@ -88,7 +88,7 @@ function renderRecord(
   const mp = record.manpowerSummary;
   const techRows =
     mp.technicians.length === 0
-      ? `<tr><td colspan="4" class="center muted">No technician work records logged for this period.</td></tr>`
+      ? `<tr><td colspan="3" class="center muted">No technician work records logged for this period.</td></tr>`
       : mp.technicians
           .map(
             (t) => `
@@ -96,7 +96,6 @@ function renderRecord(
           <td>${escapeHtml(t.technicianName)}</td>
           <td class="center mono">${t.workingDays}</td>
           <td class="center mono">${t.manDays}</td>
-          <td class="center mono">${t.assignments}</td>
         </tr>`,
           )
           .join("");
@@ -148,11 +147,10 @@ function renderRecord(
       <div class="kv-grid" style="margin-bottom:10px">
         ${kv("Total Working Days", String(mp.totalWorkingDays))}
         ${kv("Total Man-Days", String(mp.totalManDays))}
-        ${kv("Total Assignments", String(mp.totalTechnicianAssignments))}
         ${kv("Unique Technicians", String(mp.uniqueTechnicians))}
       </div>
       <table class="doc-table">
-        <thead><tr><th>Technician Name</th><th class="center">Working Days</th><th class="center">Man-Days</th><th class="center">Assignments</th></tr></thead>
+        <thead><tr><th>Technician Name</th><th class="center">Working Days</th><th class="center">Man-Days</th></tr></thead>
         <tbody>${techRows}</tbody>
       </table>
 

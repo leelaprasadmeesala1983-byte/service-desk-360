@@ -895,7 +895,6 @@ export type TechnicianManpowerItem = {
   workingDays: number;
   manDays: number;
   manHours: number | null;
-  assignments: number;
 };
 
 export type ManpowerSummary = {
@@ -903,8 +902,6 @@ export type ManpowerSummary = {
   totalWorkingDays: number;
   totalManDays: number;
   totalManHours: number | null;
-  totalAssignments: number;
-  totalTechnicianAssignments: number;
   totalUniqueTechnicians: number;
   uniqueTechnicians: number;
   uniqueTechnicianNames: string[];
@@ -1288,8 +1285,6 @@ export async function getCustomerDetailedReport(
           totalWorkingDays: 0,
           totalManDays: 0,
           totalManHours: null,
-          totalAssignments: 0,
-          totalTechnicianAssignments: 0,
           totalUniqueTechnicians: 0,
           uniqueTechnicians: 0,
           uniqueTechnicianNames: [],
@@ -1338,7 +1333,6 @@ export async function getCustomerDetailedReport(
           id: string;
           name: string;
           datesWorked: Set<string>;
-          assignmentsCount: number;
           hoursSum: number;
           hasHours: boolean;
         }
@@ -1352,7 +1346,6 @@ export async function getCustomerDetailedReport(
             id: tid,
             name: u?.name || "Technician",
             datesWorked: new Set<string>(),
-            assignmentsCount: 0,
             hoursSum: 0,
             hasHours: false,
           };
@@ -1426,7 +1419,6 @@ export async function getCustomerDetailedReport(
         for (const tid of effectiveTechIds) {
           entry.techIds.add(tid);
           const tech = getOrCreateTechStat(tid);
-          tech.assignmentsCount += 1;
           tech.datesWorked.add(dateStr);
           processedTechDates.add(`${tid}:${dateStr}`);
           if (whHours !== null) {
@@ -1470,7 +1462,6 @@ export async function getCustomerDetailedReport(
           const key = `${twl.technicianId}:${dateStr}`;
           if (!processedTechDates.has(key)) {
             processedTechDates.add(key);
-            tech.assignmentsCount += 1;
             const parsedTwl = parseWorkHistoryDescription(twl.notes);
             if (parsedTwl.workingHours !== null) {
               tech.hasHours = true;
@@ -1490,7 +1481,6 @@ export async function getCustomerDetailedReport(
           dateMap.set(dateStr, entry);
           const tech = getOrCreateTechStat(twl.technicianId);
           tech.datesWorked.add(dateStr);
-          tech.assignmentsCount += 1;
           processedTechDates.add(`${twl.technicianId}:${dateStr}`);
           if (parsedTwl.workingHours !== null) {
             tech.hasHours = true;
@@ -1592,19 +1582,12 @@ export async function getCustomerDetailedReport(
           workingDays: stat.datesWorked.size,
           manDays: stat.datesWorked.size,
           manHours: stat.hasHours ? stat.hoursSum : null,
-          assignments: stat.assignmentsCount,
         }))
         .sort(
           (a, b) =>
             b.workingDays - a.workingDays ||
-            b.assignments - a.assignments ||
             a.technicianName.localeCompare(b.technicianName),
         );
-
-      let totalTechnicianAssignments = 0;
-      for (const t of technicians) {
-        totalTechnicianAssignments += t.assignments;
-      }
 
       const uniqueTechnicianNames = technicians.map((t) => t.technicianName);
 
@@ -1622,8 +1605,6 @@ export async function getCustomerDetailedReport(
         totalWorkingDays,
         totalManDays,
         totalManHours,
-        totalAssignments: totalTechnicianAssignments,
-        totalTechnicianAssignments,
         totalUniqueTechnicians,
         uniqueTechnicians: totalUniqueTechnicians,
         uniqueTechnicianNames,
@@ -1889,7 +1870,6 @@ export async function getCustomerDetailedReport(
       id: string;
       name: string;
       dates: Set<string>;
-      assignments: number;
       hours: number;
       hasHours: boolean;
     }
@@ -1903,13 +1883,11 @@ export async function getCustomerDetailedReport(
           id: t.technicianId,
           name: t.technicianName,
           dates: new Set(),
-          assignments: 0,
           hours: 0,
           hasHours: false,
         };
         overallTechMap.set(t.technicianId, item);
       }
-      item.assignments += t.assignments;
       if (t.manHours !== null) {
         item.hasHours = true;
         item.hours += t.manHours;
@@ -1939,27 +1917,18 @@ export async function getCustomerDetailedReport(
       workingDays: t.dates.size,
       manDays: t.dates.size,
       manHours: t.hasHours ? t.hours : null,
-      assignments: t.assignments,
     }))
     .sort(
       (a, b) =>
         b.workingDays - a.workingDays ||
-        b.assignments - a.assignments ||
         a.technicianName.localeCompare(b.technicianName),
     );
-
-  let overallAssignments = 0;
-  for (const t of overallTechnicians) {
-    overallAssignments += t.assignments;
-  }
 
   const overallManpowerSummary: ManpowerSummary = {
     totalDaysWorked: overallWorkingDays,
     totalWorkingDays: overallWorkingDays,
     totalManDays: overallManDays,
     totalManHours: hasOverallHours ? overallHoursSum : null,
-    totalAssignments: overallAssignments,
-    totalTechnicianAssignments: overallAssignments,
     totalUniqueTechnicians: overallTechMap.size,
     uniqueTechnicians: overallTechMap.size,
     uniqueTechnicianNames: overallTechnicians.map((t) => t.technicianName),

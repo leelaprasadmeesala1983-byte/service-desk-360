@@ -629,7 +629,7 @@ export function Customer360Dialog({
                   </div>
 
                   {/* 4 Summary Metric Cards */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5">
                     {/* Card 1: Total Working Days */}
                     <div className="rounded-xl border border-border bg-card p-3 shadow-2xs flex flex-col justify-between">
                       <div className="flex items-center justify-between">
@@ -670,30 +670,7 @@ export function Customer360Dialog({
                       </div>
                     </div>
 
-                    {/* Card 3: Total Technician Assignments */}
-                    <div className="rounded-xl border border-border bg-card p-3 shadow-2xs flex flex-col justify-between">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-semibold text-muted-foreground">
-                          Total Assignments
-                        </span>
-                        <div className="size-6 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-                          <ClipboardList className="size-3.5" />
-                        </div>
-                      </div>
-                      <div className="mt-2">
-                        <div className="text-lg sm:text-xl font-bold text-purple-600 dark:text-purple-400 font-mono">
-                          {
-                            selectedRecord.manpowerSummary
-                              .totalTechnicianAssignments
-                          }
-                        </div>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          Work entry assignments
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Card 4: Unique Technicians */}
+                    {/* Card 3: Unique Technicians */}
                     <div className="rounded-xl border border-border bg-card p-3 shadow-2xs flex flex-col justify-between">
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-semibold text-muted-foreground">
@@ -729,9 +706,6 @@ export function Customer360Dialog({
                             <TableHead className="font-bold text-right w-28">
                               Man-Days
                             </TableHead>
-                            <TableHead className="font-bold text-right w-28">
-                              Assignments
-                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -739,7 +713,7 @@ export function Customer360Dialog({
                           0 ? (
                             <TableRow>
                               <TableCell
-                                colSpan={4}
+                                colSpan={3}
                                 className="text-center py-6 text-muted-foreground"
                               >
                                 No technician work records logged for this
@@ -768,11 +742,6 @@ export function Customer360Dialog({
                                   </TableCell>
                                   <TableCell className="text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
                                     {tech.manDays}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono">
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
-                                      {tech.assignments}
-                                    </span>
                                   </TableCell>
                                 </TableRow>
                               ),
