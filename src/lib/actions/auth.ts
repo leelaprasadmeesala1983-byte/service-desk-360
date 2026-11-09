@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { db } from "@/db";
 import { user } from "@/db/schema/auth";
 import { auth } from "@/lib/auth";
+import { isDbConnectionError } from "@/lib/db-resilience";
 import {
   forgotPasswordSchema,
   loginSchema,
@@ -18,6 +19,8 @@ const INVALID_CREDENTIALS = "Invalid email/phone number or password.";
 const INACTIVE_ACCOUNT =
   "Your account is inactive. Please contact an administrator.";
 const UNKNOWN_EMAIL = "No account found with that email address.";
+const SERVER_UNAVAILABLE =
+  "Unable to connect to the server. Please try again shortly.";
 
 /** Phone numbers are login identifiers too, so resolve them to the account email. */
 async function findAccountByIdentifier(identifier: string) {
@@ -55,24 +58,46 @@ async function login(input: unknown): Promise<ActionResult<{ role: string }>> {
 
   const { identifier, password } = parsed.data;
 
-  const account = await findAccountByIdentifier(identifier);
-  // Same message whether the identifier is unknown or the password is wrong,
-  // so the form never reveals which identifiers are registered.
-  if (!account) return actionError(INVALID_CREDENTIALS);
-
   try {
-    await auth.api.signInEmail({
-      body: { email: account.email, password },
-      headers: await headers(),
-    });
-  } catch (error) {
-    // The session hook rejects inactive accounts, but only after the password
-    // has been verified — so this message cannot be used to probe for accounts.
-    if (isInactiveAccountError(error)) return actionError(INACTIVE_ACCOUNT);
-    return actionError(INVALID_CREDENTIALS);
-  }
+    const account = await findAccountByIdentifier(identifier);
+    // Same message whether the identifier is unknown or the password is wrong,
+    // so the form never reveals which identifiers are registered.
+    if (!account) return actionError(INVALID_CREDENTIALS);
 
-  return actionOk({ role: account.role });
+    try {
+      await auth.api.signInEmail({
+        body: { email: account.email, password },
+        headers: await headers(),
+      });
+    } catch (error) {
+      // The session hook rejects inactive accounts, but only after the password
+      // has been verified — so this message cannot be used to probe for accounts.
+      if (isInactiveAccountError(error)) return actionError(INACTIVE_ACCOUNT);
+      if (isDbConnectionError(error)) {
+        console.error(
+          "[Auth Login] Database connection error during signInEmail:",
+          error instanceof Error ? error.message : error,
+        );
+        return actionError(SERVER_UNAVAILABLE);
+      }
+      return actionError(INVALID_CREDENTIALS);
+    }
+
+    return actionOk({ role: account.role });
+  } catch (error) {
+    if (isDbConnectionError(error)) {
+      console.error(
+        "[Auth Login] Database connection error during user lookup:",
+        error instanceof Error ? error.message : error,
+      );
+      return actionError(SERVER_UNAVAILABLE);
+    }
+    console.error(
+      "[Auth Login] Unexpected error during login:",
+      error instanceof Error ? error.message : error,
+    );
+    return actionError(SERVER_UNAVAILABLE);
+  }
 }
 
 function isInactiveAccountError(error: unknown): boolean {
@@ -95,12 +120,23 @@ async function verifyResetEmail(input: unknown): Promise<ActionResult> {
     );
   }
 
-  const account = await findAccountByEmail(parsed.data.email);
+  try {
+    const account = await findAccountByEmail(parsed.data.email);
 
-  if (!account) return actionError(UNKNOWN_EMAIL);
-  if (account.status === "INACTIVE") return actionError(INACTIVE_ACCOUNT);
+    if (!account) return actionError(UNKNOWN_EMAIL);
+    if (account.status === "INACTIVE") return actionError(INACTIVE_ACCOUNT);
 
-  return actionOk();
+    return actionOk();
+  } catch (error) {
+    if (isDbConnectionError(error)) {
+      console.error(
+        "[Auth verifyResetEmail] Database connection error:",
+        error instanceof Error ? error.message : error,
+      );
+      return actionError(SERVER_UNAVAILABLE);
+    }
+    return actionError("An unexpected error occurred. Please try again.");
+  }
 }
 
 /**
@@ -119,33 +155,47 @@ async function completePasswordReset(input: unknown): Promise<ActionResult> {
 
   const { email, newPassword } = parsed.data;
 
-  const account = await findAccountByEmail(email);
-  if (!account) return actionError(UNKNOWN_EMAIL);
-  if (account.status === "INACTIVE") return actionError(INACTIVE_ACCOUNT);
-
   try {
-    const ctx = await auth.$context;
-    const hashedPassword = await ctx.password.hash(newPassword);
-    const accounts = await ctx.internalAdapter.findAccounts(account.id);
-    const hasCredentials = accounts.some(
-      (row) => row.providerId === "credential",
-    );
+    const account = await findAccountByEmail(email);
+    if (!account) return actionError(UNKNOWN_EMAIL);
+    if (account.status === "INACTIVE") return actionError(INACTIVE_ACCOUNT);
 
-    // Seeded or invite-only accounts may not have a credential row yet.
-    if (hasCredentials) {
-      await ctx.internalAdapter.updatePassword(account.id, hashedPassword);
-    } else {
-      await ctx.internalAdapter.createAccount({
-        userId: account.id,
-        providerId: "credential",
-        accountId: account.id,
-        password: hashedPassword,
-      });
+    try {
+      const ctx = await auth.$context;
+      const hashedPassword = await ctx.password.hash(newPassword);
+      const accounts = await ctx.internalAdapter.findAccounts(account.id);
+      const hasCredentials = accounts.some(
+        (row) => row.providerId === "credential",
+      );
+
+      // Seeded or invite-only accounts may not have a credential row yet.
+      if (hasCredentials) {
+        await ctx.internalAdapter.updatePassword(account.id, hashedPassword);
+      } else {
+        await ctx.internalAdapter.createAccount({
+          userId: account.id,
+          providerId: "credential",
+          accountId: account.id,
+          password: hashedPassword,
+        });
+      }
+
+      // Any session opened with the old password dies with the reset.
+      await ctx.internalAdapter.deleteUserSessions(account.id);
+    } catch (innerError) {
+      if (isDbConnectionError(innerError)) {
+        throw innerError;
+      }
+      return actionError("Could not update the password. Please try again.");
     }
-
-    // Any session opened with the old password dies with the reset.
-    await ctx.internalAdapter.deleteUserSessions(account.id);
-  } catch {
+  } catch (error) {
+    if (isDbConnectionError(error)) {
+      console.error(
+        "[Auth completePasswordReset] Database connection error:",
+        error instanceof Error ? error.message : error,
+      );
+      return actionError(SERVER_UNAVAILABLE);
+    }
     return actionError("Could not update the password. Please try again.");
   }
 

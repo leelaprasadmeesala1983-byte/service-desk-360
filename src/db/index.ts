@@ -1,20 +1,48 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool, type PoolConfig } from "pg";
 
+import { setupDnsResilience } from "@/lib/dns-resilience";
 import * as schema from "./schema/index";
 
-const connectionString = process.env.DATABASE_URL;
+// Install DNS resilience fallback for Neon hostnames
+setupDnsResilience();
 
-if (!connectionString) {
-  throw new Error(
-    "DATABASE_URL is not set. Copy .env.example to .env and set it before starting the app.",
-  );
+function validateAndNormalizeConnectionString(raw?: string): string {
+  if (!raw || typeof raw !== "string" || !raw.trim()) {
+    throw new Error(
+      "DATABASE_URL is not set. Copy .env.example to .env and configure a valid PostgreSQL connection string.",
+    );
+  }
+
+  const trimmed = raw.trim();
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== "postgres:" && parsed.protocol !== "postgresql:") {
+      throw new Error(
+        `Invalid DATABASE_URL protocol: expected "postgresql:" or "postgres:", got "${parsed.protocol}"`,
+      );
+    }
+    if (!parsed.hostname) {
+      throw new Error("Invalid DATABASE_URL: missing hostname.");
+    }
+  } catch (err: any) {
+    if (err.message?.includes("Invalid DATABASE_URL")) {
+      throw err;
+    }
+    throw new Error(
+      "Invalid DATABASE_URL format. Ensure it is a valid postgresql:// URI.",
+    );
+  }
+
+  // Explicitly use verify-full to satisfy node-postgres pg v9 security semantics and eliminate warnings
+  return trimmed.includes("sslmode=require")
+    ? trimmed.replace("sslmode=require", "sslmode=verify-full")
+    : trimmed;
 }
 
-// Explicitly use verify-full to satisfy node-postgres pg v9 security semantics and eliminate warnings
-const normalizedConnectionString = connectionString.includes("sslmode=require")
-  ? connectionString.replace("sslmode=require", "sslmode=verify-full")
-  : connectionString;
+const connectionString = process.env.DATABASE_URL;
+const normalizedConnectionString =
+  validateAndNormalizeConnectionString(connectionString);
 
 const poolConfig: PoolConfig = {
   connectionString: normalizedConnectionString,

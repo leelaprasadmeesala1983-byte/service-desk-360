@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -59,6 +60,9 @@ export function CustomerReportView({
   const [reportData, setReportData] = useState<CustomerReportData | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Checkbox Selection state for selective printing
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Individual Record Dialog State
   const [selectedRecord, setSelectedRecord] =
@@ -151,11 +155,38 @@ export function CustomerReportView({
 
   const handleSelectCustomer = (cust: CustomerReportOption) => {
     setSelectedCustomerId(cust.id);
+    setSelectedIds(new Set()); // Clear selection when customer changes
     setDropdownOpen(false);
     setDropdownSearch("");
     setPage(1);
     fetchReport(cust.id, 1, limit);
   };
+
+  const toggleSelect = useCallback((item: CustomerMaterialItem) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(item.id)) next.delete(item.id);
+      else next.add(item.id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    if (!reportData?.materials) return;
+    const currentMaterials = reportData.materials;
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const allSelected =
+        currentMaterials.length > 0 &&
+        currentMaterials.every((m) => next.has(m.id));
+      if (allSelected) {
+        currentMaterials.forEach((m) => next.delete(m.id));
+      } else {
+        currentMaterials.forEach((m) => next.add(m.id));
+      }
+      return next;
+    });
+  }, [reportData?.materials]);
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
@@ -188,8 +219,22 @@ export function CustomerReportView({
       toast.error("Please select a customer and load report data first.");
       return;
     }
-    // Direct client print ensures instant generation with 0 failures
-    printCustomerReportDirect(reportData);
+    if (selectedIds.size === 0) {
+      toast.warning("Please select at least one record to print.");
+      return;
+    }
+    // Filter to ONLY selected materials
+    const selectedMaterials = reportData.materials.filter((m) =>
+      selectedIds.has(m.id),
+    );
+    printCustomerReportDirect({
+      summary: reportData.summary,
+      materials: selectedMaterials,
+      pagination: {
+        ...reportData.pagination,
+        total: selectedMaterials.length,
+      },
+    });
   };
 
   const filteredDropdownOptions = customerOptions.filter((c) => {
@@ -303,14 +348,29 @@ export function CustomerReportView({
           </div>
         </div>
 
-        <div>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setSelectedIds(new Set())}
+              className="h-9 px-3 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              Clear ({selectedIds.size})
+            </Button>
+          )}
           <Button
             onClick={handlePrint}
-            disabled={!reportData || loadingReport}
-            className="gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-xs font-semibold cursor-pointer h-9 px-4 text-xs sm:text-sm"
+            disabled={!reportData || loadingReport || selectedIds.size === 0}
+            className="gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-xs font-semibold cursor-pointer h-9 px-4 text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            title={
+              selectedIds.size === 0
+                ? "Select at least one record to print"
+                : `Print ${selectedIds.size} selected record(s)`
+            }
           >
             <Printer className="size-4" />
-            Print Report
+            Print Report ({selectedIds.size})
           </Button>
         </div>
       </div>
@@ -378,6 +438,27 @@ export function CustomerReportView({
               <Table className="min-w-[950px] text-xs">
                 <TableHeader>
                   <TableRow className="bg-muted/40">
+                    <TableHead className="w-10 text-center">
+                      <Checkbox
+                        checked={
+                          reportData.materials.length > 0 &&
+                          reportData.materials.every((m) =>
+                            selectedIds.has(m.id),
+                          )
+                        }
+                        indeterminate={
+                          reportData.materials.some((m) =>
+                            selectedIds.has(m.id),
+                          ) &&
+                          !reportData.materials.every((m) =>
+                            selectedIds.has(m.id),
+                          )
+                        }
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Select all records on current page"
+                        title="Select all records on current page"
+                      />
+                    </TableHead>
                     <TableHead className="w-28 font-bold">Track ID</TableHead>
                     <TableHead className="w-28">Date</TableHead>
                     <TableHead className="w-44">Product</TableHead>
@@ -394,7 +475,7 @@ export function CustomerReportView({
                   {reportData.materials.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={8}
+                        colSpan={9}
                         className="py-8 text-center text-muted-foreground"
                       >
                         No material records found for this customer.
@@ -403,6 +484,13 @@ export function CustomerReportView({
                   ) : (
                     reportData.materials.map((item) => (
                       <TableRow key={item.id} className="hover:bg-muted/30">
+                        <TableCell className="text-center">
+                          <Checkbox
+                            checked={selectedIds.has(item.id)}
+                            onCheckedChange={() => toggleSelect(item)}
+                            aria-label={`Select record ${item.trackId || item.id}`}
+                          />
+                        </TableCell>
                         <TableCell className="font-mono font-bold text-primary whitespace-nowrap">
                           {item.trackId}
                         </TableCell>

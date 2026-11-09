@@ -34,6 +34,7 @@ type SendToVendorTableProps = {
   selectable?: boolean;
   selectedIds?: Set<string>;
   onToggleSelect?: (item: SendToVendorRow) => void;
+  onToggleSelectAll?: (records: SendToVendorRow[]) => void;
   onUpdateStatus?: (item: SendToVendorRow) => void;
   onReceiveFromVendor?: (item: SendToVendorRow) => void;
   isSearch?: boolean;
@@ -52,9 +53,10 @@ export function SendToVendorTable({
   onView,
   onEdit,
   onDelete,
-  selectable = false,
+  selectable = true,
   selectedIds,
   onToggleSelect,
+  onToggleSelectAll,
   onUpdateStatus,
   onReceiveFromVendor,
   isSearch = false,
@@ -67,6 +69,11 @@ export function SendToVendorTable({
   const pageCount = Math.max(1, totalPages || Math.ceil(total / limit));
   const safePage = Math.min(Math.max(1, page), pageCount);
 
+  const allPageSelected =
+    records.length > 0 && records.every((r) => selectedIds?.has(r.id));
+  const somePageSelected =
+    records.some((r) => selectedIds?.has(r.id)) && !allPageSelected;
+
   return (
     <div className="space-y-4">
       {/* Table Container */}
@@ -75,7 +82,17 @@ export function SendToVendorTable({
           <Table className="min-w-[950px]">
             <TableHeader>
               <TableRow className="bg-muted/30">
-                {selectable && <TableHead className="w-10 text-center" />}
+                {selectable && (
+                  <TableHead className="w-10 text-center">
+                    <Checkbox
+                      checked={allPageSelected}
+                      indeterminate={somePageSelected}
+                      onCheckedChange={() => onToggleSelectAll?.(records)}
+                      aria-label="Select all records on current page"
+                      title="Select all records on current page"
+                    />
+                  </TableHead>
+                )}
                 <TableHead className="w-14 text-center">S.No</TableHead>
                 <TableHead className="w-28">Track ID</TableHead>
                 <TableHead className="w-36">Customer</TableHead>

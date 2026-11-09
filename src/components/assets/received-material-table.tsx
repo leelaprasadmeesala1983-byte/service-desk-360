@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, Pencil, Trash2, Truck } from "lucide-react";
+import { Eye, Pencil, Printer, Trash2, Truck } from "lucide-react";
 import { useMemo } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ type ReceivedMaterialTableProps = {
   onLimitChange: (newLimit: number) => void;
   onView: (item: ReceivedItemRow) => void;
   onEdit: (item: ReceivedItemRow) => void;
+  onPrint?: (item: ReceivedItemRow) => void;
   onDelete: (item: ReceivedItemRow) => void;
   selectedItems: ReceivedItemRow[];
   onSelectionChange: (items: ReceivedItemRow[]) => void;
@@ -71,6 +72,7 @@ export function ReceivedMaterialTable({
   onLimitChange,
   onView,
   onEdit,
+  onPrint,
   onDelete,
   selectedItems,
   onSelectionChange,
@@ -243,7 +245,7 @@ export function ReceivedMaterialTable({
                 <TableHead className="w-44">Complaint / Remarks</TableHead>
                 <TableHead className="w-32">Received Date</TableHead>
                 <TableHead className="w-32">Status</TableHead>
-                <TableHead className="w-28 text-right">Actions</TableHead>
+                <TableHead className="w-36 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -347,7 +349,7 @@ export function ReceivedMaterialTable({
                         )}
                       </TableCell>
 
-                      {/* 9. Actions */}
+                      {/* 9. Actions: 1. View, 2. Edit, 3. Print, 4. Delete */}
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button
@@ -370,6 +372,17 @@ export function ReceivedMaterialTable({
                             className="size-7 text-muted-foreground hover:text-foreground cursor-pointer"
                           >
                             <Pencil className="size-3.5" />
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            onClick={() => onPrint?.(item)}
+                            aria-label="Print Received Material"
+                            title="Print Received Material"
+                            className="size-7 text-muted-foreground hover:text-primary hover:bg-primary/10 cursor-pointer"
+                          >
+                            <Printer className="size-3.5" />
                           </Button>
 
                           <Button

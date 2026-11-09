@@ -147,53 +147,79 @@ export function normalizeVendorDispatchDocumentData(
  */
 function renderDispatchBody(data: VendorDispatchDocumentData): string {
   const rows = data.materials
-    .map(
-      (m, idx) => `
+    .map((m, idx) => {
+      const modelStr =
+        [m.brand, m.model].filter(Boolean).join(" - ") || m.model || "—";
+      const remarksStr =
+        m.complaint || data.remarks || data.dispatchRemarks || "—";
+      return `
       <tr>
         <td class="center">${idx + 1}</td>
-        <td class="mono">${escapeHtml(m.trackId)}</td>
-        <td>${escapeHtml(m.productName)}</td>
-        <td>${escapeHtml(m.brand)}</td>
-        <td>${escapeHtml(m.model)}</td>
+        <td class="mono bold" style="color: #2563eb;">${escapeHtml(m.trackId)}</td>
+        <td>${escapeHtml(data.customer.name)}</td>
+        <td class="bold">${escapeHtml(m.productName)}</td>
+        <td>${escapeHtml(modelStr)}</td>
         <td class="mono bold">${escapeHtml(m.serialNumber)}</td>
-        <td class="center">${m.quantity}</td>
-        <td>${escapeHtml(m.complaint)}</td>
-      </tr>`,
-    )
+        <td class="center bold">${m.quantity}</td>
+        <td><span style="display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;">${escapeHtml(data.status)}</span></td>
+        <td>${escapeHtml(remarksStr)}</td>
+      </tr>`;
+    })
     .join("");
   const totalQty = data.materials.reduce((sum, m) => sum + m.quantity, 0);
 
+  const vendorContactLine = [data.vendor.contact, data.vendor.phone]
+    .filter((v) => v && v !== "—")
+    .join(" · ");
+
   return `
     ${renderDocHeader({
-      title: "Material Sent for Repair",
+      title: "Vendor Dispatch Document",
       refId: data.dispatchId,
-      date: data.dispatchDate,
+      date: `Dispatch Date: ${data.dispatchDate}`,
     })}
     <div class="cards">
-      ${renderInfoCard("Vendor", [
-        data.vendor.name,
-        data.vendor.address,
-        [data.vendor.contact, data.vendor.phone]
-          .filter((v) => v && v !== "—")
-          .join(" "),
+      ${renderInfoCard("Vendor Information", [
+        `Name: ${data.vendor.name}`,
+        vendorContactLine ? `Contact: ${vendorContactLine}` : "",
+        data.vendor.address && data.vendor.address !== "—"
+          ? `Address: ${data.vendor.address}`
+          : "",
       ])}
-      ${renderInfoCard("Courier", [
-        data.courier,
-        data.docketAwbNumber !== "—" ? `Docket: ${data.docketAwbNumber}` : "",
-        `Packages: ${data.numberOfPackages}`,
+      ${renderInfoCard("Dispatch & Customer Details", [
+        `Customer: ${data.customer.name}${data.customer.contact && data.customer.contact !== "—" ? ` (${data.customer.contact})` : ""}`,
+        `Dispatch Date: ${data.dispatchDate} · Status: ${data.status}`,
+        `Courier: ${data.courier}${data.docketAwbNumber !== "—" ? ` · Docket: ${data.docketAwbNumber}` : ""} · Packages: ${data.numberOfPackages}`,
+        data.remarks || data.reasonForRepair !== "—"
+          ? `Remarks: ${data.remarks || data.reasonForRepair}`
+          : "",
       ])}
     </div>
     <table class="doc-table">
       <thead>
         <tr>
-          <th class="center">#</th><th>Track ID</th><th>Product</th><th>Brand</th>
-          <th>Model</th><th>Serial No</th><th class="center">Qty</th><th>Complaint</th>
+          <th class="center" style="width: 5%;">#</th>
+          <th style="width: 14%;">Track ID</th>
+          <th style="width: 14%;">Customer</th>
+          <th style="width: 14%;">Product</th>
+          <th style="width: 14%;">Model</th>
+          <th style="width: 13%;">Serial No</th>
+          <th class="center" style="width: 5%;">Qty</th>
+          <th style="width: 10%;">Status</th>
+          <th style="width: 11%;">Remarks</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
     <div class="doc-totals">Total Quantity: ${totalQty} &nbsp;|&nbsp; Total Items: ${data.materials.length}</div>
-    ${renderSignatures(["Prepared By", "Checked By", "Vendor Signature"])}`;
+    ${renderSignatures(["Dispatched By", "Verified By", "Authorized Signature"])}
+    <div class="doc-footer" style="margin-top: 36px; border-top: 1px dashed #cbd5e1; padding-top: 10px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; color: #64748b; font-size: 10px;">
+        <span>ServiceDesk 360 • Asset Management</span>
+        <span>Printed: ${formatDateTime(new Date())}</span>
+        <span>Dispatch ID: ${escapeHtml(data.dispatchId)}</span>
+      </div>
+    </div>`;
 }
 
 export function generateVendorDispatchHtml(
