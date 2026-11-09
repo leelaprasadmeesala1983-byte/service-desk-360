@@ -72,13 +72,19 @@ async function runMidnightRolloverTask(): Promise<void> {
   );
 
   try {
-    await performMidnightRolloverForAllUsers();
-    globalThis.__quickCashLastRolloverDate__ = todayStr;
-    revalidatePath("/quick-cash");
-    revalidatePath("/");
-    console.log(
-      `[Quick Cash Scheduler] Midnight rollover completed successfully.`,
-    );
+    const success = await performMidnightRolloverForAllUsers();
+    if (success) {
+      globalThis.__quickCashLastRolloverDate__ = todayStr;
+      revalidatePath("/quick-cash");
+      revalidatePath("/");
+      console.log(
+        `[Quick Cash Scheduler] Midnight rollover completed successfully.`,
+      );
+    } else {
+      console.warn(
+        `[Quick Cash Scheduler] Midnight rollover was unsuccessful; skipping date mark so heartbeat will retry.`,
+      );
+    }
   } catch (error) {
     console.error("[Quick Cash Scheduler] Midnight rollover error:", error);
   } finally {
@@ -120,13 +126,29 @@ export function initMidnightRolloverScheduler(): void {
     `[Quick Cash Scheduler] Initializing automatic midnight rollover (Timezone: ${APP_TIMEZONE})...`,
   );
 
-  // Run initial catch-up immediately on startup
-  void performMidnightRolloverForAllUsers().then(() => {
-    globalThis.__quickCashLastRolloverDate__ = formatLocalDate(
-      new Date(),
-      APP_TIMEZONE,
-    );
-  });
+  // Run initial catch-up immediately on startup without blocking
+  void performMidnightRolloverForAllUsers()
+    .then((success) => {
+      if (success) {
+        globalThis.__quickCashLastRolloverDate__ = formatLocalDate(
+          new Date(),
+          APP_TIMEZONE,
+        );
+        console.log(
+          `[Quick Cash Scheduler] Initial rollover catch-up completed successfully.`,
+        );
+      } else {
+        console.warn(
+          `[Quick Cash Scheduler] Initial rollover catch-up was unsuccessful (DB may be offline). Heartbeat will retry once database becomes available.`,
+        );
+      }
+    })
+    .catch((error) => {
+      console.error(
+        "[Quick Cash Scheduler] Initial rollover catch-up unexpected error:",
+        error,
+      );
+    });
 
   // Schedule exact midnight timer
   scheduleNextMidnightRun();

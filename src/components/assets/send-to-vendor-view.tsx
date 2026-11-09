@@ -72,8 +72,7 @@ export function SendToVendorView({
     null,
   );
 
-  // Print selection (select mode is toggled by the Print button)
-  const [selectMode, setSelectMode] = useState(false);
+  // Print selection
   const [selected, setSelected] = useState<Map<string, SendToVendorRow>>(
     new Map(),
   );
@@ -87,18 +86,27 @@ export function SendToVendorView({
     });
   }, []);
 
-  const cancelSelect = () => {
-    setSelectMode(false);
+  const toggleSelectAll = useCallback((records: SendToVendorRow[]) => {
+    setSelected((prev) => {
+      const next = new Map(prev);
+      const allSelected =
+        records.length > 0 && records.every((r) => next.has(r.id));
+      if (allSelected) {
+        records.forEach((r) => next.delete(r.id));
+      } else {
+        records.forEach((r) => next.set(r.id, r));
+      }
+      return next;
+    });
+  }, []);
+
+  const clearSelection = () => {
     setSelected(new Map());
   };
 
   const handlePrintClick = () => {
-    if (!selectMode) {
-      setSelectMode(true);
-      return;
-    }
     if (selected.size === 0) {
-      toast.warning("Select at least one record to print.");
+      toast.warning("Please select at least one record to print.");
       return;
     }
     printVendorDispatches(Array.from(selected.values()), () => {
@@ -113,6 +121,7 @@ export function SendToVendorView({
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
       setPage(1); // Reset to page 1 on search change
+      setSelected(new Map()); // Clear selection when filter changes
     }, 300);
     return () => clearTimeout(timer);
   }, [search]);
@@ -257,20 +266,26 @@ export function SendToVendorView({
           <Button
             type="button"
             variant="outline"
+            disabled={selected.size === 0}
             onClick={handlePrintClick}
-            className="h-9 gap-2 text-xs cursor-pointer shrink-0"
+            className="h-9 gap-2 text-xs font-semibold cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={
+              selected.size === 0
+                ? "Select at least one record to print"
+                : `Print ${selected.size} selected record(s)`
+            }
           >
             <Printer className="size-3.5" />
-            {selectMode ? `Print (${selected.size})` : "Print"}
+            Print ({selected.size})
           </Button>
-          {selectMode && (
+          {selected.size > 0 && (
             <Button
               type="button"
               variant="ghost"
-              onClick={cancelSelect}
-              className="h-9 text-xs cursor-pointer shrink-0"
+              onClick={clearSelection}
+              className="h-9 text-xs cursor-pointer shrink-0 text-muted-foreground hover:text-foreground"
             >
-              Cancel
+              Clear ({selected.size})
             </Button>
           )}
         </div>
@@ -292,9 +307,10 @@ export function SendToVendorView({
         onView={(item) => setViewRecord(item)}
         onEdit={(item) => setEditRecord(item)}
         onDelete={(item) => setDeleteRecord(item)}
-        selectable={selectMode}
+        selectable={true}
         selectedIds={new Set(selected.keys())}
         onToggleSelect={toggleSelect}
+        onToggleSelectAll={toggleSelectAll}
         onUpdateStatus={(item) => setStatusRecord(item)}
         isSearch={Boolean(debouncedSearch)}
         onResetSearch={() => setSearch("")}

@@ -406,8 +406,9 @@ export async function recalculateDailyCashRegister(
 
 /**
  * Performs midnight rollover for all admin users and any users with registers.
+ * Returns true if rollover completed successfully, or false if the database was unavailable.
  */
-export async function performMidnightRolloverForAllUsers(): Promise<void> {
+export async function performMidnightRolloverForAllUsers(): Promise<boolean> {
   const todayStr = formatLocalDate(new Date(), APP_TIMEZONE);
 
   try {
@@ -438,7 +439,12 @@ export async function performMidnightRolloverForAllUsers(): Promise<void> {
         operationName: "performMidnightRolloverForAllUsers",
       },
     );
+    return true;
   } catch (error) {
-    console.error("performMidnightRolloverForAllUsers error:", error);
+    console.error(
+      "[Quick Cash Rollover] performMidnightRolloverForAllUsers failed (DB may be unavailable):",
+      error instanceof Error ? error.message : error,
+    );
+    return false;
   }
 }

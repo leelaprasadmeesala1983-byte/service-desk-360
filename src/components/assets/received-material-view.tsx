@@ -13,12 +13,14 @@ import {
   updateAsset,
 } from "@/lib/actions/assets";
 import { createSendToVendor } from "@/lib/actions/send-to-vendor";
+import { printReceivedMaterial } from "@/lib/utils/print-received-material";
 import type { AssetFormValues } from "@/lib/validations/assets";
 import type { SendToVendorFormValues } from "@/lib/validations/send-to-vendor";
 import type { AssetListResponse, ReceivedItemRow } from "@/types/assets";
 
 import { AssetDeleteDialog } from "./asset-delete-dialog";
 import { AssetFormDialog } from "./asset-form-dialog";
+import { ReceivedMaterialPrintReceipt } from "./received-material-print-receipt";
 import {
   isItemAvailable,
   ReceivedMaterialTable,
@@ -53,6 +55,7 @@ export function ReceivedMaterialView({
   const [editItem, setEditItem] = useState<ReceivedItemRow | null>(null);
   const [viewItem, setViewItem] = useState<ReceivedItemRow | null>(null);
   const [deleteItem, setDeleteItem] = useState<ReceivedItemRow | null>(null);
+  const [printItem, setPrintItem] = useState<ReceivedItemRow | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -200,6 +203,19 @@ export function ReceivedMaterialView({
     }
   };
 
+  const handlePrintMaterial = useCallback((item: ReceivedItemRow) => {
+    setPrintItem(item);
+    printReceivedMaterial(item, () => {
+      toast.warning(
+        "Please allow pop-ups for ServiceDesk 360 to print the receipt.",
+      );
+      // Fallback: If popup is blocked by browser, trigger in-page window.print()
+      setTimeout(() => {
+        window.print();
+      }, 100);
+    });
+  }, []);
+
   const editInitialData = editItem
     ? {
         id: editItem.assetId,
@@ -300,6 +316,7 @@ export function ReceivedMaterialView({
         }}
         onView={(item) => setViewItem(item)}
         onEdit={(item) => setEditItem(item)}
+        onPrint={handlePrintMaterial}
         onDelete={(item) => setDeleteItem(item)}
         selectedItems={selectedItems}
         onSelectionChange={setSelectedItems}
@@ -353,6 +370,9 @@ export function ReceivedMaterialView({
         }}
         onSubmit={handleDispatchSubmit}
       />
+
+      {/* Hidden In-Page Print Document for Browser Print Dialog */}
+      <ReceivedMaterialPrintReceipt item={printItem} />
     </div>
   );
 }

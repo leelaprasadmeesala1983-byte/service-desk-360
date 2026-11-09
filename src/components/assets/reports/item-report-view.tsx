@@ -16,9 +16,11 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { printItemReportDirect } from "@/lib/utils/print-reports";
 import type { ItemReportData } from "@/types/reports";
 
 type ItemReportViewProps = {
@@ -32,6 +34,11 @@ export function ItemReportView({ initialTrackId = "" }: ItemReportViewProps) {
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
+  // Checkbox selection state for timeline milestones
+  const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<Set<string>>(
+    new Set(),
+  );
+
   const handleSearch = (overrideQuery?: string) => {
     const q = (
       overrideQuery !== undefined ? overrideQuery : searchQuery
@@ -44,6 +51,7 @@ export function ItemReportView({ initialTrackId = "" }: ItemReportViewProps) {
     setLoading(true);
     setError(null);
     setHasSearched(true);
+    setSelectedMilestoneIds(new Set());
 
     fetch(`/api/reports/items?trackId=${encodeURIComponent(q)}`)
       .then(async (res) => {
@@ -57,9 +65,14 @@ export function ItemReportView({ initialTrackId = "" }: ItemReportViewProps) {
       })
       .then((data: ItemReportData) => {
         setReportData(data);
+        const allIds = Array.isArray(data.timeline)
+          ? data.timeline.map((e, idx) => e.id || String(idx))
+          : [];
+        setSelectedMilestoneIds(new Set(allIds));
       })
       .catch((err: Error) => {
         setReportData(null);
+        setSelectedMilestoneIds(new Set());
         setError(err.message || "Failed to find item report.");
       })
       .finally(() => {
@@ -67,17 +80,42 @@ export function ItemReportView({ initialTrackId = "" }: ItemReportViewProps) {
       });
   };
 
+  const toggleSelectMilestone = (id: string) => {
+    setSelectedMilestoneIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllMilestones = () => {
+    if (!reportData?.timeline) return;
+    const allIds = reportData.timeline.map((e, idx) => e.id || String(idx));
+    setSelectedMilestoneIds((prev) => {
+      const allSelected =
+        allIds.length > 0 && allIds.every((id) => prev.has(id));
+      if (allSelected) {
+        return new Set();
+      }
+      return new Set(allIds);
+    });
+  };
+
   const handlePrint = () => {
     if (!reportData) {
       toast.error("Please search and load a material first.");
       return;
     }
-    const printUrl = `/reports/print/item?trackId=${encodeURIComponent(reportData.trackId)}`;
-    window.open(
-      printUrl,
-      "_blank",
-      "noopener,noreferrer,width=1000,height=800",
-    );
+    if (selectedMilestoneIds.size === 0) {
+      toast.warning("Please select at least one milestone to print.");
+      return;
+    }
+    printItemReportDirect(reportData, selectedMilestoneIds, () => {
+      toast.error(
+        "Please allow pop-ups for ServiceDesk 360 to print the report.",
+      );
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -89,7 +127,7 @@ export function ItemReportView({ initialTrackId = "" }: ItemReportViewProps) {
 
   return (
     <div className="space-y-6">
-      {/* 1. Header & Print Full Report Button */}
+      {/* 1. Header & Print Report Button */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
@@ -102,13 +140,28 @@ export function ItemReportView({ initialTrackId = "" }: ItemReportViewProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          {selectedMilestoneIds.size > 0 && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setSelectedMilestoneIds(new Set())}
+              className="h-9 px-3 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              Clear ({selectedMilestoneIds.size})
+            </Button>
+          )}
           <Button
             onClick={handlePrint}
-            disabled={!reportData || loading}
-            className="gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-xs font-semibold"
+            disabled={!reportData || loading || selectedMilestoneIds.size === 0}
+            className="gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-xs font-semibold cursor-pointer h-9 px-4 text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            title={
+              selectedMilestoneIds.size === 0
+                ? "Select at least one milestone to print"
+                : `Print ${selectedMilestoneIds.size} selected milestone(s)`
+            }
           >
             <Printer className="size-4" />
-            Print Full Report
+            Print Report ({selectedMilestoneIds.size})
           </Button>
         </div>
       </div>
@@ -224,7 +277,7 @@ export function ItemReportView({ initialTrackId = "" }: ItemReportViewProps) {
                       reportData.currentStatus === "Delivered"
                       ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
                       : reportData.currentStatus === "Under Repair" ||
-                          reportData.currentStatus === "Sent to Vendor"
+                        reportData.currentStatus === "Sent to Vendor"
                         ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
                         : reportData.currentStatus === "Received From Vendor"
                           ? "bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20"
@@ -346,7 +399,7 @@ export function ItemReportView({ initialTrackId = "" }: ItemReportViewProps) {
 
           {/* 4. Complete Dynamic Journey Timeline */}
           <div className="rounded-xl border border-border bg-card p-4 sm:p-6 shadow-xs">
-            <div className="flex items-center justify-between border-b border-border pb-3 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3 mb-6">
               <div>
                 <h3 className="text-sm sm:text-base font-bold text-foreground">
                   Complete Material Journey Timeline
@@ -356,18 +409,50 @@ export function ItemReportView({ initialTrackId = "" }: ItemReportViewProps) {
                   receipt to return.
                 </p>
               </div>
-              <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
-                {reportData.timeline.length} Milestones
-              </span>
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-md border border-border/60">
+                  <Checkbox
+                    id="select-all-milestones"
+                    checked={
+                      reportData.timeline.length > 0 &&
+                      reportData.timeline.every((e, idx) =>
+                        selectedMilestoneIds.has(e.id || String(idx)),
+                      )
+                    }
+                    indeterminate={
+                      reportData.timeline.some((e, idx) =>
+                        selectedMilestoneIds.has(e.id || String(idx)),
+                      ) &&
+                      !reportData.timeline.every((e, idx) =>
+                        selectedMilestoneIds.has(e.id || String(idx)),
+                      )
+                    }
+                    onCheckedChange={toggleSelectAllMilestones}
+                  />
+                  <label
+                    htmlFor="select-all-milestones"
+                    className="text-xs font-semibold text-foreground cursor-pointer select-none"
+                  >
+                    Select All
+                  </label>
+                </div>
+                <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
+                  {selectedMilestoneIds.size}/{reportData.timeline.length}{" "}
+                  Selected
+                </span>
+              </div>
             </div>
 
             {/* Vertical Timeline */}
             <div className="relative pl-6 sm:pl-8 space-y-6 before:absolute before:top-3 before:bottom-3 before:left-3 sm:before:left-4 before:w-0.5 before:bg-border">
               {reportData.timeline.map((event, idx) => {
                 const isLast = idx === reportData.timeline.length - 1;
+                const eventKey = event.id || String(idx);
+                const isSelected = selectedMilestoneIds.has(eventKey);
+
                 return (
                   <div
-                    key={event.id || idx}
+                    key={eventKey}
                     className="relative group text-xs sm:text-sm"
                   >
                     {/* Circle Pin */}
@@ -386,12 +471,28 @@ export function ItemReportView({ initialTrackId = "" }: ItemReportViewProps) {
                       )}
                     </div>
 
-                    <div className="rounded-xl border border-border bg-muted/30 hover:bg-muted/50 p-4 transition-colors">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1.5">
-                        <span className="font-bold text-foreground text-sm sm:text-base">
-                          {event.title}
-                        </span>
-                        <span className="font-medium text-xs text-muted-foreground flex items-center gap-1.5">
+                    <div
+                      className={cn(
+                        "rounded-xl border p-4 transition-colors",
+                        isSelected
+                          ? "border-primary/40 bg-card shadow-xs"
+                          : "border-border bg-muted/20 opacity-70",
+                      )}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1.5">
+                        <div className="flex items-center gap-2.5">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() =>
+                              toggleSelectMilestone(eventKey)
+                            }
+                            aria-label={`Select ${event.title}`}
+                          />
+                          <span className="font-bold text-foreground text-sm sm:text-base">
+                            {event.title}
+                          </span>
+                        </div>
+                        <span className="font-medium text-xs text-muted-foreground flex items-center gap-1.5 ml-6 sm:ml-0">
                           <Calendar className="size-3.5 text-muted-foreground/70" />
                           {event.date} {event.time && `· ${event.time}`}
                         </span>
@@ -404,33 +505,33 @@ export function ItemReportView({ initialTrackId = "" }: ItemReportViewProps) {
                       {(event.vendorOrPerson ||
                         event.courier ||
                         event.docketNumber) && (
-                        <div className="mt-2.5 pt-2 border-t border-border/50 flex flex-wrap items-center gap-4 text-xs font-mono text-muted-foreground">
-                          {event.vendorOrPerson && (
-                            <span>
-                              Party:{" "}
-                              <strong className="text-foreground font-semibold">
-                                {event.vendorOrPerson}
-                              </strong>
-                            </span>
-                          )}
-                          {event.courier && (
-                            <span>
-                              Carrier:{" "}
-                              <strong className="text-foreground font-semibold">
-                                {event.courier}
-                              </strong>
-                            </span>
-                          )}
-                          {event.docketNumber && (
-                            <span className="bg-background px-2 py-0.5 rounded border border-border">
-                              Docket:{" "}
-                              <strong className="text-foreground">
-                                {event.docketNumber}
-                              </strong>
-                            </span>
-                          )}
-                        </div>
-                      )}
+                          <div className="mt-2.5 pt-2 border-t border-border/50 flex flex-wrap items-center gap-4 text-xs font-mono text-muted-foreground">
+                            {event.vendorOrPerson && (
+                              <span>
+                                Party:{" "}
+                                <strong className="text-foreground font-semibold">
+                                  {event.vendorOrPerson}
+                                </strong>
+                              </span>
+                            )}
+                            {event.courier && (
+                              <span>
+                                Carrier:{" "}
+                                <strong className="text-foreground font-semibold">
+                                  {event.courier}
+                                </strong>
+                              </span>
+                            )}
+                            {event.docketNumber && (
+                              <span className="bg-background px-2 py-0.5 rounded border border-border">
+                                Docket:{" "}
+                                <strong className="text-foreground">
+                                  {event.docketNumber}
+                                </strong>
+                              </span>
+                            )}
+                          </div>
+                        )}
                     </div>
                   </div>
                 );
