@@ -43,7 +43,12 @@ import {
   SERVICE_CATEGORY_LABELS,
   type UserRole,
 } from "@/lib/constants";
-import { formatDateTime, formatLocalDateTime } from "@/lib/format";
+import {
+  formatDate,
+  formatLocalDate,
+  formatLocalDateTime,
+  withCurrentTime,
+} from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import {
@@ -209,7 +214,7 @@ function ServiceFormDialog({
           amount: "",
           closedDescription: "",
           imageUrl: "",
-          createdAt: formatLocalDateTime(new Date()),
+          createdAt: formatLocalDate(new Date()),
         },
   });
 
@@ -319,7 +324,7 @@ function ServiceFormDialog({
       amount: "",
       closedDescription: "",
       imageUrl: "",
-      createdAt: formatLocalDateTime(new Date()),
+      createdAt: formatLocalDate(new Date()),
     });
   }, [open, record, form]);
 
@@ -493,6 +498,7 @@ function ServiceFormDialog({
 
         const payload = {
           ...raw,
+          createdAt: withCurrentTime(raw.createdAt),
           id: raw.id,
           customerId: selectedCustomerId || raw.customerId || undefined,
           customerName: form.getValues("customerName") || raw.customerName,
@@ -810,6 +816,7 @@ function ServiceFormDialog({
                   options={assigneeOptions}
                   placeholder="Select Technician"
                   className="sm:col-span-1"
+                  disabled={isEdit}
                   error={errors.assignedTechnicianIds?.message}
                 />
 
@@ -820,17 +827,18 @@ function ServiceFormDialog({
                   required
                   options={STATUS_OPTIONS}
                   className="sm:col-span-1"
+                  disabled={isEdit}
                 />
 
                 {!isEdit && (
                   <Field
-                    label="Created Date & Time"
+                    label="Created Date"
                     required
                     className="sm:col-span-1"
                     error={errors.createdAt?.message}
                   >
                     <Input
-                      type="datetime-local"
+                      type="date"
                       className="h-10 rounded-md"
                       {...form.register("createdAt")}
                     />
@@ -853,28 +861,23 @@ function ServiceFormDialog({
 
             {isEdit && (
               <>
-                <Field label="Created Date & Time" className="sm:col-span-1">
+                <Field label="Created Date" className="sm:col-span-1">
                   <Input
                     type="text"
                     readOnly
                     disabled
-                    value={
-                      record?.createdAt ? formatDateTime(record.createdAt) : "—"
-                    }
+                    value={formatDate(record?.createdAt)}
                     className="h-10 rounded-md bg-muted/50 cursor-not-allowed"
                   />
                 </Field>
 
-                <Field
-                  label="Updated Date & Time"
-                  required
-                  className="sm:col-span-1"
-                  error={errors.updatedAt?.message}
-                >
+                <Field label="Updated Date" className="sm:col-span-1">
                   <Input
-                    type="datetime-local"
-                    className="h-10 rounded-md"
-                    {...form.register("updatedAt")}
+                    type="text"
+                    readOnly
+                    disabled
+                    value={formatDate(record?.updatedAt)}
+                    className="h-10 rounded-md bg-muted/50 cursor-not-allowed"
                   />
                 </Field>
               </>
@@ -888,6 +891,7 @@ function ServiceFormDialog({
                 required
                 options={STATUS_OPTIONS}
                 className="sm:col-span-1"
+                disabled
               />
             )}
 

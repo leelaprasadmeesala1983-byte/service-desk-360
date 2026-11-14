@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { InstallationRow } from "@/db/queries/installations";
-import { formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 
 type InstallationDetailsDialogProps = {
   open: boolean;
@@ -75,10 +75,10 @@ function InstallationDetailsDialog({
                 {record.description}
               </DetailRow>
               <DetailRow label="Created Date">
-                {formatDateTime(record.createdAt)}
+                {formatDate(record.createdAt)}
               </DetailRow>
               <DetailRow label="Updated Date">
-                {formatDateTime(record.updatedAt)}
+                {formatDate(record.updatedAt)}
               </DetailRow>
             </DetailGrid>
 

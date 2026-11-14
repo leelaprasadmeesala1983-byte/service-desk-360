@@ -26,6 +26,7 @@ import { recordStatusChangeEvent } from "@/lib/actions/work-history";
 import { RECORD_STATUS_LABELS, type RecordStatus } from "@/lib/constants";
 import { buildExcelSpreadsheet, getExportFilename } from "@/lib/excel-export";
 import { formatDate, formatRecordId } from "@/lib/format";
+import { lockEditFields } from "@/lib/locked-edit-fields";
 import {
   diffRecord,
   notifyAdminsOfUpdate,
@@ -307,7 +308,8 @@ async function updateProject(
   if (current.role === "ADMIN") {
     const parsed = editProjectSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
-    const data = parsed.data;
+    // Technician, status and updated date are locked in Edit.
+    const data = { ...parsed.data, ...lockEditFields(existing) };
 
     const technicianIds = Array.isArray(data.assignedTechnicianIds)
       ? data.assignedTechnicianIds
@@ -422,7 +424,8 @@ async function updateProject(
 
   const parsed = technicianProjectSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
-  const data = parsed.data;
+  // Technician, status and updated date are locked in Edit.
+  const data = { ...parsed.data, ...lockEditFields(existing) };
 
   await db
     .update(project)

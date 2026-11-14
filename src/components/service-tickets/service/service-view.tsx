@@ -35,7 +35,7 @@ import {
 } from "@/lib/actions/service-requests";
 import { SERVICE_CATEGORY_LABELS, type UserRole } from "@/lib/constants";
 import { downloadExcelBase64 } from "@/lib/excel-export";
-import { formatDateTime, parseRecordIdSearch } from "@/lib/format";
+import { formatDate, parseRecordIdSearch } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type ServiceViewProps = {
@@ -198,7 +198,7 @@ function ServiceView({
               className="gap-1.5"
             >
               <History className="size-4" />
-              Log Request
+              Daily Log Request
             </Button>
             {isAdmin && (
               <Button
@@ -325,10 +325,10 @@ function ServiceView({
                       />
                     </TableCell>
                     <TableCell className="text-muted-foreground whitespace-nowrap text-xs">
-                      {formatDateTime(row.createdAt)}
+                      {formatDate(row.createdAt)}
                     </TableCell>
                     <TableCell className="text-muted-foreground whitespace-nowrap text-xs">
-                      {formatDateTime(row.updatedAt)}
+                      {formatDate(row.updatedAt)}
                     </TableCell>
                     <TableCell className="text-right">
                       <RowActions

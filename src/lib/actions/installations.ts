@@ -28,6 +28,7 @@ import { recordStatusChangeEvent } from "@/lib/actions/work-history";
 import { RECORD_STATUS_LABELS, type RecordStatus } from "@/lib/constants";
 import { buildExcelSpreadsheet, getExportFilename } from "@/lib/excel-export";
 import { formatDate, formatRecordId } from "@/lib/format";
+import { lockEditFields } from "@/lib/locked-edit-fields";
 import {
   diffRecord,
   notifyAdminsOfUpdate,
@@ -341,7 +342,8 @@ async function updateInstallation(
   if (current.role === "ADMIN") {
     const parsed = editInstallationSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
-    const data = parsed.data;
+    // Technician, status and updated date are locked in Edit.
+    const data = { ...parsed.data, ...lockEditFields(existing) };
 
     const technicianIds = Array.isArray(data.assignedTechnicianIds)
       ? data.assignedTechnicianIds
@@ -560,7 +562,8 @@ async function updateInstallation(
 
   const parsed = technicianInstallationSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
-  const data = parsed.data;
+  // Technician, status and updated date are locked in Edit.
+  const data = { ...parsed.data, ...lockEditFields(existing) };
 
   const paymentMode = data.paymentMode || null;
   const paymentStatus =

@@ -117,7 +117,7 @@ export function EditWorkLogDialog({
       .replace(/[\s_-]+/g, "");
     if (rawStatus === "OPEN") {
       toast.error(
-        "Log Request is available only for In Progress or Closed records.",
+        "Daily Log Request is available only for In Progress or Closed records.",
       );
       return;
     }
@@ -165,50 +165,29 @@ export function EditWorkLogDialog({
             placeholder="Select technician(s)"
           />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Field
-              label="Work Date"
-              required
-              error={form.formState.errors.workDate?.message}
-            >
-              <Input
-                type="date"
-                {...form.register("workDate", {
-                  onChange: (e) => {
-                    const val = e.target.value;
-                    const curDt = form.getValues("workDateTime");
-                    const timePart =
-                      curDt && curDt.includes("T")
-                        ? curDt.split("T")[1]
-                        : "12:00";
-                    if (val) {
-                      form.setValue("workDateTime", `${val}T${timePart}`);
-                    }
-                  },
-                })}
-                className="h-9"
-              />
-            </Field>
-
-            <Field
-              label="Work Date & Time"
-              required
-              error={form.formState.errors.workDateTime?.message}
-            >
-              <Input
-                type="datetime-local"
-                {...form.register("workDateTime", {
-                  onChange: (e) => {
-                    const val = e.target.value;
-                    if (val && val.includes("T")) {
-                      form.setValue("workDate", val.split("T")[0]);
-                    }
-                  },
-                })}
-                className="h-9"
-              />
-            </Field>
-          </div>
+          <Field
+            label="Work Date"
+            required
+            error={form.formState.errors.workDate?.message}
+          >
+            <Input
+              type="date"
+              {...form.register("workDate", {
+                onChange: (e) => {
+                  const val = e.target.value;
+                  const curDt = form.getValues("workDateTime");
+                  const timePart =
+                    curDt && curDt.includes("T")
+                      ? curDt.split("T")[1]
+                      : "12:00";
+                  if (val) {
+                    form.setValue("workDateTime", `${val}T${timePart}`);
+                  }
+                },
+              })}
+              className="h-9"
+            />
+          </Field>
 
           <ControlledSelect
             control={form.control}
@@ -220,7 +199,8 @@ export function EditWorkLogDialog({
 
           {isStatusBlocked && (
             <div className="rounded-md bg-destructive/10 border border-destructive/20 p-2.5 text-xs text-destructive font-medium">
-              Log Request is available only for In Progress or Closed records.
+              Daily Log Request is available only for In Progress or Closed
+              records.
             </div>
           )}
 

@@ -138,7 +138,7 @@ export async function createWorkHistory(input: unknown): Promise<ActionResult> {
       .replace(/[\s_-]+/g, "");
     if (submittedStatus === "OPEN") {
       return actionError(
-        "Log Request is available only for In Progress or Closed records.",
+        "Daily Log Request is available only for In Progress or Closed records.",
       );
     }
 
@@ -354,7 +354,7 @@ export async function updateWorkHistory(input: unknown): Promise<ActionResult> {
       .replace(/[\s_-]+/g, "");
     if (submittedStatus === "OPEN") {
       return actionError(
-        "Log Request is available only for In Progress or Closed records.",
+        "Daily Log Request is available only for In Progress or Closed records.",
       );
     }
 

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import type { ServiceRequestRow } from "@/db/queries/service-requests";
 import { SERVICE_CATEGORY_LABELS } from "@/lib/constants";
-import { formatCurrency, formatDateTime } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 
 type ServiceDetailsDialogProps = {
   open: boolean;
@@ -66,10 +66,10 @@ function ServiceDetailsDialog({
                 {record.address}
               </DetailRow>
               <DetailRow label="Created Date">
-                {formatDateTime(record.createdAt)}
+                {formatDate(record.createdAt)}
               </DetailRow>
               <DetailRow label="Last Updated">
-                {formatDateTime(record.updatedAt)}
+                {formatDate(record.updatedAt)}
               </DetailRow>
               <DetailRow label="Issue Description" wide>
                 {record.description}

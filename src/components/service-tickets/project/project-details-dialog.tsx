@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { ProjectRow } from "@/db/queries/projects";
-import { formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 
 type ProjectDetailsDialogProps = {
   open: boolean;
@@ -61,10 +61,10 @@ function ProjectDetailsDialog({
               </DetailRow>
               <DetailRow label="Location">{record.location}</DetailRow>
               <DetailRow label="Created Date">
-                {formatDateTime(record.createdAt)}
+                {formatDate(record.createdAt)}
               </DetailRow>
               <DetailRow label="Updated Date">
-                {formatDateTime(record.updatedAt)}
+                {formatDate(record.updatedAt)}
               </DetailRow>
               <DetailRow label="Project Description" wide>
                 {record.description}

@@ -32,6 +32,7 @@ import {
 } from "@/lib/constants";
 import { buildExcelSpreadsheet, getExportFilename } from "@/lib/excel-export";
 import { formatCurrency, formatDate, formatRecordId } from "@/lib/format";
+import { lockEditFields } from "@/lib/locked-edit-fields";
 import {
   diffRecord,
   notifyAdminsOfUpdate,
@@ -350,7 +351,8 @@ async function updateServiceRequest(
   if (current.role === "ADMIN") {
     const parsed = editServiceRequestSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
-    const data = parsed.data;
+    // Technician, status and updated date are locked in Edit.
+    const data = { ...parsed.data, ...lockEditFields(existing) };
 
     const technicianIds = data.assignedTechnicianIds;
 
@@ -514,7 +516,8 @@ async function updateServiceRequest(
 
   const parsed = technicianServiceRequestSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
-  const data = parsed.data;
+  // Technician, status and updated date are locked in Edit.
+  const data = { ...parsed.data, ...lockEditFields(existing) };
 
   await db
     .update(serviceRequest)

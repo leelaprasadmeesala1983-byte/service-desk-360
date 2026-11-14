@@ -179,7 +179,7 @@ function ProjectView({
               className="gap-1.5"
             >
               <History className="size-4" />
-              Log Request
+              Daily Log Request
             </Button>
             {isAdmin && (
               <Button

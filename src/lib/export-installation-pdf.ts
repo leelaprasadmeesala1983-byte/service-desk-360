@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import type { InstallationRow } from "@/db/queries/installations";
 import { RECORD_STATUS_LABELS } from "@/lib/constants";
-import { formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { drawPdfLetterhead } from "@/lib/pdf-letterhead";
 
 export function exportInstallationToPdf(record: InstallationRow): void {
@@ -44,7 +44,7 @@ export function exportInstallationToPdf(record: InstallationRow): void {
     margin,
     title: "Installation Details",
     refId: record.recordId,
-    date: formatDateTime(new Date()),
+    date: formatDate(new Date()),
   });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
@@ -171,9 +171,9 @@ export function exportInstallationToPdf(record: InstallationRow): void {
   );
   drawTwoColumnRow(
     "Created Date",
-    formatDateTime(record.createdAt),
+    formatDate(record.createdAt),
     "Last Updated Date",
-    formatDateTime(record.updatedAt),
+    formatDate(record.updatedAt),
   );
   drawFullWidthField("Installation Description", record.description);
 

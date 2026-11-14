@@ -258,6 +258,29 @@ function formatLocalDateTime(
   }
 }
 
+/**
+ * Turns a date-only "YYYY-MM-DD" value from a date input into an ISO
+ * timestamp on that day using the current time of day, so the stored
+ * timestamp keeps a real time even though the UI only shows the date.
+ * Any other value is returned unchanged.
+ */
+function withCurrentTime<T>(value: T): T | string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+  const [year, month, day] = value.split("-").map(Number);
+  const now = new Date();
+  const date = new Date(
+    year,
+    month - 1,
+    day,
+    now.getHours(),
+    now.getMinutes(),
+    now.getSeconds(),
+  );
+  return Number.isNaN(date.getTime()) ? value : date.toISOString();
+}
+
 export type { RecordKind };
 export {
   formatRecordId,
@@ -270,6 +293,7 @@ export {
   getInitials,
   formatLocalDate,
   formatLocalDateTime,
+  withCurrentTime,
   getLocalDateBoundaries,
   addDaysToDateStr,
   getDaysBetweenDates,

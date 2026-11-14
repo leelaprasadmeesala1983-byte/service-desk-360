@@ -32,7 +32,12 @@ import {
   updateInstallation,
 } from "@/lib/actions/installations";
 import { RECORD_STATUS_LABELS, type UserRole } from "@/lib/constants";
-import { formatDateTime, formatLocalDateTime } from "@/lib/format";
+import {
+  formatDate,
+  formatLocalDate,
+  formatLocalDateTime,
+  withCurrentTime,
+} from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   createInstallationSchema,
@@ -154,7 +159,7 @@ function InstallationFormDialog({
           paymentMode: "",
           paymentStatus: "PAID",
           amount: "",
-          createdAt: formatLocalDateTime(new Date()),
+          createdAt: formatLocalDate(new Date()),
         },
   });
 
@@ -230,7 +235,7 @@ function InstallationFormDialog({
       paymentMode: "",
       paymentStatus: "PAID",
       amount: "",
-      createdAt: formatLocalDateTime(new Date()),
+      createdAt: formatLocalDate(new Date()),
     });
   }, [open, record, form]);
 
@@ -294,7 +299,7 @@ function InstallationFormDialog({
           accountPassword: "",
           accountMobile: "",
           referenceNo: "",
-          createdAt: formatLocalDateTime(new Date()),
+          createdAt: formatLocalDate(new Date()),
         });
       }
     }
@@ -329,6 +334,7 @@ function InstallationFormDialog({
 
         const payload = {
           ...raw,
+          createdAt: withCurrentTime(raw.createdAt),
           customerId: selectedCustomerId || raw.customerId || undefined,
           customerName: form.getValues("customerName") || raw.customerName,
           contactNumber: form.getValues("contactNumber") || raw.contactNumber,
@@ -576,6 +582,7 @@ function InstallationFormDialog({
                   options={assigneeOptions}
                   hint="Only technicians appear in this list."
                   error={errors.assignedTechnicianIds?.message}
+                  disabled={isEdit}
                 />
 
                 {/* Row 3: Customer Address (spans full width) */}
@@ -602,17 +609,18 @@ function InstallationFormDialog({
               label="Status"
               required
               options={STATUS_OPTIONS}
+              disabled={isEdit}
             />
 
             {!isEdit && (
               <Field
-                label="Created Date & Time"
+                label="Created Date"
                 required
                 className="sm:col-span-1"
                 error={errors.createdAt?.message}
               >
                 <Input
-                  type="datetime-local"
+                  type="date"
                   className="h-10 rounded-lg text-sm"
                   {...form.register("createdAt")}
                 />
@@ -621,28 +629,23 @@ function InstallationFormDialog({
 
             {isEdit && (
               <>
-                <Field label="Created Date & Time" className="sm:col-span-1">
+                <Field label="Created Date" className="sm:col-span-1">
                   <Input
                     type="text"
                     readOnly
                     disabled
-                    value={
-                      record?.createdAt ? formatDateTime(record.createdAt) : "—"
-                    }
+                    value={formatDate(record?.createdAt)}
                     className="h-9 rounded-md bg-muted/50 cursor-not-allowed"
                   />
                 </Field>
 
-                <Field
-                  label="Updated Date & Time"
-                  required
-                  className="sm:col-span-1"
-                  error={errors.updatedAt?.message}
-                >
+                <Field label="Updated Date" className="sm:col-span-1">
                   <Input
-                    type="datetime-local"
-                    className="h-9 rounded-md"
-                    {...form.register("updatedAt")}
+                    type="text"
+                    readOnly
+                    disabled
+                    value={formatDate(record?.updatedAt)}
+                    className="h-9 rounded-md bg-muted/50 cursor-not-allowed"
                   />
                 </Field>
               </>

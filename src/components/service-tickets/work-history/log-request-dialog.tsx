@@ -188,7 +188,7 @@ export function LogRequestDialog({
       workType: workType ?? "SERVICE",
       referenceId: preselectedTicketId ?? "",
       technicianIds: [],
-      workDate: new Date().toISOString().split("T")[0],
+      workDate: getNowLocalIso().split("T")[0],
       workDateTime: getNowLocalIso(),
       status: "OPEN",
       description: "",
@@ -216,7 +216,7 @@ export function LogRequestDialog({
   useEffect(() => {
     if (open) {
       const nowIso = getNowLocalIso();
-      const todayDate = new Date().toISOString().split("T")[0];
+      const todayDate = nowIso.split("T")[0];
       const targetId = preselectedTicketId ?? "";
       const matched = targetId
         ? (selectableTickets ?? []).find((t) => t.id === targetId)
@@ -293,7 +293,7 @@ export function LogRequestDialog({
       .replace(/[\s_-]+/g, "");
     if (rawStatus === "OPEN") {
       toast.error(
-        "Log Request is available only for In Progress or Closed records.",
+        "Daily Log Request is available only for In Progress or Closed records.",
       );
       return;
     }
@@ -326,7 +326,7 @@ export function LogRequestDialog({
         <DialogHeader className="border-b border-border/80 pb-3">
           <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
             <History className="size-5 text-primary" />
-            <span>Log Request</span>
+            <span>Daily Log Request</span>
           </DialogTitle>
         </DialogHeader>
 
@@ -428,7 +428,8 @@ export function LogRequestDialog({
 
           {isStatusBlocked && (
             <div className="rounded-md bg-destructive/10 border border-destructive/20 p-2.5 text-xs text-destructive font-medium">
-              Log Request is available only for In Progress or Closed records.
+              Daily Log Request is available only for In Progress or Closed
+              records.
             </div>
           )}
 
@@ -453,19 +454,25 @@ export function LogRequestDialog({
             placeholder="Select Technicians"
           />
 
-          {/* 4. Date & Time */}
+          {/* 4. Date (time of day is filled in automatically) */}
           <Field
-            label="Date & Time"
+            label="Date"
             required
-            error={form.formState.errors.workDateTime?.message}
+            error={
+              form.formState.errors.workDate?.message ??
+              form.formState.errors.workDateTime?.message
+            }
           >
             <Input
-              type="datetime-local"
-              {...form.register("workDateTime", {
+              type="date"
+              {...form.register("workDate", {
                 onChange: (e) => {
                   const val = e.target.value;
-                  if (val && val.includes("T")) {
-                    form.setValue("workDate", val.split("T")[0]);
+                  if (val) {
+                    const timePart = getNowLocalIso().split("T")[1];
+                    form.setValue("workDateTime", `${val}T${timePart}`, {
+                      shouldValidate: true,
+                    });
                   }
                 },
               })}

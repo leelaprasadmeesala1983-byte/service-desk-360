@@ -40,7 +40,7 @@ import type {
 import { updateInstallationDetails } from "@/lib/actions/installations";
 import { fetchWorkHistoryByRecord } from "@/lib/actions/work-history";
 import type { RecordStatus, RecordType } from "@/lib/constants";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type WorkHistoryDialogProps = {
@@ -781,7 +781,7 @@ export function WorkHistoryDialog({
                               </Badge>
                               <span className="flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-foreground whitespace-nowrap">
                                 <Clock className="size-3.5 text-muted-foreground" />
-                                {formatDateTime(log.workDateTime)}
+                                {formatDate(log.workDateTime)}
                               </span>
                             </div>
 
@@ -837,7 +837,7 @@ export function WorkHistoryDialog({
                               </Badge>
                               <span className="flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-foreground whitespace-nowrap">
                                 <Clock className="size-3.5 text-muted-foreground" />
-                                {formatDateTime(log.workDateTime)}
+                                {formatDate(log.workDateTime)}
                               </span>
                             </div>
 
@@ -868,7 +868,7 @@ export function WorkHistoryDialog({
                               </Badge>
                               <span className="flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-foreground whitespace-nowrap">
                                 <Clock className="size-3.5 text-muted-foreground" />
-                                {formatDateTime(log.workDateTime)}
+                                {formatDate(log.workDateTime)}
                               </span>
                               <StatusBadge status={log.status} />
                             </div>
@@ -927,7 +927,7 @@ export function WorkHistoryDialog({
                               </strong>
                             </span>
                             <span className="whitespace-nowrap">
-                              Recorded: {formatDateTime(log.createdAt)}
+                              Recorded: {formatDate(log.createdAt)}
                             </span>
                           </div>
                         </div>
