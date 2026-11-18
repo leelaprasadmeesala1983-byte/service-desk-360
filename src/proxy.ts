@@ -2,6 +2,8 @@ import { getSessionCookie } from "better-auth/cookies";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
+import { logger } from "@/lib/logger";
+
 /**
  * Public routes that do not require an active user session.
  */
@@ -61,6 +63,16 @@ function hasSessionCookie(request: NextRequest): boolean {
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Server Actions are POSTs to the page route carrying a Next-Action header;
+  // they don't pass through route handlers, so log their invocation here.
+  const actionId = request.headers.get("next-action");
+  if (actionId && request.method === "POST") {
+    logger.info(
+      { component: "server-action", path: pathname, actionId },
+      `--> server action on ${pathname}`,
+    );
+  }
 
   // 1. Static and internal Next.js assets bypass proxy checks completely
   if (isStaticOrInternal(pathname)) {

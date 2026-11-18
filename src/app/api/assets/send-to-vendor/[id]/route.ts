@@ -5,10 +5,11 @@ import {
   getSendToVendorById,
   updateSendToVendorRecord,
 } from "@/db/queries/send-to-vendor";
+import { withApiLogging } from "@/lib/api-logger";
 import { getCurrentUser } from "@/lib/session";
 import { sendToVendorFormSchema } from "@/lib/validations/send-to-vendor";
 
-export async function GET(
+async function getHandler(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -38,7 +39,7 @@ export async function GET(
   }
 }
 
-export async function PUT(
+async function putHandler(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -110,7 +111,7 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
+async function deleteHandler(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -148,3 +149,7 @@ export async function DELETE(
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
+
+export const GET = withApiLogging(getHandler);
+export const PUT = withApiLogging(putHandler);
+export const DELETE = withApiLogging(deleteHandler);

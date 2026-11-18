@@ -5,9 +5,10 @@ import {
   deleteWorkHistory,
   updateWorkHistory,
 } from "@/lib/actions/work-history";
+import { withApiLogging } from "@/lib/api-logger";
 import { getCurrentUser } from "@/lib/session";
 
-export async function GET(
+async function getHandler(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -32,7 +33,7 @@ export async function GET(
   }
 }
 
-export async function PUT(
+async function putHandler(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -58,14 +59,14 @@ export async function PUT(
   }
 }
 
-export async function PATCH(
+async function patchHandler(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
   return PUT(request, context);
 }
 
-export async function DELETE(
+async function deleteHandler(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -86,3 +87,8 @@ export async function DELETE(
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
+
+export const GET = withApiLogging(getHandler);
+export const PUT = withApiLogging(putHandler);
+export const PATCH = withApiLogging(patchHandler);
+export const DELETE = withApiLogging(deleteHandler);

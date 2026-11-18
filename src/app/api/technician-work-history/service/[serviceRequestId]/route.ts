@@ -1,9 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { getCombinedWorkHistory } from "@/db/queries/work-history";
+import { withApiLogging } from "@/lib/api-logger";
 import { getCurrentUser } from "@/lib/session";
 
-export async function GET(
+async function getHandler(
   _request: NextRequest,
   { params }: { params: Promise<{ serviceRequestId: string }> },
 ) {
@@ -47,3 +48,5 @@ export async function GET(
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
+
+export const GET = withApiLogging(getHandler);

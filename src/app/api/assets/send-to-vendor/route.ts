@@ -4,10 +4,11 @@ import {
   createSendToVendorRecord,
   listSendToVendor,
 } from "@/db/queries/send-to-vendor";
+import { withApiLogging } from "@/lib/api-logger";
 import { getCurrentUser } from "@/lib/session";
 import { sendToVendorFormSchema } from "@/lib/validations/send-to-vendor";
 
-export async function GET(request: NextRequest) {
+async function getHandler(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -93,3 +94,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
+
+export const GET = withApiLogging(getHandler);
+export const POST = withApiLogging(postHandler);

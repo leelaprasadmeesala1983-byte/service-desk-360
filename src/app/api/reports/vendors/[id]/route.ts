@@ -1,8 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getVendorReport } from "@/db/queries/reports";
+import { withApiLogging } from "@/lib/api-logger";
 import { getCurrentUser } from "@/lib/session";
 
-export async function GET(
+async function getHandler(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -49,3 +50,5 @@ export async function GET(
     );
   }
 }
+
+export const GET = withApiLogging(getHandler);

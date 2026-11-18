@@ -1,8 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getAssetLifecycleHistory } from "@/db/queries/asset-lifecycle";
+import { withApiLogging } from "@/lib/api-logger";
 import { getCurrentUser } from "@/lib/session";
 
-export async function GET(
+async function getHandler(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -24,3 +25,5 @@ export async function GET(
     );
   }
 }
+
+export const GET = withApiLogging(getHandler);

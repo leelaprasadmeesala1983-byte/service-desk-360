@@ -1,9 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { dispatchMaterialToCustomer } from "@/db/queries/asset-lifecycle";
+import { withApiLogging } from "@/lib/api-logger";
 import { getCurrentUser } from "@/lib/session";
 import { customerDispatchFormSchema } from "@/lib/validations/customer-dispatch";
 
-export async function POST(
+async function postHandler(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -53,3 +54,5 @@ export async function POST(
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
+
+export const POST = withApiLogging(postHandler);

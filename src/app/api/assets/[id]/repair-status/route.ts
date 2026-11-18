@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { updateAssetRepairStatus } from "@/db/queries/asset-lifecycle";
+import { withApiLogging } from "@/lib/api-logger";
 import { getCurrentUser } from "@/lib/session";
 
 const repairStatusSchema = z.object({
@@ -14,7 +15,7 @@ const repairStatusSchema = z.object({
   remarks: z.string().optional().default(""),
 });
 
-export async function PATCH(
+async function patchHandler(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -63,3 +64,5 @@ export async function PATCH(
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
+
+export const PATCH = withApiLogging(patchHandler);

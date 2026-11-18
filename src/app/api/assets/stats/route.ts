@@ -1,9 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { getAssetStats } from "@/db/queries/assets";
+import { withApiLogging } from "@/lib/api-logger";
 import { getCurrentUser } from "@/lib/session";
 
-export async function GET(_request: NextRequest) {
+async function getHandler(_request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -21,3 +22,5 @@ export async function GET(_request: NextRequest) {
     );
   }
 }
+
+export const GET = withApiLogging(getHandler);

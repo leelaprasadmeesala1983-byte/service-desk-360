@@ -1,9 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { updateInstallationDetails } from "@/lib/actions/installations";
+import { withApiLogging } from "@/lib/api-logger";
 import { getCurrentUser } from "@/lib/session";
 
-export async function PUT(
+async function putHandler(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -32,9 +33,12 @@ export async function PUT(
   }
 }
 
-export async function PATCH(
+async function patchHandler(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
   return PUT(request, context);
 }
+
+export const PUT = withApiLogging(putHandler);
+export const PATCH = withApiLogging(patchHandler);
