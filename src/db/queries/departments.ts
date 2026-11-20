@@ -4,6 +4,7 @@ import { asc } from "drizzle-orm";
 
 import { db } from "@/db";
 import { department } from "@/db/schema/department";
+import { DEFAULT_DEPARTMENTS } from "@/lib/constants";
 
 /**
  * All selectable department names, alphabetical (spec §4.5.3). The built-in
