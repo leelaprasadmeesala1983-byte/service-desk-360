@@ -71,6 +71,20 @@
       "when": 1790324343074,
       "tag": "0009_nervous_echo",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795117350365,
+      "tag": "0010_young_namora",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795181443426,
+      "tag": "0011_schema_drift_fix",
+      "breakpoints": true
     }
   ]
 }

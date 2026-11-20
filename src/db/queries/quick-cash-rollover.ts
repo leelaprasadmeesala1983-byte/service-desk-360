@@ -444,6 +444,9 @@ export async function performMidnightRolloverForAllUsers(): Promise<boolean> {
     console.error(
       "[Quick Cash Rollover] performMidnightRolloverForAllUsers failed (DB may be unavailable):",
       error instanceof Error ? error.message : error,
+      error instanceof Error && error.cause
+        ? `\n  cause: ${(error.cause as { code?: string; message?: string }).code ?? ""} ${(error.cause as Error).message ?? String(error.cause)}`
+        : "",
     );
     return false;
   }
