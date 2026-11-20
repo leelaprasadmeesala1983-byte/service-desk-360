@@ -5,13 +5,23 @@ import { asc } from "drizzle-orm";
 import { db } from "@/db";
 import { department } from "@/db/schema/department";
 
-/** All selectable department names, alphabetical (spec §4.5.3). */
-function listDepartmentNames(): Promise<string[]> {
-  return db
+/**
+ * All selectable department names, alphabetical (spec §4.5.3). The built-in
+ * defaults are always included, so the dropdown is complete even on a
+ * database that was never seeded.
+ */
+async function listDepartmentNames(): Promise<string[]> {
+  const rows = await db
     .select({ name: department.name })
     .from(department)
-    .orderBy(asc(department.name))
-    .then((rows) => rows.map((row) => row.name));
+    .orderBy(asc(department.name));
+
+  const names = new Set<string>(DEFAULT_DEPARTMENTS);
+  for (const row of rows) names.add(row.name);
+
+  return [...names].sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: "base" }),
+  );
 }
 
 /**
